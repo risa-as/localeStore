@@ -52,7 +52,8 @@ export const config = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async session({session, user, trigger, token} : any) {
             // Set The User ID From The Token
-            session.user.id = token.sub;
+            session.user.id = token.id
+            // session.user.id = token.sub;
             session.user.role = token.role
             session.user.name = token.name
             console.log("token",token)
@@ -65,6 +66,9 @@ export const config = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async jwt({token, user, trigger, session}: any) {
             if (user) {
+                // another way
+                token.id = user.id
+                // end
                 token.role = user.role
 
                 // if user has no name then use the email
