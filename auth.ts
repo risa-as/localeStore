@@ -4,7 +4,9 @@ import {prisma} from "./db/prisma"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { compareSync } from 'bcrypt-ts-edge';
 import type { NextAuthConfig } from 'next-auth';
-
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { authConfig } from './auth.config';
 export const config = {
     pages: {
         signIn: "/sign-in",
@@ -49,6 +51,7 @@ export const config = {
         })
     ],
     callbacks: {
+        ...authConfig,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async session({session, user, trigger, token} : any) {
             // Set The User ID From The Token
@@ -82,7 +85,7 @@ export const config = {
                 })
             }
             return token;
-        }
+        },
     },
 } satisfies NextAuthConfig;
 
