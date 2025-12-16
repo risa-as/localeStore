@@ -51,7 +51,7 @@ export const config = {
         })
     ],
     callbacks: {
-        ...authConfig,
+        ...authConfig.callbacks,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         async session({session, user, trigger, token} : any) {
             // Set The User ID From The Token
