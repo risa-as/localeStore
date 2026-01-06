@@ -15,6 +15,7 @@ import { Prisma } from "@prisma/client";
 // Create Order and order items
 export async function createOrder() {
   try {
+    alert("Hello");
     const session = await auth();
     if (!session) throw new Error("User not authenticated");
 
