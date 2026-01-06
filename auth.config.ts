@@ -17,7 +17,7 @@ export const authConfig = {
       ];
 
       // Get pathname from the req URL object
-      const { pathname } = request.nextUrl;
+      const { pathname } = request.nextUrl; 
       // Check if user is not authenticated and accessing a protected path
       if (!auth && protectedPaths.some((p) => p.test(pathname))) return false;
 
@@ -25,7 +25,6 @@ export const authConfig = {
       if (!request.cookies.get('sessionCartId')) {
         // Generate new session cart id cookie
         const sessionCartId = crypto.randomUUID();
-                console.log(sessionCartId)
         // Create new response and add the new headers
         const response = NextResponse.next({
           request: {
