@@ -131,7 +131,8 @@ export async function deleteProduct(id: string) {
       message: "Product deleted successfully",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    const { formError } = formatError(error);
+    return { success: false, message: formError };
   }
 }
 
@@ -148,7 +149,8 @@ export async function createProduct(data: z.infer<typeof insertProductSchema>) {
       message: "Product created successfully",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    const { formError } = formatError(error);
+    return { success: false, message: formError };
   }
 }
 
@@ -174,7 +176,8 @@ export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
       message: "Product updated successfully",
     };
   } catch (error) {
-    return { success: false, message: formatError(error) };
+    const { formError } = formatError(error);
+    return { success: false, message: formError };
   }
 }
 

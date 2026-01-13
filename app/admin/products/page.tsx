@@ -1,200 +1,99 @@
-"use server";
-import { prisma } from "@/db/prisma";
-import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { Prisma } from "@prisma/client";
-import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "@/lib/constants";
-import { convertToPlainObject, formatError } from "@/lib/utils";
-import { insertProductSchema, updateProductSchema } from "@/lib/validators";
+import Link from "next/link";
+import { getAllProducts, deleteProduct } from "@/lib/actions/product.actions";
+import { formatCurrency, formatId } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import Pagination from "@/components/shared/pagination";
+import DeleteDialog from "@/components/shared/delete-dialog";
+import { requireAdmin } from "@/lib/auth-guard";
 
-// Get latest products
-export async function getLatestProducts() {
-  const data = await prisma.product.findMany({
-    take: LATEST_PRODUCTS_LIMIT,
-    orderBy: { createdAt: "desc" },
+const AdminProductsPage = async (props: {
+  searchParams: Promise<{
+    page: string;
+    query: string;
+    category: string;
+  }>;
+}) => {
+  await requireAdmin();
+
+  const searchParams = await props.searchParams;
+
+  const page = Number(searchParams.page) || 1;
+  const searchText = searchParams.query || "";
+  const category = searchParams.category || "";
+
+  const products = await getAllProducts({
+    query: searchText,
+    page,
+    category,
   });
 
-  return convertToPlainObject(data);
-}
+  return (
+    <div className="space-y-2">
+      <div className="flex-between">
+        <div className="flex items-center gap-3">
+          <h1 className="h2-bold">Products</h1>
+          {searchText && (
+            <div>
+              Filtered by <i>&quot;{searchText}&quot;</i>{" "}
+              <Link href="/admin/products">
+                <Button variant="outline" size="sm">
+                  Remove Filter
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+        <Button asChild variant="default">
+          <Link href="/admin/products/create">Create Product</Link>
+        </Button>
+      </div>
 
-// Get single product by it's slug
-export async function getProductBySlug(slug: string) {
-  return await prisma.product.findFirst({
-    where: { slug: slug },
-  });
-}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>ID</TableHead>
+            <TableHead>NAME</TableHead>
+            <TableHead className="text-right">PRICE</TableHead>
+            <TableHead>CATEGORY</TableHead>
+            <TableHead>STOCK</TableHead>
+            <TableHead>RATING</TableHead>
+            <TableHead className="w-[100px]">ACTIONS</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {products.data.map((product) => (
+            <TableRow key={product.id}>
+              <TableCell>{formatId(product.id)}</TableCell>
+              <TableCell>{product.name}</TableCell>
+              <TableCell className="text-right">
+                {formatCurrency(product.price)}
+              </TableCell>
+              <TableCell>{product.category}</TableCell>
+              <TableCell>{product.stock}</TableCell>
+              <TableCell>{product.rating}</TableCell>
+              <TableCell className="flex gap-1">
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/admin/products/${product.id}`}>Edit</Link>
+                </Button>
+                <DeleteDialog id={product.id} action={deleteProduct} />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {products.totalPages > 1 && (
+        <Pagination page={page} totalPages={products.totalPages} />
+      )}
+    </div>
+  );
+};
 
-// Get single product by it's ID
-export async function getProductById(productId: string) {
-  const data = await prisma.product.findFirst({
-    where: { id: productId },
-  });
-
-  return convertToPlainObject(data);
-}
-
-// Get all products
-export async function getAllProducts({
-  query,
-  limit = PAGE_SIZE,
-  page,
-  category,
-  price,
-  rating,
-  sort,
-}: {
-  query: string;
-  limit?: number;
-  page: number;
-  category?: string;
-  price?: string;
-  rating?: string;
-  sort?: string;
-}) {
-  // Query filter
-  const queryFilter: Prisma.ProductWhereInput =
-    query && query !== "all"
-      ? {
-          name: {
-            contains: query,
-            mode: "insensitive",
-          } as Prisma.StringFilter,
-        }
-      : {};
-
-  // Category filter
-  const categoryFilter = category && category !== "all" ? { category } : {};
-
-  // Price filter
-  const priceFilter: Prisma.ProductWhereInput =
-    price && price !== "all"
-      ? {
-          price: {
-            gte: Number(price.split("-")[0]),
-            lte: Number(price.split("-")[1]),
-          },
-        }
-      : {};
-
-  // Rating filter
-  const ratingFilter =
-    rating && rating !== "all"
-      ? {
-          rating: {
-            gte: Number(rating),
-          },
-        }
-      : {};
-
-  const data = await prisma.product.findMany({
-    where: {
-      ...queryFilter,
-      ...categoryFilter,
-      ...priceFilter,
-      ...ratingFilter,
-    },
-    orderBy:
-      sort === "lowest"
-        ? { price: "asc" }
-        : sort === "highest"
-        ? { price: "desc" }
-        : sort === "rating"
-        ? { rating: "desc" }
-        : { createdAt: "desc" },
-    skip: (page - 1) * limit,
-    take: limit,
-  });
-
-  const dataCount = await prisma.product.count();
-
-  return {
-    data,
-    totalPages: Math.ceil(dataCount / limit),
-  };
-}
-
-// Delete a product
-export async function deleteProduct(id: string) {
-  try {
-    const productExists = await prisma.product.findFirst({
-      where: { id },
-    });
-
-    if (!productExists) throw new Error("Product not found");
-
-    await prisma.product.delete({ where: { id } });
-
-    revalidatePath("/admin/products");
-
-    return {
-      success: true,
-      message: "Product deleted successfully",
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-}
-
-// Create a product
-export async function createProduct(data: z.infer<typeof insertProductSchema>) {
-  try {
-    const product = insertProductSchema.parse(data);
-    await prisma.product.create({ data: product });
-
-    revalidatePath("/admin/products");
-
-    return {
-      success: true,
-      message: "Product created successfully",
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-}
-
-// Update a product
-export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
-  try {
-    const product = updateProductSchema.parse(data);
-    const productExists = await prisma.product.findFirst({
-      where: { id: product.id },
-    });
-
-    if (!productExists) throw new Error("Product not found");
-
-    await prisma.product.update({
-      where: { id: product.id },
-      data: product,
-    });
-
-    revalidatePath("/admin/products");
-
-    return {
-      success: true,
-      message: "Product updated successfully",
-    };
-  } catch (error) {
-    return { success: false, message: formatError(error) };
-  }
-}
-
-// Get all categories
-export async function getAllCategories() {
-  const data = await prisma.product.groupBy({
-    by: ["category"],
-    _count: true,
-  });
-
-  return data;
-}
-
-// Get featured products
-export async function getFeaturedProducts() {
-  const data = await prisma.product.findMany({
-    where: { isFeatured: true },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
-
-  return convertToPlainObject(data);
-}
+export default AdminProductsPage;
