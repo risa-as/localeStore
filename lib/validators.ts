@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { formatNumberWithDecimal } from "./utils";
+import { formatNumberWithDecimal, convertArabicToEnglishNumbers } from "./utils";
 import { PAYMENT_METHODS } from "./constants";
 
 const currency = z
@@ -28,6 +28,7 @@ export const insertProductSchema = z.object({
 
 // Custom schema for Iraqi phone number
 const iqPhoneSchema = z.string()
+  .transform((val) => convertArabicToEnglishNumbers(val)) // Convert Arabic numerals first
   .transform((val) => val.replace(/\s+/g, "")) // Remove all spaces
   .transform((val) => {
     if (val.startsWith("+964")) return "0" + val.slice(4);
@@ -117,7 +118,7 @@ export const insertOrderSchema = z.object({
   phoneNumber: iqPhoneSchema,
   governorate: z.string().min(3, "Governorate must be at least 3 characters"),
   address: z.string().min(3, "Address must be at least 3 characters"),
-  quantity: z.coerce.number().int().positive("Quantity must be a positive number"),
+  quantity: z.preprocess((val) => convertArabicToEnglishNumbers(String(val)), z.coerce.number().int().positive("Quantity must be a positive number")),
   selectedColor: z.string().optional().nullable(),
 });
 

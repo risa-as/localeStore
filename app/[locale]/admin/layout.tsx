@@ -3,7 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
-import AdminSearch from "@/components/admin/admin-search";
+
 
 export default function AdminLayout({
   children,
@@ -24,14 +24,11 @@ export default function AdminLayout({
           </Link>
           <MainNav className="ms-6" />
           <div className="ms-auto items-center flex gap-4">
-            <div>
-              <AdminSearch />
-            </div>
             <Menu />
           </div>
         </div>
       </div>
-      <div className="flex-1 space-y-4 p-8 pt-6 container mx-auto">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6 container mx-auto">
         {children}
       </div>
     </div>

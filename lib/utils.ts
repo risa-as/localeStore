@@ -158,3 +158,10 @@ export function formUrlQuery({
     }
   );
 }
+
+// Convert Eastern Arabic numerals to Western Arabic numerals
+export function convertArabicToEnglishNumbers(str: string) {
+  return str.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, function (c) {
+    return String.fromCharCode(c.charCodeAt(0) - 1584);
+  });
+}

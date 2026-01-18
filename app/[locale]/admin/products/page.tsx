@@ -60,62 +60,64 @@ const AdminProductsPage = async (props: {
         </Button>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('id')}</TableHead>
-            <TableHead>{t('name')}</TableHead>
-            <TableHead className="text-end">{t('price')}</TableHead>
-            <TableHead className="text-end">{t('costPrice')}</TableHead>
-            <TableHead className="text-end">{t('shippingPrice')}</TableHead>
-            <TableHead className="text-end">{t('profit')}</TableHead>
-            <TableHead>{t('category')}</TableHead>
-            <TableHead>{t('stock')}</TableHead>
-            <TableHead>{t('offers')}</TableHead>
-            <TableHead>{t('rating')}</TableHead>
-            <TableHead className="w-[100px]">{t('actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {products.data.map((product: any) => (
-            <TableRow key={product.id}>
-              <TableCell>{formatId(product.id)}</TableCell>
-              <TableCell>{product.name}</TableCell>
-              <TableCell className="text-end">
-                {formatCurrency(product.price)}
-              </TableCell>
-              <TableCell className="text-end">
-                {formatCurrency(product.costPrice)}
-              </TableCell>
-              <TableCell className="text-end">
-                {formatCurrency(product.shippingPrice)}
-              </TableCell>
-              <TableCell className="text-end font-bold text-green-600">
-                {formatCurrency(Number(product.price) - Number(product.costPrice))}
-              </TableCell>
-              <TableCell>{product.category}</TableCell>
-              <TableCell>{product.stock}</TableCell>
-              <TableCell>{product.offers}</TableCell>
-              <TableCell>{product.rating}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-1">
-                  <Button asChild variant="ghost" size="icon">
-                    <Link href={`/admin/products/${product.id}`}>
-                      <Pencil className="w-4 h-4" />
-                    </Link>
-                  </Button>
-                  <Button asChild variant="ghost" size="icon">
-                    <Link href={`/landing/${product.slug}`}>
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                  </Button>
-                  <DeleteDialog id={product.id} action={deleteProduct} />
-                </div>
-              </TableCell>
+      <div className="overflow-x-auto rounded-md border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('id')}</TableHead>
+              <TableHead>{t('name')}</TableHead>
+              <TableHead className="text-end">{t('price')}</TableHead>
+              <TableHead className="text-end">{t('costPrice')}</TableHead>
+              <TableHead className="text-end">{t('shippingPrice')}</TableHead>
+              <TableHead className="text-end">{t('profit')}</TableHead>
+              <TableHead>{t('category')}</TableHead>
+              <TableHead>{t('stock')}</TableHead>
+              <TableHead>{t('offers')}</TableHead>
+              <TableHead>{t('rating')}</TableHead>
+              <TableHead className="w-[100px]">{t('actions')}</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {products.data.map((product: any) => (
+              <TableRow key={product.id}>
+                <TableCell>{formatId(product.id)}</TableCell>
+                <TableCell>{product.name}</TableCell>
+                <TableCell className="text-end">
+                  {formatCurrency(product.price)}
+                </TableCell>
+                <TableCell className="text-end">
+                  {formatCurrency(product.costPrice)}
+                </TableCell>
+                <TableCell className="text-end">
+                  {formatCurrency(product.shippingPrice)}
+                </TableCell>
+                <TableCell className="text-end font-bold text-green-600">
+                  {formatCurrency(Number(product.price) - Number(product.costPrice))}
+                </TableCell>
+                <TableCell>{product.category}</TableCell>
+                <TableCell>{product.stock}</TableCell>
+                <TableCell>{product.offers}</TableCell>
+                <TableCell>{product.rating}</TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-1">
+                    <Button asChild variant="ghost" size="icon">
+                      <Link href={`/admin/products/${product.id}`}>
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                    </Button>
+                    <Button asChild variant="ghost" size="icon">
+                      <Link href={`/landing/${product.slug}`}>
+                        <Eye className="w-4 h-4" />
+                      </Link>
+                    </Button>
+                    <DeleteDialog id={product.id} action={deleteProduct} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
       {products.totalPages > 1 && (
         <Pagination page={page} totalPages={products.totalPages} />
       )}

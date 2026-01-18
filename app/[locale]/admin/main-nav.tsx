@@ -22,7 +22,7 @@ const MainNav = ({
   const pathname = usePathname();
   return (
     <nav
-      className={cn("flex items-center gap-4 lg:gap-6", className)}
+      className={cn("flex items-center gap-4 lg:gap-6 overflow-x-auto whitespace-nowrap pb-2", className)}
       {...props}
     >
       {links.map((item) => (
