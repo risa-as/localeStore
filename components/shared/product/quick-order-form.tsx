@@ -185,7 +185,7 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                             render={({ field }) => (
                                 <FormItem className="space-y-2">
                                     <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("selectColor")}</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined}>
                                         <FormControl>
                                             <SelectTrigger className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-sm">
                                                 <SelectValue placeholder={tCheckout("selectColorPlaceholder")} />
