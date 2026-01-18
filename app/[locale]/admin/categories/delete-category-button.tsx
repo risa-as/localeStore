@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "@/components/ui/button";
+import { Loader2, Trash } from "lucide-react";
 import { useTransition } from "react";
 import { deleteCategory } from "@/lib/actions/category.actions";
 import { useToast } from "@/hooks/use-toast";
@@ -11,7 +12,7 @@ export default function DeleteCategoryButton({ id }: { id: string }) {
     return (
         <Button
             variant="destructive"
-            size="sm"
+            size="icon"
             disabled={isPending}
             onClick={() =>
                 startTransition(async () => {
@@ -23,7 +24,7 @@ export default function DeleteCategoryButton({ id }: { id: string }) {
                 })
             }
         >
-            {isPending ? "Deleting..." : "Delete"}
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash className="w-4 h-4" />}
         </Button>
     );
 }

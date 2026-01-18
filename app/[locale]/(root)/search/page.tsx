@@ -113,23 +113,23 @@ const SearchPage = async (props: {
   /* prices and ratings are already defined at module level (ratings only now), need to pass them */
   const prices = [
     {
-      name: `$1 ${t('priceTo')} $50`,
+      name: `1,000 د.ع ${t('priceTo')} 50,000 د.ع`,
       value: "1-50",
     },
     {
-      name: `$51 ${t('priceTo')} $100`,
+      name: `51,000 د.ع ${t('priceTo')} 100,000 د.ع`,
       value: "51-100",
     },
     {
-      name: `$101 ${t('priceTo')} $200`,
+      name: `101,000 د.ع ${t('priceTo')} 200,000 د.ع`,
       value: "101-200",
     },
     {
-      name: `$201 ${t('priceTo')} $500`,
+      name: `201,000 د.ع ${t('priceTo')} 500,000 د.ع`,
       value: "201-500",
     },
     {
-      name: `$501 ${t('priceTo')} $1000`,
+      name: `501,000 د.ع ${t('priceTo')} 1,000,000 د.ع`,
       value: "501-1000",
     },
   ];

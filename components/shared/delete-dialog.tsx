@@ -13,6 +13,7 @@ import {
   AlertDialogTrigger,
 } from "../ui/alert-dialog";
 import { Button } from "../ui/button";
+import { Trash } from "lucide-react";
 
 import { useTranslations } from "next-intl";
 
@@ -48,8 +49,8 @@ const DeleteDialog = ({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button size="sm" variant="destructive" className="ml-2">
-          {t('delete')}
+        <Button size="icon" variant="destructive" className="ml-2">
+          <Trash className="w-4 h-4" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

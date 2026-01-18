@@ -41,7 +41,7 @@ const ProductDetailsPage = async (props: {
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <ProductPrice
                   value={parseFloat(product.price)}
-                  className="w-24 rounded-full bg-green-100 text-green-700 px-5 py-2"
+                  className="rounded-full bg-green-100 text-green-700 px-5 py-2 inline-flex items-center justify-center shadow-sm"
                 />
               </div>
             </div>
@@ -63,6 +63,16 @@ const ProductDetailsPage = async (props: {
                   </div>
                 </div>
                 <div className="mb-2 flex justify-between">
+                  <div>Shipping</div>
+                  <div>
+                    {Number(product.shippingPrice) === 0 ? (
+                      <Badge variant="secondary">Free</Badge>
+                    ) : (
+                      <ProductPrice value={parseFloat(product.shippingPrice)} />
+                    )}
+                  </div>
+                </div>
+                <div className="mb-2 flex justify-between">
                   <div>Status</div>
                   {product.stock > 0 ? (
                     <Badge variant="outline">In Stock</Badge>
@@ -78,6 +88,7 @@ const ProductDetailsPage = async (props: {
                       name: product.name,
                       slug: product.slug,
                       price: product.price,
+                      shippingPrice: product.shippingPrice,
                       qty: 1,
                       image: product.images![0],
                     }}

@@ -38,14 +38,17 @@ export const productDefaultValues = {
   slug: "",
   category: "",
   images: [],
-  brand: "",
+  colors: [],
   description: "",
   price: "0",
+  shippingPrice: "0",
+  costPrice: "0",
   stock: 0,
   rating: 0,
   numReviews: "0",
   isFeatured: false,
   banner: null,
+  offers: "",
 };
 
 export const USER_ROLES = process.env.USER_ROLES
@@ -59,3 +62,24 @@ export const reviewFormDefaultValues = {
 };
 
 export const SENDER_EMAIL = process.env.SENDER_EMAIL || "onboarding@resend.dev";
+
+export const iraqGovernorates = [
+  "Baghdad",
+  "Basra",
+  "Nineveh",
+  "Erbil",
+  "Kirkuk",
+  "Sulaymaniyah",
+  "Diyala",
+  "Babylon",
+  "Anbar",
+  "Dhi Qar",
+  "Karbala",
+  "Najaf",
+  "Wasit",
+  "Qadisiyah",
+  "Maysan",
+  "Muthanna",
+  "Saladin",
+  "Dohuk",
+];

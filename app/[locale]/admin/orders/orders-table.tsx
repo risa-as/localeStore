@@ -10,7 +10,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatDateTime, formatId } from "@/lib/utils";
+import { formatDateTime, formatId, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
@@ -135,6 +135,10 @@ export default function OrdersTable({
                             <TableHead>{t("name")}</TableHead>
                             <TableHead>Product</TableHead>
                             <TableHead>{t("phoneNumber")}</TableHead>
+                            <TableHead>Governorate</TableHead>
+                            <TableHead>Address</TableHead>
+                            <TableHead>Qty</TableHead>
+                            <TableHead>Price</TableHead>
                             <TableHead>{t("status")}</TableHead>
                             <TableHead className="w-[100px]">{t("actions")}</TableHead>
                         </TableRow>
@@ -162,6 +166,10 @@ export default function OrdersTable({
                                         : "No items"}
                                 </TableCell>
                                 <TableCell>{order.phoneNumber}</TableCell>
+                                <TableCell>{order.governorate}</TableCell>
+                                <TableCell>{order.address}</TableCell>
+                                <TableCell>{order.quantity}</TableCell>
+                                <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
                                 <TableCell>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
                                         order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :

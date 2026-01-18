@@ -84,7 +84,7 @@
         "item": "المنتج",
         "quantity": "الكمية",
         "price": "السعر",
-        "subtotal": "المجموع الفرعي",
+        "subtotal": "مجموع المنتجات",
         "proceedToCheckout": "متابعة الدفع"
     },
     "Checkout": {
@@ -96,12 +96,13 @@
         },
         "shippingAddress": "عنوان الشحن",
         "paymentMethod": "طريقة الدفع",
+        "quantity": "الكمية",
         "orderItems": "عناصر الطلب",
         "edit": "تعديل",
         "items": "العناصر",
         "tax": "الضريبة",
         "shipping": "الشحن",
-        "total": "الإجمالي",
+        "total": "المجموع",
         "placeOrder": "إتمام الطلب",
         "placeOrderButton": "تأكيد الطلب",
         "shippingAddressTitle": "عنوان الشحن",
@@ -119,8 +120,13 @@
         "continue": "متابعة",
         "phoneNumber": "رقم الهاتف",
         "governorate": "المحافظة",
+        "enterGovernorate": "أدخل المحافظة",
         "paymentMethodTitle": "طريقة الدفع",
-        "paymentMethodDescription": "الرجاء اختيار طريقة الدفع"
+        "paymentMethodDescription": "الرجاء اختيار طريقة الدفع",
+        "selectColor": "اختر اللون",
+        "selectColorPlaceholder": "اختر لوناً",
+        "secureOrder": "أمن طلبك",
+        "enterPhone": "07xxxxxxxxx"
     },
     "Admin": {
         "dashboard": "لوحة التحكم",
@@ -147,7 +153,6 @@
         "recentSales": "أحدث المبيعات",
         "buyer": "المشتري",
         "date": "التاريخ",
-        "total": "الإجمالي",
         "action": "إجراء",
         "actions": "إجراءات",
         "details": "التفاصيل",
@@ -159,9 +164,11 @@
         "name": "الاسم",
         "price": "السعر",
         "costPrice": "سعر الشراء",
+        "shippingPrice": "كلفة التوصيل",
         "profit": "الربح",
         "category": "الفئة",
         "stock": "المخزون",
+        "offers": "العروض",
         "rating": "التقييم",
         "edit": "تعديل",
         "paid": "مدفوع",
@@ -203,6 +210,8 @@
         "brand": "العلامة التجارية",
         "price": "السعر",
         "costPrice": "سعر الشراء",
+        "shippingPrice": "كلفة التوصيل",
+        "placeholderShippingPrice": "أدخل كلفة التوصيل",
         "stock": "المخزون",
         "images": "الصور",
         "featuredProduct": "منتج مميز",
@@ -218,7 +227,11 @@
         "buttonGenerate": "توليد",
         "buttonCreate": "إنشاء المنتج",
         "buttonUpdate": "تحديث المنتج",
-        "buttonSubmitting": "جاري الإرسال"
+        "buttonSubmitting": "جاري الإرسال",
+        "colors": "الألوان",
+        "placeholderColors": "أدخل الألوان مفصولة بفواصل",
+        "offers": "العروض",
+        "placeholderOffers": "أدخل العروض مفصولة بفواصل"
     },
     "SearchPage": {
         "title": "بحث عن منتجات",
@@ -248,7 +261,8 @@
         "warrantyDesc": "حماية وتغطية شاملة",
         "easyReturns": "إرجاع سهل",
         "easyReturnsDesc": "ضمان استرجاع الأموال لمدة 30 يومًا",
-        "securePayment": "دفع آمن مشفر بتقنية SSL 256-bit"
+        "securePayment": "دفع آمن مشفر بتقنية SSL 256-bit",
+        "shipping": "الشحن"
     },
     "ThankYou": {
         "title": "تم تأكيد الطلب",
@@ -257,5 +271,25 @@
         "message": "لقد استلمنا طلبك ونقوم بتجهيزه بعناية للشحن. ستتلقى رسالة تأكيد عبر البريد الإلكتروني قريبًا.",
         "continueShopping": "متابعة التسوق",
         "redirecting": "سيتم التحويل خلال"
+    },
+    "Governorates": {
+        "Baghdad": "بغداد",
+        "Basra": "البصرة",
+        "Nineveh": "نينوى",
+        "Erbil": "أربيل",
+        "Kirkuk": "كركوك",
+        "Sulaymaniyah": "السليمانية",
+        "Diyala": "ديالى",
+        "Babylon": "بابل",
+        "Anbar": "الأنبار",
+        "Dhi Qar": "ذي قار",
+        "Karbala": "كربلاء",
+        "Najaf": "النجف",
+        "Wasit": "واسط",
+        "Qadisiyah": "القادسية",
+        "Maysan": "ميسان",
+        "Muthanna": "المثنى",
+        "Saladin": "صلاح الدين",
+        "Dohuk": "دهوك"
     }
 }

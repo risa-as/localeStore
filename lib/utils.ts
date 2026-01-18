@@ -31,19 +31,19 @@ export function formatError(error: unknown) {
     };
   }
 
-  // PRISMA UNIQUE ERROR (email exists)
+  // PRISMA UNIQUE ERROR
   if (
     error &&
     typeof error === "object" &&
     "name" in error &&
     "code" in error &&
     error.name === "PrismaClientKnownRequestError" &&
-    error.code === "23505"
+    (error.code === "23505" || error.code === "P2002")
   ) {
     return {
       success: false,
       fieldErrors: {},
-      formError: "Email already exists",
+      formError: "Product with this name or slug already exists",
     };
   }
 
@@ -67,20 +67,20 @@ export function round2(value: number | string) {
 }
 
 // Currency Formatter
-const CURRENCY_FORMATTER = new Intl.NumberFormat("en-US", {
-  currency: "USD",
-  style: "currency",
-  minimumFractionDigits: 2,
-});
-
-// Format Currency useing the formatter above
+// Format Currency using the formatter above
 export function formatCurrency(amount: number | string | null) {
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "decimal",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+
   if (typeof amount === "number") {
-    return CURRENCY_FORMATTER.format(amount);
+    return `${formatter.format(amount * 1000)} د.ع`;
   } else if (typeof amount === "string") {
-    return CURRENCY_FORMATTER.format(Number(amount));
+    return `${formatter.format(Number(amount) * 1000)} د.ع`;
   } else {
-    return NaN;
+    return "NaN";
   }
 }
 

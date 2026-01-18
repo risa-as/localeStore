@@ -25,6 +25,11 @@ const prismaClientSingleton = () => {
             return product.price?.toString() ?? "";
           },
         },
+        shippingPrice: {
+          compute(product) {
+            return product.shippingPrice?.toString() ?? "0";
+          },
+        },
         rating: {
           compute(product) {
             return product.rating?.toString() ?? "";
@@ -44,12 +49,7 @@ const prismaClientSingleton = () => {
             return cart.shippingPrice?.toString() ?? "0";
           },
         },
-        taxPrice: {
-          needs: { taxPrice: true },
-          compute(cart) {
-            return cart.taxPrice?.toString() ?? "0";
-          },
-        },
+
         totalPrice: {
           needs: { totalPrice: true },
           compute(cart) {

@@ -151,6 +151,7 @@ export async function createProduct(data: z.infer<typeof insertProductSchema>) {
       message: "Product created successfully",
     };
   } catch (error) {
+    console.error("CREATE PRODUCT ERROR:", error);
     const { formError } = formatError(error);
     return { success: false, message: formError };
   }

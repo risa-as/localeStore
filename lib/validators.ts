@@ -14,15 +14,29 @@ export const insertProductSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   slug: z.string().min(3, "Slug must be at least 3 characters"),
   category: z.string().min(3, "Category must be at least 3 characters"),
-  brand: z.string().min(3, "Brand must be at least 3 characters"),
+  colors: z.array(z.string()).min(1, "At least one color is required"),
   description: z.string().min(3, "Description must be at least 3 characters"),
   stock: z.coerce.number(),
   images: z.array(z.string()).min(1, "Product must have at least one image"),
   isFeatured: z.boolean(),
   banner: z.string().nullable(),
   price: currency,
+  shippingPrice: currency,
   costPrice: currency,
+  offers: z.string().optional(),
 });
+
+// Custom schema for Iraqi phone number
+const iqPhoneSchema = z.string()
+  .transform((val) => val.replace(/\s+/g, "")) // Remove all spaces
+  .transform((val) => {
+    if (val.startsWith("+964")) return "0" + val.slice(4);
+    if (val.startsWith("964")) return "0" + val.slice(3);
+    return val;
+  })
+  .refine((val) => /^(077|078|079|075)\d{8}$/.test(val), {
+    message: "Phone number must start with 077, 078, 079, or 075 and have 11 digits",
+  });
 
 // Schema for updating products
 export const updateProductSchema = insertProductSchema.extend({
@@ -63,6 +77,7 @@ export const cartItemSchema = z.object({
   slug: z.string().min(1, "Slug is required"),
   qty: z.number().int().nonnegative("Quantity must be a positive number"),
   image: z.string().min(1, "Image is required"),
+  shippingPrice: currency,
   price: currency,
 });
 
@@ -71,7 +86,6 @@ export const insertCartSchema = z.object({
   itemsPrice: currency,
   totalPrice: currency,
   shippingPrice: currency,
-  taxPrice: currency,
   sessionCartId: z.string().min(1, "Session cart id is required"),
   userId: z.string().optional().nullable(),
 });
@@ -100,16 +114,18 @@ export const paymentMethodSchema = z
 // Schema for inserting order
 export const insertOrderSchema = z.object({
   fullName: z.string().min(3, "Name must be at least 3 characters"),
-  phoneNumber: z.string().min(10, "Phone number must be at least 10 characters"),
+  phoneNumber: iqPhoneSchema,
   governorate: z.string().min(3, "Governorate must be at least 3 characters"),
   address: z.string().min(3, "Address must be at least 3 characters"),
   quantity: z.coerce.number().int().positive("Quantity must be a positive number"),
+  selectedColor: z.string().optional(),
 });
 
 // Schema for updating an order
 export const updateOrderSchema = insertOrderSchema.extend({
   id: z.string().min(1, "ID is required"),
   status: z.string().min(1, "Status is required"),
+  totalPrice: currency,
 });
 
 // Schema for inserting an order item
@@ -120,6 +136,7 @@ export const insertOrderItemSchema = z.object({
   name: z.string(),
   price: currency,
   qty: z.number(),
+  selectedColor: z.string().optional(),
 });
 
 // Schema for the PayPal paymentResult

@@ -84,7 +84,7 @@
         "item": "Item",
         "quantity": "Quantity",
         "price": "Price",
-        "subtotal": "Subtotal",
+        "subtotal": "Products Total",
         "proceedToCheckout": "Proceed To Checkout"
     },
     "Checkout": {
@@ -96,6 +96,7 @@
         },
         "shippingAddress": "Shipping Address",
         "paymentMethod": "Payment Method",
+        "quantity": "Quantity",
         "orderItems": "Order Items",
         "edit": "Edit",
         "items": "Items",
@@ -119,8 +120,13 @@
         "continue": "Continue",
         "phoneNumber": "Phone Number",
         "governorate": "Governorate",
+        "enterGovernorate": "Enter Governorate",
         "paymentMethodTitle": "Payment Method",
-        "paymentMethodDescription": "Please Select Payment Method"
+        "paymentMethodDescription": "Please Select Payment Method",
+        "selectColor": "Select Color",
+        "selectColorPlaceholder": "Select a color",
+        "secureOrder": "Secure Your Order",
+        "enterPhone": "07xxxxxxxxx"
     },
     "Admin": {
         "dashboard": "Dashboard",
@@ -147,7 +153,6 @@
         "recentSales": "Recent Sales",
         "buyer": "Buyer",
         "date": "Date",
-        "total": "Total",
         "action": "Action",
         "actions": "Actions",
         "details": "Details",
@@ -159,9 +164,11 @@
         "name": "Name",
         "price": "Price",
         "costPrice": "Cost Price",
+        "shippingPrice": "Shipping Price",
         "profit": "Profit",
         "category": "Category",
         "stock": "Stock",
+        "offers": "Offers",
         "rating": "Rating",
         "edit": "Edit",
         "paid": "Paid",
@@ -203,6 +210,8 @@
         "brand": "Brand",
         "price": "Price",
         "costPrice": "Cost Price",
+        "shippingPrice": "Shipping Price",
+        "placeholderShippingPrice": "Enter shipping price",
         "stock": "Stock",
         "images": "Images",
         "featuredProduct": "Featured Product",
@@ -218,7 +227,11 @@
         "buttonGenerate": "Generate",
         "buttonCreate": "Create Product",
         "buttonUpdate": "Update Product",
-        "buttonSubmitting": "Submitting"
+        "buttonSubmitting": "Submitting",
+        "colors": "Colors",
+        "placeholderColors": "Enter colors separated by comma",
+        "offers": "Offers",
+        "placeholderOffers": "Enter offers separated by comma"
     },
     "SearchPage": {
         "title": "Search Products",
@@ -248,7 +261,8 @@
         "warrantyDesc": "Full coverage protection",
         "easyReturns": "Easy Returns",
         "easyReturnsDesc": "30-day money back guarantee",
-        "securePayment": "Secure Payment 256-bit SSL Encrypted"
+        "securePayment": "Secure Payment 256-bit SSL Encrypted",
+        "shipping": "Shipping"
     },
     "ThankYou": {
         "title": "Order Confirmed",
@@ -257,5 +271,25 @@
         "message": "We've received your order and are meticulously preparing it for shipment. You will receive a confirmation email shortly.",
         "continueShopping": "Continue Shopping",
         "redirecting": "Redirecting in"
+    },
+    "Governorates": {
+        "Baghdad": "Baghdad",
+        "Basra": "Basra",
+        "Nineveh": "Nineveh",
+        "Erbil": "Erbil",
+        "Kirkuk": "Kirkuk",
+        "Sulaymaniyah": "Sulaymaniyah",
+        "Diyala": "Diyala",
+        "Babylon": "Babylon",
+        "Anbar": "Anbar",
+        "Dhi Qar": "Dhi Qar",
+        "Karbala": "Karbala",
+        "Najaf": "Najaf",
+        "Wasit": "Wasit",
+        "Qadisiyah": "Qadisiyah",
+        "Maysan": "Maysan",
+        "Muthanna": "Muthanna",
+        "Saladin": "Saladin",
+        "Dohuk": "Dohuk"
     }
 }

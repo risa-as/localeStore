@@ -21,7 +21,7 @@ const Charts = ({
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `$${value}`}
+          tickFormatter={(value) => `${value * 1000} د.ع`}
         />
         <Bar
           dataKey="totalSales"

@@ -4,7 +4,9 @@ import { useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useTranslations } from "next-intl";
 import { insertOrderSchema } from "@/lib/validators";
+import { iraqGovernorates } from "@/lib/constants";
 import { createQuickOrder } from "@/lib/actions/order.actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +22,13 @@ import { useToast } from "@/hooks/use-toast";
 import { Minus, Plus, Loader2, ArrowRight } from "lucide-react";
 import { Product } from "@/types";
 import { useRouter } from "next/navigation";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 
 interface QuickOrderFormProps {
     product: Product;
@@ -29,8 +38,11 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
     const { toast } = useToast();
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
+    const tCheckout = useTranslations("Checkout");
+    const tGov = useTranslations("Governorates");
+    const tAuth = useTranslations("Auth");
 
-    const form = useForm({
+    const form = useForm<z.infer<typeof insertOrderSchema>>({
         resolver: zodResolver(insertOrderSchema) as any,
         defaultValues: {
             fullName: "",
@@ -38,6 +50,7 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
             governorate: "",
             address: "",
             quantity: 1,
+            selectedColor: product.colors && product.colors.length > 0 ? product.colors[0] : "",
         },
     });
 
@@ -77,20 +90,22 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
     return (
         <div className="w-full">
             <h3 className="text-2xl lg:text-3xl font-serif font-medium mb-8 text-slate-900">
-                Secure Your Order
+                {tCheckout("secureOrder")}
             </h3>
 
             <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+
+
                     <FormField
                         control={form.control}
                         name="fullName"
                         render={({ field }) => (
                             <FormItem className="space-y-2">
-                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Full Name</FormLabel>
+                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("fullName")}</FormLabel>
                                 <FormControl>
                                     <Input
-                                        placeholder="EX: JOHN DOE"
+                                        placeholder={tCheckout("enterFullName")}
                                         {...field}
                                         className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-transparent transition-all shadow-sm"
                                     />
@@ -106,10 +121,10 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                             name="phoneNumber"
                             render={({ field }) => (
                                 <FormItem className="space-y-2">
-                                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Phone</FormLabel>
+                                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("phoneNumber")}</FormLabel>
                                     <FormControl>
                                         <Input
-                                            placeholder="01xxxxxxxxx"
+                                            placeholder={tCheckout("enterPhone")}
                                             {...field}
                                             className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-transparent transition-all shadow-sm"
                                         />
@@ -123,14 +138,21 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                             name="governorate"
                             render={({ field }) => (
                                 <FormItem className="space-y-2">
-                                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">City</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            placeholder="Cairo"
-                                            {...field}
-                                            className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-transparent transition-all shadow-sm"
-                                        />
-                                    </FormControl>
+                                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("governorate")}</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-sm">
+                                                <SelectValue placeholder={tCheckout("enterGovernorate")} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {iraqGovernorates.map((gov) => (
+                                                <SelectItem key={gov} value={gov}>
+                                                    {tGov(gov)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <FormMessage />
                                 </FormItem>
                             )}
@@ -142,10 +164,10 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                         name="address"
                         render={({ field }) => (
                             <FormItem className="space-y-2">
-                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Address</FormLabel>
+                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("address")}</FormLabel>
                                 <FormControl>
                                     <Input
-                                        placeholder="Street Name, Building No..."
+                                        placeholder={tCheckout("enterAddress")}
                                         {...field}
                                         className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 focus:border-transparent transition-all shadow-sm"
                                     />
@@ -155,12 +177,40 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                         )}
                     />
 
+                    {/* Color Selection */}
+                    {product.colors && product.colors.length > 0 && (
+                        <FormField
+                            control={form.control}
+                            name="selectedColor"
+                            render={({ field }) => (
+                                <FormItem className="space-y-2">
+                                    <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("selectColor")}</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                        <FormControl>
+                                            <SelectTrigger className="bg-white/60 border-transparent h-14 rounded-2xl px-5 text-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-sm">
+                                                <SelectValue placeholder={tCheckout("selectColorPlaceholder")} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {product.colors.map((color) => (
+                                                <SelectItem key={color} value={color}>
+                                                    {color}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    )}
+
                     <FormField
                         control={form.control}
                         name="quantity"
                         render={({ field }) => (
                             <FormItem className="space-y-2">
-                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">Quantity</FormLabel>
+                                <FormLabel className="text-xs font-bold uppercase tracking-widest text-slate-500 ml-1">{tCheckout("quantity")}</FormLabel>
                                 <FormControl>
                                     <div className="flex items-center justify-between bg-white/60 border border-transparent rounded-2xl p-1.5 shadow-sm h-14">
                                         <Button
@@ -200,11 +250,11 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                         {isPending ? (
                             <>
                                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                Processing...
+                                {tAuth("submittingButton")}
                             </>
                         ) : (
                             <>
-                                Complete Order <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                                {tCheckout("placeOrderButton")} <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </>
                         )}
                     </Button>

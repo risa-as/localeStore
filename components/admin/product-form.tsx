@@ -203,22 +203,51 @@ const ProductForm = ({
                 </FormItem>
               )}
             />
-            {/* Brand */}
+            {/* Colors */}
             <FormField
               control={form.control}
-              name="brand"
+              name="colors"
               render={({
                 field,
               }: {
                 field: ControllerRenderProps<
                   z.infer<typeof insertProductSchema>,
-                  "brand"
+                  "colors"
                 >;
               }) => (
                 <FormItem className="w-full">
-                  <FormLabel>{t('brand')}</FormLabel>
+                  <FormLabel>{t('colors')}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t('placeholderBrand')} {...field} />
+                    <Input
+                      placeholder={t('placeholderColors')}
+                      value={field.value?.length > 0 ? field.value.join(", ") : ""}
+                      onChange={(e) =>
+                        field.onChange(
+                          e.target.value.split(",").map((c) => c.trim())
+                        )
+                      }
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Offers */}
+            <FormField
+              control={form.control}
+              name="offers"
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof insertProductSchema>,
+                  "offers"
+                >;
+              }) => (
+                <FormItem className="w-full">
+                  <FormLabel>{t('offers')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('placeholderOffers')} {...field} value={field.value || ""} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -263,6 +292,27 @@ const ProductForm = ({
                   <FormLabel>{t('costPrice')}</FormLabel>
                   <FormControl>
                     <Input placeholder={t('placeholderPrice')} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Shipping Price */}
+            <FormField
+              control={form.control}
+              name="shippingPrice"
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof insertProductSchema>,
+                  "shippingPrice"
+                >;
+              }) => (
+                <FormItem className="w-full">
+                  <FormLabel>{t('shippingPrice')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('placeholderShippingPrice')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

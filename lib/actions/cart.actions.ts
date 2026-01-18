@@ -10,15 +10,15 @@ import { Prisma } from "@prisma/client";
 // Calculate cart prices
 const calcPrice = (items: CartItem[]) => {
   const itemsPrice = round2(
-      items.reduce((acc, item) => acc + Number(item.price) * item.qty, 0)
+    items.reduce((acc, item) => acc + Number(item.price) * item.qty, 0)
+  ),
+    shippingPrice = round2(
+      items.reduce((acc, item) => acc + Number(item.shippingPrice) * item.qty, 0)
     ),
-    shippingPrice = round2(itemsPrice > 100 ? 0 : 5),
-    taxPrice = round2(0.15 * itemsPrice),
-    totalPrice = round2(itemsPrice + taxPrice + shippingPrice);
+    totalPrice = round2(itemsPrice + shippingPrice);
   return {
     itemsPrice: itemsPrice.toFixed(2),
     shippingPrice: shippingPrice.toFixed(2),
-    taxPrice: taxPrice.toFixed(2),
     totalPrice: totalPrice.toFixed(2),
   };
 };
@@ -41,6 +41,10 @@ export async function addItemToCart(data: CartItem) {
       },
     });
     if (!product) throw new Error("Product Not Found");
+
+    // Ensure price and shippingPrice matches product
+    item.price = product.price.toString();
+    item.shippingPrice = product.shippingPrice.toString();
 
     // Create New Cart Object
     if (!cart) {
@@ -95,9 +99,8 @@ export async function addItemToCart(data: CartItem) {
 
       return {
         success: true,
-        message: `${product.name} ${
-          existItem ? "Updated In" : "Added To"
-        } Cart`,
+        message: `${product.name} ${existItem ? "Updated In" : "Added To"
+          } Cart`,
       };
     }
   } catch (error) {
@@ -126,7 +129,6 @@ export async function getMyCart() {
     itemsPrice: cart.itemsPrice.toString(),
     totalPrice: cart.totalPrice.toString(),
     shippingPrice: cart.shippingPrice.toString(),
-    taxPrice: cart.taxPrice.toString(),
   });
 }
 
@@ -169,9 +171,8 @@ export async function removeItemFromCart(productId: string) {
     revalidatePath(`/product/${product.slug}`);
     return {
       success: true,
-      message: `${product.name} ${
-        exist.qty > 1 ? "Updated In" : "Remove From"
-      } Cart`,
+      message: `${product.name} ${exist.qty > 1 ? "Updated In" : "Remove From"
+        } Cart`,
     };
   } catch (error) {
     // Use Function From Utils To Handle Error

@@ -2,7 +2,7 @@
 
 import { formatCurrency } from "@/lib/utils";
 import { Product } from "@/types";
-import { Check, Star, ShieldCheck, Truck, RotateCcw, ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, Star, ShieldCheck, Truck, RotateCcw, ArrowRight, ChevronLeft, ChevronRight, Tag } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { QuickOrderForm } from "./quick-order-form";
@@ -59,7 +59,7 @@ export default function LandingPage({ product }: { product: Product }) {
                                         src={images[currentImageIndex]}
                                         alt={product.name}
                                         fill
-                                        className="object-cover"
+                                        className="object-contain"
                                         priority
                                     />
                                 </motion.div>
@@ -98,13 +98,13 @@ export default function LandingPage({ product }: { product: Product }) {
 
                         {/* Thumbnails */}
                         {images.length > 1 && (
-                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide pr-1">
                                 {images.map((img, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => setCurrentImageIndex(idx)}
                                         className={cn(
-                                            "relative w-20 h-20 rounded-xl overflow-hidden transition-all duration-300 flex-shrink-0 border-2",
+                                            "relative w-20 h-20 rounded-xl overflow-hidden transition-all duration-300 flex-shrink-0 border-2 p-1 mt-2",
                                             currentImageIndex === idx
                                                 ? "border-slate-900 shadow-lg scale-105"
                                                 : "border-transparent opacity-60 hover:opacity-100 hover:scale-105"
@@ -114,7 +114,7 @@ export default function LandingPage({ product }: { product: Product }) {
                                             src={img}
                                             alt={`View ${idx + 1}`}
                                             fill
-                                            className="object-cover"
+                                            className="object-cover rounded-lg"
                                         />
                                     </button>
                                 ))}
@@ -125,7 +125,12 @@ export default function LandingPage({ product }: { product: Product }) {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4">
                             {[
                                 { icon: ShieldCheck, title: t('warranty') },
-                                { icon: Truck, title: t('freeShipping') },
+                                {
+                                    icon: Truck,
+                                    title: Number(product.shippingPrice) === 0
+                                        ? t('freeShipping')
+                                        : `${t('shipping')}: ${formatCurrency(Number(product.shippingPrice))}`
+                                },
                                 { icon: RotateCcw, title: t('easyReturns') },
                                 { icon: Star, title: t('premiumQuality') }
                             ].map((feature, idx) => (
@@ -160,6 +165,35 @@ export default function LandingPage({ product }: { product: Product }) {
                                         </span>
                                     )}
                                 </div>
+
+                                {/* Shipping Cost Display */}
+                                {/* Shipping Cost Display */}
+                                <div className="flex items-center gap-2 text-sm">
+                                    {Number(product.shippingPrice) === 0 ? (
+                                        <span className="font-semibold text-green-600 flex items-center gap-1 bg-green-50 px-2 py-1 rounded-md border border-green-100">
+                                            <Truck className="w-4 h-4" />
+                                            {t('freeShipping')}
+                                        </span>
+                                    ) : (
+                                        <span className="font-medium text-slate-600 flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">
+                                            <Truck className="w-4 h-4 text-slate-500" />
+                                            {t('shipping')}: <span className="text-slate-900 font-semibold">{formatCurrency(Number(product.shippingPrice))}</span>
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Offers */}
+                                {product.offers && (
+                                    <div className="flex flex-wrap items-center gap-3 text-sm">
+                                        {product.offers.split(',').map((offer, index) => (
+                                            <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-red-50 text-red-600 rounded-lg font-medium border border-red-100">
+                                                <Tag className="w-4 h-4" />
+                                                {offer.trim()}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <p className="text-slate-600 text-lg leading-relaxed font-light">
                                     {product.description}
                                 </p>

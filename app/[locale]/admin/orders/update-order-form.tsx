@@ -50,6 +50,7 @@ export default function UpdateOrderForm({
             governorate: order.governorate,
             address: order.address,
             quantity: order.quantity,
+            totalPrice: order.totalPrice,
             status: order.status,
         },
     });

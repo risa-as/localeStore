@@ -13,15 +13,15 @@ const ProductImages = ({ images }: { images: string[] }) => {
                 alt="Product Image"
                 width={1000}
                 height={1000}
-                className="min-h-[300px] object-cover object-center rounded-lg border aspect-square"
+                className="min-h-[300px] object-contain object-center rounded-lg border aspect-square"
             />
             <div className="flex gap-2">
                 {images.map((image, index) => (
                     <div
                         key={image}
                         onClick={() => setCurrent(index)}
-                        className={cn("border cursor-pointer hover:border-orange-600 rounded-md overflow-hidden",
-                            current === index && "border-orange-500"
+                        className={cn("border cursor-pointer hover:border-orange-600 rounded-md overflow-hidden p-1",
+                            current === index && "border-orange-500 border-2"
                         )}
                         style={{ height: '100px', width: '100px' }} // Optional: Enforce thumbnail size
                     >

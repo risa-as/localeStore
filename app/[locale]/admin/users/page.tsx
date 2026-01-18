@@ -2,6 +2,7 @@ import { deleteUser, getAllUsers } from "@/lib/actions/user.actions";
 import { Metadata } from "next";
 import { formatId } from "@/lib/utils";
 import Link from "next/link";
+import { Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -77,8 +78,10 @@ const AdminUserPage = async (props: {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/admin/users/${user.id}`}>{t('edit')}</Link>
+                      <Button asChild variant="ghost" size="icon">
+                        <Link href={`/admin/users/${user.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Link>
                       </Button>
                       <DeleteDialog id={user.id} action={deleteUser} />
                     </div>
