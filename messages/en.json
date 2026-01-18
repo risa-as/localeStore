@@ -117,6 +117,8 @@
         "country": "Country",
         "enterCountry": "Enter Country",
         "continue": "Continue",
+        "phoneNumber": "Phone Number",
+        "governorate": "Governorate",
         "paymentMethodTitle": "Payment Method",
         "paymentMethodDescription": "Please Select Payment Method"
     },
@@ -127,6 +129,19 @@
         "customers": "Customers",
         "products": "Products",
         "orders": "Orders",
+        "Orders": {
+            "Status": {
+                "home": "Home",
+                "account": "Account",
+                "pending": "Pending",
+                "completed": "Completed",
+                "returned": "Returned",
+                "waiting": "Waiting"
+            },
+            "selected": "selected",
+            "moveTo": "Move to",
+            "update": "Update"
+        },
         "users": "Users",
         "salesOverview": "Sales Overview",
         "recentSales": "Recent Sales",
@@ -143,6 +158,8 @@
         "id": "ID",
         "name": "Name",
         "price": "Price",
+        "costPrice": "Cost Price",
+        "profit": "Profit",
         "category": "Category",
         "stock": "Stock",
         "rating": "Rating",
@@ -161,7 +178,18 @@
         "deleteDescription": "This action cannot be undone",
         "deleteCancel": "Cancel",
         "deleting": "Deleting...",
-        "delete": "Delete"
+        "delete": "Delete",
+        "phoneNumber": "Phone Number",
+        "status": "Status",
+        "categories": "Categories",
+        "profitAnalysis": "Profit Analysis",
+        "productName": "Product Name",
+        "quantitySold": "Quantity Sold",
+        "revenue": "Revenue",
+        "cost": "Cost",
+        "total": "Total",
+        "netProfit": "Net Profit",
+        "noData": "No data found for the selected period."
     },
     "Categories": {
         "selectCategory": "Select a Category"
@@ -174,6 +202,7 @@
         "category": "Category",
         "brand": "Brand",
         "price": "Price",
+        "costPrice": "Cost Price",
         "stock": "Stock",
         "images": "Images",
         "featuredProduct": "Featured Product",
@@ -207,5 +236,26 @@
         "noResults": "No products found",
         "starsAndUp": "stars & up",
         "priceTo": "to"
+    },
+    "LandingPage": {
+        "premiumCollection": "Premium Collection",
+        "onlyLeft": "Only {count} left",
+        "premiumQuality": "Premium Quality",
+        "premiumQualityDesc": "Certified authentic materials",
+        "freeShipping": "Free Shipping",
+        "freeShippingDesc": "Worldwide express delivery",
+        "warranty": "2-Year Warranty",
+        "warrantyDesc": "Full coverage protection",
+        "easyReturns": "Easy Returns",
+        "easyReturnsDesc": "30-day money back guarantee",
+        "securePayment": "Secure Payment 256-bit SSL Encrypted"
+    },
+    "ThankYou": {
+        "title": "Order Confirmed",
+        "description": "Thank you for your refined choice.",
+        "orderReference": "Order Reference",
+        "message": "We've received your order and are meticulously preparing it for shipment. You will receive a confirmation email shortly.",
+        "continueShopping": "Continue Shopping",
+        "redirecting": "Redirecting in"
     }
 }

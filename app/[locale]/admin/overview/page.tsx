@@ -35,7 +35,7 @@ const AdminOverviewPage = async () => {
   return (
     <div className="space-y-2">
       <h1 className="h2-bold">{t('dashboard')}</h1>
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('totalRevenue')}</CardTitle>
@@ -45,6 +45,15 @@ const AdminOverviewPage = async () => {
             {formatCurrency(
               summary.totalSales._sum.totalPrice?.toString() || 0
             )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">{t('profit')}</CardTitle>
+            <BadgeDollarSignIcon />
+          </CardHeader>
+          <CardContent className="text-2xl font-bold">
+            {formatCurrency(summary.totalProfit)}
           </CardContent>
         </Card>
         <Card>
@@ -101,7 +110,7 @@ const AdminOverviewPage = async () => {
               <TableBody>
                 {summary.latestOrders.map((order: any) => (
                   <TableRow key={order.id}>
-                    <TableCell>{order?.user?.name || t('deletedUser')}</TableCell>
+                    <TableCell>{order?.fullName || t('deletedUser')}</TableCell>
                     <TableCell>
                       {formatDateTime(order?.createdAt).dateOnly}
                     </TableCell>

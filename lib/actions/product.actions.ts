@@ -14,14 +14,16 @@ export async function getLatestProducts() {
     orderBy: { createdAt: "desc" },
   });
 
-  return convertToPlainObject(data);
+  return convertToPlainObject(data) as any;
 }
 
 // Get single product by it's slug
 export async function getProductBySlug(slug: string) {
-  return await prisma.product.findFirst({
+  const data = await prisma.product.findFirst({
     where: { slug: slug },
   });
+
+  return convertToPlainObject(data) as any;
 }
 
 // Get single product by it's ID
@@ -30,7 +32,7 @@ export async function getProductById(productId: string) {
     where: { id: productId },
   });
 
-  return convertToPlainObject(data);
+  return convertToPlainObject(data) as any;
 }
 
 // Get all products
@@ -199,5 +201,5 @@ export async function getFeaturedProducts() {
     take: 4,
   });
 
-  return convertToPlainObject(data);
+  return convertToPlainObject(data) as any;
 }

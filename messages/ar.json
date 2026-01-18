@@ -117,6 +117,8 @@
         "country": "الدولة",
         "enterCountry": "أدخل الدولة",
         "continue": "متابعة",
+        "phoneNumber": "رقم الهاتف",
+        "governorate": "المحافظة",
         "paymentMethodTitle": "طريقة الدفع",
         "paymentMethodDescription": "الرجاء اختيار طريقة الدفع"
     },
@@ -127,6 +129,19 @@
         "customers": "العملاء",
         "products": "المنتجات",
         "orders": "الطلبات",
+        "Orders": {
+            "Status": {
+                "home": "الرئيسية",
+                "account": "حساب",
+                "pending": "معلق",
+                "completed": "مكتمل",
+                "returned": "راجع",
+                "waiting": "انتظار"
+            },
+            "selected": "محدد",
+            "moveTo": "نقل إلى",
+            "update": "تحديث"
+        },
         "users": "المستخدمون",
         "salesOverview": "نظرة عامة على المبيعات",
         "recentSales": "أحدث المبيعات",
@@ -143,6 +158,8 @@
         "id": "المعرف",
         "name": "الاسم",
         "price": "السعر",
+        "costPrice": "سعر الشراء",
+        "profit": "الربح",
         "category": "الفئة",
         "stock": "المخزون",
         "rating": "التقييم",
@@ -161,7 +178,18 @@
         "deleteDescription": "هذا الإجراء لا يمكن التراجع عنه",
         "deleteCancel": "إلغاء",
         "deleting": "جاري الحذف...",
-        "delete": "حذف"
+        "delete": "حذف",
+        "phoneNumber": "رقم الهاتف",
+        "status": "الحالة",
+        "categories": "الفئات",
+        "profitAnalysis": "تحليل الأرباح",
+        "productName": "اسم المنتج",
+        "quantitySold": "الكمية المباعة",
+        "revenue": "الإيرادات",
+        "cost": "التكلفة",
+        "total": "المجموع",
+        "netProfit": "صافي الربح",
+        "noData": "لا توجد بيانات للفترة المحددة."
     },
     "Categories": {
         "selectCategory": "اختر فئة"
@@ -174,6 +202,7 @@
         "category": "الفئة",
         "brand": "العلامة التجارية",
         "price": "السعر",
+        "costPrice": "سعر الشراء",
         "stock": "المخزون",
         "images": "الصور",
         "featuredProduct": "منتج مميز",
@@ -207,5 +236,26 @@
         "noResults": "لم يتم العثور على منتجات",
         "starsAndUp": "نجوم فأكثر",
         "priceTo": "إلى"
+    },
+    "LandingPage": {
+        "premiumCollection": "مجموعة متميزة",
+        "onlyLeft": "تبقى {count} فقط",
+        "premiumQuality": "جودة عالية",
+        "premiumQualityDesc": "مواد أصلية معتمدة",
+        "freeShipping": "شحن مجاني",
+        "freeShippingDesc": "توصيل سريع لجميع أنحاء العالم",
+        "warranty": "ضمان لمدة سنتين",
+        "warrantyDesc": "حماية وتغطية شاملة",
+        "easyReturns": "إرجاع سهل",
+        "easyReturnsDesc": "ضمان استرجاع الأموال لمدة 30 يومًا",
+        "securePayment": "دفع آمن مشفر بتقنية SSL 256-bit"
+    },
+    "ThankYou": {
+        "title": "تم تأكيد الطلب",
+        "description": "شكراً لاختيارك الراقي.",
+        "orderReference": "رقم مرجع الطلب",
+        "message": "لقد استلمنا طلبك ونقوم بتجهيزه بعناية للشحن. ستتلقى رسالة تأكيد عبر البريد الإلكتروني قريبًا.",
+        "continueShopping": "متابعة التسوق",
+        "redirecting": "سيتم التحويل خلال"
     }
 }

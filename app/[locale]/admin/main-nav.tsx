@@ -14,8 +14,10 @@ const MainNav = ({
   const links = [
     { title: t('overview'), href: "/admin/overview" },
     { title: t('products'), href: "/admin/products" },
+    { title: t('categories'), href: "/admin/categories" },
     { title: t('orders'), href: "/admin/orders" },
     { title: t('users'), href: "/admin/users" },
+    { title: t('profitAnalysis'), href: "/admin/profit" },
   ];
   const pathname = usePathname();
   return (

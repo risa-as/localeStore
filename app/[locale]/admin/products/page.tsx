@@ -65,6 +65,8 @@ const AdminProductsPage = async (props: {
             <TableHead>{t('id')}</TableHead>
             <TableHead>{t('name')}</TableHead>
             <TableHead className="text-end">{t('price')}</TableHead>
+            <TableHead className="text-end">{t('costPrice')}</TableHead>
+            <TableHead className="text-end">{t('profit')}</TableHead>
             <TableHead>{t('category')}</TableHead>
             <TableHead>{t('stock')}</TableHead>
             <TableHead>{t('rating')}</TableHead>
@@ -79,6 +81,12 @@ const AdminProductsPage = async (props: {
               <TableCell className="text-end">
                 {formatCurrency(product.price)}
               </TableCell>
+              <TableCell className="text-end">
+                {formatCurrency(product.costPrice)}
+              </TableCell>
+              <TableCell className="text-end font-bold text-green-600">
+                {formatCurrency(Number(product.price) - Number(product.costPrice))}
+              </TableCell>
               <TableCell>{product.category}</TableCell>
               <TableCell>{product.stock}</TableCell>
               <TableCell>{product.rating}</TableCell>
@@ -86,6 +94,9 @@ const AdminProductsPage = async (props: {
                 <div className="flex items-center gap-1">
                   <Button asChild variant="outline" size="sm">
                     <Link href={`/admin/products/${product.id}`}>{t('edit')}</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href={`/landing/${product.slug}`}>View</Link>
                   </Button>
                   <DeleteDialog id={product.id} action={deleteProduct} />
                 </div>

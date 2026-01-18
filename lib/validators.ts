@@ -21,11 +21,18 @@ export const insertProductSchema = z.object({
   isFeatured: z.boolean(),
   banner: z.string().nullable(),
   price: currency,
+  costPrice: currency,
 });
 
 // Schema for updating products
 export const updateProductSchema = insertProductSchema.extend({
   id: z.string().min(1, "Id is required"),
+});
+
+// Schema for inserting categories
+export const insertCategorySchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  slug: z.string().min(3, "Slug must be at least 3 characters"),
 });
 
 // Schema for signing users in
@@ -92,15 +99,17 @@ export const paymentMethodSchema = z
 
 // Schema for inserting order
 export const insertOrderSchema = z.object({
-  userId: z.string().min(1, "User is required"),
-  itemsPrice: currency,
-  shippingPrice: currency,
-  taxPrice: currency,
-  totalPrice: currency,
-  paymentMethod: z.string().refine((data) => PAYMENT_METHODS.includes(data), {
-    message: "Invalid payment method",
-  }),
-  shippingAddress: shippingAddressSchema,
+  fullName: z.string().min(3, "Name must be at least 3 characters"),
+  phoneNumber: z.string().min(10, "Phone number must be at least 10 characters"),
+  governorate: z.string().min(3, "Governorate must be at least 3 characters"),
+  address: z.string().min(3, "Address must be at least 3 characters"),
+  quantity: z.coerce.number().int().positive("Quantity must be a positive number"),
+});
+
+// Schema for updating an order
+export const updateOrderSchema = insertOrderSchema.extend({
+  id: z.string().min(1, "ID is required"),
+  status: z.string().min(1, "Status is required"),
 });
 
 // Schema for inserting an order item

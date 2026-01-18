@@ -26,6 +26,13 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { createProduct, updateProduct } from "@/lib/actions/product.actions";
 import { Card, CardContent } from "../ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 import Image from "next/image";
 import { Checkbox } from "../ui/checkbox";
 import { UploadButton } from "@/lib/uploadthing";
@@ -36,13 +43,15 @@ type ProductFormValues =
   | z.infer<typeof updateProductSchema>;
 
 const ProductForm = ({
-  type,
   product,
   productId,
+  categories,
+  type,
 }: {
   type: "Create" | "Update";
   product?: Product;
   productId?: string;
+  categories: { id: string; name: string }[];
 }) => {
   const router = useRouter();
   const { toast } = useToast();
@@ -164,21 +173,31 @@ const ProductForm = ({
           </div>
           <div className="flex flex-col md:flex-row gap-5">
             {/* Cate */}
+            {/* Category */}
             <FormField
               control={form.control}
               name="category"
-              render={({
-                field,
-              }: {
-                field: ControllerRenderProps<
-                  z.infer<typeof insertProductSchema>,
-                  "category"
-                >;
-              }) => (
+              render={({ field }) => (
                 <FormItem className="w-full">
                   <FormLabel>{t('category')}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t('placeholderCategory')} {...field} />
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('placeholderCategory')} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((category) => (
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -221,6 +240,27 @@ const ProductForm = ({
               }) => (
                 <FormItem className="w-full">
                   <FormLabel>{t('price')}</FormLabel>
+                  <FormControl>
+                    <Input placeholder={t('placeholderPrice')} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {/* Cost Price */}
+            <FormField
+              control={form.control}
+              name="costPrice"
+              render={({
+                field,
+              }: {
+                field: ControllerRenderProps<
+                  z.infer<typeof insertProductSchema>,
+                  "costPrice"
+                >;
+              }) => (
+                <FormItem className="w-full">
+                  <FormLabel>{t('costPrice')}</FormLabel>
                   <FormControl>
                     <Input placeholder={t('placeholderPrice')} {...field} />
                   </FormControl>

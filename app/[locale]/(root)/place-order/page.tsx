@@ -1,5 +1,4 @@
 import { auth } from "@/auth";
-import CheckoutSteps from "@/components/shared/checkout-steps";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -20,58 +19,71 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import PlaceOrderForm from "./place-order-form";
 import { getTranslations } from "next-intl/server";
+import { cookies } from "next/headers";
 
 export const metadata: Metadata = {
   title: "Place Order",
 };
+
 const PlaceOrderPage = async () => {
   const cart = await getMyCart();
-  const session = await auth();
-  const userId = session?.user?.id;
 
-  if (!userId) throw new Error("User not found");
+  const cookieStore = await cookies();
+  const guestShippingInfo = cookieStore.get("guest-shipping-info")?.value;
 
-  const user = await getUserById(userId);
+  let defaultValues: {
+    fullName: string;
+    phoneNumber: string;
+    governorate: string;
+    address: string;
+    quantity: number;
+  } = {
+    fullName: "",
+    phoneNumber: "",
+    governorate: "",
+    address: "",
+    quantity: 0
+  };
+  let isEditable = true;
+
+  let userAddress: ShippingAddress | null = null; // Keep for display purposes
+  let paymentMethod = "Cash On Delivery"; // Default for guest
+
+  if (guestShippingInfo) {
+    const guestData = JSON.parse(guestShippingInfo);
+    // Assuming guestData matches insertOrderSchema structure from createQuickOrder
+    defaultValues = {
+      fullName: guestData.fullName || "",
+      phoneNumber: guestData.phoneNumber || "",
+      governorate: guestData.city || guestData.governorate || "",
+      address: guestData.streetAddress || guestData.address || "",
+      quantity: 0
+    };
+    isEditable = false;
+
+    // Adapt guestData to ShippingAddress for display in existing JSX
+    userAddress = {
+      fullName: guestData.fullName,
+      streetAddress: guestData.address,
+      city: guestData.governorate,
+      postalCode: "",
+      country: "",
+    };
+  }
+
 
   if (!cart || cart.items.length === 0) redirect("/cart");
-  if (!user.address) redirect("/shipping-address");
-  if (!user.paymentMethod) redirect("/payment-method");
+  // We no longer redirect if userAddress is missing, as we will collect it in the form if needed.
 
-  const userAddress = user.address as ShippingAddress;
   const t = await getTranslations('Checkout');
 
   return (
     <>
-      <CheckoutSteps current={3} />
       <h1 className="py-4 text-2xl">{t('placeOrder')}</h1>
       <div className="grid md:grid-cols-3 md:gap-5">
         <div className="md:col-span-2 overflow-x-auto space-y-4">
-          <Card>
-            <CardContent className="p-4 gap-4">
-              <h2 className="text-xl pb-4">{t('shippingAddress')}</h2>
-              <p>{userAddress.fullName}</p>
-              <p>
-                {userAddress.streetAddress}, {userAddress.city}{" "}
-                {userAddress.postalCode}, {userAddress.country}{" "}
-              </p>
-              <div className="mt-3">
-                <Link href="/shipping-address">
-                  <Button variant="outline">{t('edit')}</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4 gap-4">
-              <h2 className="text-xl pb-4">{t('paymentMethod')}</h2>
-              <p className="">{user.paymentMethod}</p>
-              <div className="mt-3">
-                <Link href="/payment-method">
-                  <Button variant="outline">{t('edit')}</Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Only show summary cards if we have the info (Landing Page Guest Flow) */}
+          {/* Summary moved to PlaceOrderForm */}
           <Card>
             <CardContent className="p-4 gap-4">
               <h2 className="text-xl pb-4">{t('orderItems')}</h2>
@@ -132,7 +144,8 @@ const PlaceOrderPage = async () => {
                 <div>{t('total')}</div>
                 <div>{formatCurrency(cart.totalPrice)}</div>
               </div>
-              <PlaceOrderForm />
+              {/* Form handles inputs (if isEditable) or just hidden fields/submit (if !isEditable) */}
+              <PlaceOrderForm cart={cart} defaultValues={defaultValues} isEditable={isEditable} />
             </CardContent>
           </Card>
         </div>
