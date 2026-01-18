@@ -118,7 +118,7 @@ export const insertOrderSchema = z.object({
   governorate: z.string().min(3, "Governorate must be at least 3 characters"),
   address: z.string().min(3, "Address must be at least 3 characters"),
   quantity: z.coerce.number().int().positive("Quantity must be a positive number"),
-  selectedColor: z.string().optional(),
+  selectedColor: z.string().optional().nullable(),
 });
 
 // Schema for updating an order
@@ -136,7 +136,7 @@ export const insertOrderItemSchema = z.object({
   name: z.string(),
   price: currency,
   qty: z.number(),
-  selectedColor: z.string().optional(),
+  selectedColor: z.string().optional().nullable(),
 });
 
 // Schema for the PayPal paymentResult
