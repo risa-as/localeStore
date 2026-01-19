@@ -7,25 +7,25 @@ datasource db {
 }
 
 model Product {
-  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name        String
-  slug        String      @unique(map: "product_slug_idx")
-  category    String
-  images      String[]
-  colors      String[]
-  description String
-  stock       Int
-  price       Decimal     @default(0) @db.Decimal(12, 2)
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  slug          String      @unique(map: "product_slug_idx")
+  category      String
+  images        String[]
+  description   String
+  stock         Int
+  price         Decimal     @default(0) @db.Decimal(12, 2)
+  rating        Decimal     @default(0) @db.Decimal(3, 2)
+  numReviews    Int         @default(0)
+  isFeatured    Boolean     @default(false)
+  banner        String?
+  createdAt     DateTime    @default(now()) @db.Timestamp(6)
+  costPrice     Decimal     @default(0) @db.Decimal(12, 2)
+  colors        String[]
   shippingPrice Decimal     @default(0) @db.Decimal(12, 2)
-  costPrice   Decimal     @default(0) @db.Decimal(12, 2)
-  rating      Decimal     @default(0) @db.Decimal(3, 2)
-  numReviews  Int         @default(0)
-  isFeatured  Boolean     @default(false)
-  banner      String?
-  offers      String?
-  createdAt   DateTime    @default(now()) @db.Timestamp(6)
-  OrderItem   OrderItem[]
-  Review      Review[]
+  offers        String?
+  OrderItem     OrderItem[]
+  Review        Review[]
 }
 
 model User {
@@ -41,14 +41,14 @@ model User {
   createdAt     DateTime  @default(now()) @db.Timestamp(6)
   updatedAt     DateTime  @updatedAt
   account       Account[]
-  session       Session[]
   Cart          Cart[]
   Order         Order[]
   Review        Review[]
+  session       Session[]
 }
 
 model Account {
-  userId            String  @db.Uuid
+  userId            String   @db.Uuid
   type              String
   provider          String
   providerAccountId String
@@ -59,11 +59,9 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([provider, providerAccountId])
 }
@@ -72,10 +70,9 @@ model Session {
   sessionToken String   @id
   userId       String   @db.Uuid
   expires      DateTime @db.Timestamp(6)
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  updatedAt DateTime @updatedAt
 }
 
 model VerificationToken {
@@ -94,15 +91,12 @@ model Cart {
   itemsPrice    Decimal  @db.Decimal(12, 2)
   totalPrice    Decimal  @db.Decimal(12, 2)
   shippingPrice Decimal  @db.Decimal(12, 2)
-
   createdAt     DateTime @default(now()) @db.Timestamp(6)
   user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-
 model Order {
   id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId        String?     @db.Uuid
   fullName      String
   phoneNumber   String
   governorate   String
@@ -110,14 +104,15 @@ model Order {
   quantity      Int
   totalPrice    Decimal     @default(0) @db.Decimal(12, 2)
   status        String      @default("home")
+  createdAt     DateTime    @default(now()) @db.Timestamp(6)
+  deliveredAt   DateTime?   @db.Timestamp(6)
+  isDelivered   Boolean     @default(false)
   isPaid        Boolean     @default(false)
   paidAt        DateTime?   @db.Timestamp(6)
-  isDelivered   Boolean     @default(false)
-  deliveredAt   DateTime?   @db.Timestamp(6)
   paymentResult Json?       @db.Json
-  createdAt     DateTime    @default(now()) @db.Timestamp(6)
-  orderitems    OrderItem[]
+  userId        String?     @db.Uuid
   user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderitems    OrderItem[]
 }
 
 model OrderItem {
@@ -125,12 +120,12 @@ model OrderItem {
   productId     String  @db.Uuid
   qty           Int
   price         Decimal @db.Decimal(12, 2)
-  shippingPrice Decimal @default(0) @db.Decimal(12, 2)
-  costPrice     Decimal @default(0) @db.Decimal(12, 2)
   name          String
   slug          String
   image         String
+  costPrice     Decimal @default(0) @db.Decimal(12, 2)
   selectedColor String?
+  shippingPrice Decimal @default(0) @db.Decimal(12, 2)
   order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -149,7 +144,6 @@ model Review {
   product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
-
 
 model Category {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid

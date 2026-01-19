@@ -12,6 +12,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { insertOrderSchema } from "@/lib/validators";
 import { Input } from "@/components/ui/input";
+import { iraqGovernorates } from "@/lib/constants";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const PlaceOrderForm = ({
   cart,
@@ -24,6 +32,7 @@ const PlaceOrderForm = ({
 }) => {
   const router = useRouter();
   const t = useTranslations('Checkout');
+  const tGov = useTranslations('Governorates');
   const [loading, setLoading] = useState(false);
 
   const {
@@ -70,7 +79,18 @@ const PlaceOrderForm = ({
           </div>
           <div>
             <label className="block text-sm font-medium">{t('governorate')}</label>
-            <Input {...register("governorate")} placeholder={t('governorate')} />
+            <Select onValueChange={(value) => setValue("governorate", value)}>
+              <SelectTrigger>
+                <SelectValue placeholder={t('governorate')} />
+              </SelectTrigger>
+              <SelectContent>
+                {iraqGovernorates.map((gov) => (
+                  <SelectItem key={gov} value={gov}>
+                    {tGov(gov) || gov}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             {errors.governorate && <p className="text-red-500 text-sm">{errors.governorate.message}</p>}
           </div>
           <div>

@@ -13,6 +13,180 @@ import { PAGE_SIZE } from "../constants";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
+// Create Quick Order (Direct from Landing Page)
+export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, productId: string) {
+  try {
+    const orderData = insertOrderSchema.parse(data);
+
+    // Set Guest Cookie for persistence
+    const cookieStore = await cookies();
+    cookieStore.set("guest-shipping-info", JSON.stringify({
+      fullName: orderData.fullName,
+      streetAddress: orderData.address,
+      city: orderData.governorate, // Mapping governorate to city/address field as best fit
+      phoneNumber: orderData.phoneNumber,
+      postalCode: "00000", // Default or extract if available
+      country: "Iraq", // Default or extract
+    }), {
+      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+      path: "/"
+    });
+
+    // Fetch product to ensure price and stock
+    const product = await prisma.product.findUnique({
+      where: { id: productId },
+    });
+
+    if (!product) {
+      return { success: false, message: "Product not found" };
+    }
+
+    if (product.stock < orderData.quantity) {
+      return { success: false, message: "Not enough stock" };
+    }
+
+    // Check for existing order within 18 hours
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    const cutoffDate = new Date(Date.now() - 18 * 60 * 60 * 1000);
+    const recentOrder = await prisma.order.findFirst({
+      where: {
+        phoneNumber: orderData.phoneNumber,
+        createdAt: { gte: cutoffDate },
+        status: { in: ["home", "pending"] },
+      },
+      include: { orderitems: true },
+    });
+
+    if (recentOrder) {
+      // Checking if item exists
+      const existingItem = recentOrder.orderitems.find(
+        (item) => item.productId === product.id
+      );
+
+      await prisma.$transaction(async (tx) => {
+        if (existingItem) {
+          // Update quantity
+          await tx.orderItem.update({
+            where: {
+              orderId_productId: {
+                orderId: recentOrder.id,
+                productId: existingItem.productId,
+              }
+            },
+            data: {
+              qty: existingItem.qty + orderData.quantity,
+            },
+          });
+        } else {
+          // Add new item
+          await tx.orderItem.create({
+            data: {
+              orderId: recentOrder.id,
+              productId: product.id,
+              slug: product.slug,
+              name: product.name,
+              qty: orderData.quantity,
+              image: product.images[0] || "/placeholder.jpg",
+              price: product.price,
+              selectedColor: orderData.selectedColor,
+              shippingPrice: product.shippingPrice, // Save shipping price
+            },
+          });
+        }
+
+        // Recalculate total
+        const updatedItems = await tx.orderItem.findMany({ where: { orderId: recentOrder.id } });
+
+        // Items Price
+        const itemsPrice = updatedItems.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
+
+        // Flat Shipping (Max of items)
+        const shippingPrice = updatedItems.length > 0
+          ? Math.max(...updatedItems.map((item) => Number(item.shippingPrice)))
+          : 0;
+
+        const newTotalPrice = itemsPrice + shippingPrice;
+
+        await tx.order.update({
+          where: { id: recentOrder.id },
+          data: {
+            totalPrice: newTotalPrice,
+            fullName: orderData.fullName,
+            governorate: orderData.governorate,
+            address: orderData.address,
+            userId: session?.user?.id, // Link to user if logged in
+          }
+        });
+      });
+
+      return {
+        success: true,
+        message: "تم تحديث طلبك بنجاح",
+        redirectTo: `/thank-you?orderId=${recentOrder.id}`,
+      };
+    }
+
+
+    // Create Order
+    // Flat Rate Shipping: (Price * Qty) + Shipping
+    const itemsPrice = Number(product.price) * orderData.quantity;
+    const shippingPrice = Number(product.shippingPrice);
+    const price = itemsPrice + shippingPrice;
+
+
+
+    // Create a transaction to create order and order items in database
+    const insertedOrderId = await prisma.$transaction(async (tx) => {
+      // Create order
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { selectedColor, quantity, ...orderDataWithoutColor } = orderData;
+      const insertedOrder = await tx.order.create({
+        data: {
+          ...orderDataWithoutColor,
+          quantity: orderData.quantity,
+          totalPrice: price,
+          status: "home", // Default status
+          userId,
+        }
+      });
+
+      // Create order item
+      await tx.orderItem.create({
+        data: {
+          orderId: insertedOrder.id,
+          productId: product.id,
+          slug: product.slug,
+          name: product.name,
+          qty: orderData.quantity,
+          image: product.images[0] || "/placeholder.jpg",
+          price: product.price,
+          selectedColor: orderData.selectedColor,
+          shippingPrice: product.shippingPrice, // Save Shipping Price
+        },
+      });
+
+      return insertedOrder.id;
+    });
+
+    if (!insertedOrderId) throw new Error("Order not created");
+
+    // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
+
+    return {
+      success: true,
+      message: "Order created",
+      redirectTo: `/thank-you?orderId=${insertedOrderId}`,
+    };
+  } catch (error) {
+    console.error("Error in createQuickOrder:", error);
+    if (isRedirectError(error)) throw error;
+    const { success, formError } = formatError(error);
+    return { success, message: formError };
+  }
+}
+
 // Create Order and order items
 export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
   try {
@@ -29,7 +203,11 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const orderData = insertOrderSchema.parse(data);
 
     // Calculate total price from cart items
-    const price = cart.items.reduce((acc, item) => acc + ((Number(item.price) + Number(item.shippingPrice)) * item.qty), 0);
+    const itemsPrice = cart.items.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
+    const shippingPrice = cart.items.length > 0
+      ? Math.max(...cart.items.map((item) => Number(item.shippingPrice)))
+      : 0;
+    const price = itemsPrice + shippingPrice;
 
     // Get product details
     const productIds = cart.items.map((item) => item.productId);
@@ -48,7 +226,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       where: {
         phoneNumber: orderData.phoneNumber,
         createdAt: { gte: cutoffDate },
-        status: { not: "Cancelled" },
+        status: { in: ["home", "pending"] },
       },
       include: { orderitems: true },
     });
@@ -64,7 +242,12 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
           if (existingItem) {
             // Update quantity
             await tx.orderItem.update({
-              where: { orderId_productId: { orderId: recentOrder.id, productId: item.productId } },
+              where: {
+                orderId_productId: {
+                  orderId: recentOrder.id,
+                  productId: existingItem.productId,
+                }
+              },
               data: { qty: existingItem.qty + item.qty }
             });
           } else {
@@ -78,7 +261,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
                 qty: item.qty,
                 image: item.image,
                 price: item.price,
-                shippingPrice: item.shippingPrice,
+                shippingPrice: item.shippingPrice, // Create with shipping
               },
             });
           }
@@ -86,7 +269,16 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
 
         // Recalculate Total Price
         const updatedItems = await tx.orderItem.findMany({ where: { orderId: recentOrder.id } });
-        const newTotalPrice = updatedItems.reduce((acc, item) => acc + ((Number(item.price) + Number(item.shippingPrice)) * item.qty), 0);
+
+        // Items Price
+        const newItemsPrice = updatedItems.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
+
+        // Flat Shipping
+        const newShippingPrice = updatedItems.length > 0
+          ? Math.max(...updatedItems.map((item) => Number(item.shippingPrice)))
+          : 0;
+
+        const newTotalPrice = newItemsPrice + newShippingPrice;
 
         await tx.order.update({
           where: { id: recentOrder.id },
@@ -95,6 +287,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             fullName: orderData.fullName,
             governorate: orderData.governorate,
             address: orderData.address,
+            userId: userId ?? recentOrder.userId, // Link to user if logged in
           }
         });
 
@@ -120,7 +313,6 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       };
     }
 
-    // ORIGINAL CREATE LOGIC
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
       // Create order
@@ -149,7 +341,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             qty: item.qty,
             image: item.image,
             price: item.price,
-            shippingPrice: item.shippingPrice,
+            shippingPrice: item.shippingPrice, // Add shipping price
           },
         });
       }
@@ -181,6 +373,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       // User didn't specify page, just message. I will use original redirects.
     };
   } catch (error) {
+    console.error("Error in createQuickOrder:", error);
     if (isRedirectError(error)) throw error;
     const { success, formError } = formatError(error);
     return { success, message: formError };
@@ -250,6 +443,7 @@ export async function getMyOrders({
 }: {
   limit?: number;
   page: number;
+  query?: string;
 }) {
   const session = await auth();
   if (!session) {
@@ -432,19 +626,15 @@ type SalesDataType = {
 
 // Get sales data and order statistics
 export async function getOrderSummery() {
-  const ordersCount = await prisma.order.count();
-  const productsCount = await prisma.product.count();
-  const usersCount = await prisma.user.count();
-
-  // Calculate the total sales
-  const totalSales = await prisma.order.aggregate({
-    _sum: { totalPrice: true },
-  });
+  const now = new Date();
+  const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const previousMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
   // Get monthly sales
   const salesDataRaw = await prisma.$queryRaw<
     Array<{ month: string; totalSales: Prisma.Decimal }>
-  >`SELECT to_char("createdAt", 'MM/YY') as "month", sum("totalPrice") as "totalSales" FROM "Order" GROUP BY to_char("createdAt", 'MM/YY')`;
+  >`SELECT to_char("createdAt", 'MM/YY') as "month", sum("totalPrice") as "totalSales" FROM "Order" GROUP BY to_char("createdAt", 'MM/YY') ORDER BY min("createdAt")`;
 
   const salesData: SalesDataType = salesDataRaw.map((item) => ({
     month: item.month,
@@ -460,6 +650,7 @@ export async function getOrderSummery() {
   const totalProfitRaw = await prisma.orderItem.findMany({
     where: {
       order: {
+        createdAt: { gte: currentMonthStart },
         status: { not: "Cancelled" }
       }
     },
@@ -475,186 +666,72 @@ export async function getOrderSummery() {
     return acc + (Number(item.price) * item.qty - cost);
   }, 0);
 
+  // --- Real Stats Calculation ---
+
+  // Helper to get count for a range
+  const getCount = async (model: any, start: Date, end?: Date) => {
+    return await model.count({
+      where: {
+        createdAt: {
+          gte: start,
+          ...(end ? { lte: end } : {}),
+        },
+      },
+    });
+  };
+
+  // Helper to get sum for a range (Sales)
+  const getSalesSum = async (start: Date, end?: Date) => {
+    const result = await prisma.order.aggregate({
+      _sum: { totalPrice: true },
+      where: {
+        createdAt: {
+          gte: start,
+          ...(end ? { lte: end } : {}),
+        },
+      },
+    });
+    return Number(result._sum.totalPrice || 0);
+  };
+
+  // 1. Orders
+  const currentMonthOrders = await getCount(prisma.order, currentMonthStart);
+  const prevMonthOrders = await getCount(prisma.order, previousMonthStart, previousMonthEnd);
+  const ordersChange = prevMonthOrders === 0 ? currentMonthOrders * 100 : ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100;
+
+  // 2. Users
+  const currentMonthUsers = await getCount(prisma.user, currentMonthStart);
+  const prevMonthUsers = await getCount(prisma.user, previousMonthStart, previousMonthEnd);
+  const usersChange = prevMonthUsers === 0 ? currentMonthUsers * 100 : ((currentMonthUsers - prevMonthUsers) / prevMonthUsers) * 100;
+
+  // 3. Products
+  const currentMonthProducts = await getCount(prisma.product, currentMonthStart);
+  const prevMonthProducts = await getCount(prisma.product, previousMonthStart, previousMonthEnd);
+  const productsChange = prevMonthProducts === 0 ? currentMonthProducts * 100 : ((currentMonthProducts - prevMonthProducts) / prevMonthProducts) * 100;
+
+  // 4. Revenue (Sales)
+  const currentMonthRevenue = await getSalesSum(currentMonthStart);
+  const prevMonthRevenue = await getSalesSum(previousMonthStart, previousMonthEnd);
+  const revenueChange = prevMonthRevenue === 0 ? currentMonthRevenue * 100 : ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100;
+
+
   return {
-    ordersCount,
-    productsCount,
-    usersCount,
-    totalSales,
+    ordersCount: currentMonthOrders,
+    productsCount: currentMonthProducts,
+    usersCount: currentMonthUsers,
+    totalSales: currentMonthRevenue,
     totalProfit,
     salesData,
     latestOrders,
+    statsChange: {
+      orders: Math.round(ordersChange),
+      users: Math.round(usersChange),
+      products: Math.round(productsChange),
+      revenue: Math.round(revenueChange),
+    }
   };
 }
-// Create Quick Order (Direct from Landing Page)
-export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, productId: string) {
-  try {
-    const orderData = insertOrderSchema.parse(data);
 
-    // Set Guest Cookie for persistence
-    const cookieStore = await cookies();
-    cookieStore.set("guest-shipping-info", JSON.stringify({
-      fullName: orderData.fullName,
-      streetAddress: orderData.address,
-      city: orderData.governorate, // Mapping governorate to city/address field as best fit
-      phoneNumber: orderData.phoneNumber,
-      postalCode: "00000", // Default or extract if available
-      country: "Iraq", // Default or extract
-    }), {
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      path: "/"
-    });
-
-    // Fetch product to ensure price and stock
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) {
-      return { success: false, message: "Product not found" };
-    }
-
-    if (product.stock < orderData.quantity) {
-      return { success: false, message: "Not enough stock" };
-    }
-
-    // Check for existing order within 18 hours
-    const cutoffDate = new Date(Date.now() - 18 * 60 * 60 * 1000);
-    const recentOrder = await prisma.order.findFirst({
-      where: {
-        phoneNumber: orderData.phoneNumber,
-        createdAt: { gte: cutoffDate },
-        status: { not: "Cancelled" },
-      },
-      include: { orderitems: true },
-    });
-
-    if (recentOrder) {
-      // MERGE LOGIC
-      const existingItemIndex = recentOrder.orderitems.findIndex(
-        (item) => item.productId === product.id && item.selectedColor === orderData.selectedColor
-      );
-
-      await prisma.$transaction(async (tx) => {
-        if (existingItemIndex > -1) {
-          // Update quantity of existing item
-          const existingItem = recentOrder.orderitems[existingItemIndex];
-          await tx.orderItem.update({
-            where: { orderId_productId: { orderId: recentOrder.id, productId: product.id } }, // PK is orderId + productId. Wait.
-            // CAUTION: The standard Prisma schema usually defines composite PK on orderId + productId. 
-            // BUT if we have variants (colors), we might have multiple items with same productId but different colors?
-            // Let's check schema.
-            // Schema has: @@id([orderId, productId], map: "orderitems_orderId_productId_pk")
-            // This means we CANNOT have two items with same ProductID in the same Order, even if colors are different.
-            // This is a schema limitation. 
-            // If the user buys Red Shirt and Blue Shirt (same ProductID), Prisma will crash on duplicate PK.
-            // For now, I must assume "Same Product" means "Same ProductID". 
-            // If the user changes color, technically it's the "Same Product" in this schema's view if they share ID.
-            // However, the prompt says "if he requested another product... write the two products together".
-            // If schema limits 1 row per ProductID per Order, I can only update quantity.
-            // If I want to support multiple variants, I'd need to change the PK or `productId` refers to a specific variant. 
-            // Assuming `Product` is a generic parent, checking schema again... `Product` has `colors String[]`. 
-            // So `Product` is the parent. `OrderItem` links to `Product`.
-            // Limitation: Currently Schema prevents multiple variants of same product in one order.
-            // I will proceed assuming if ProductID matches, we merge/update quantity, identifying it as "Same Product".
-            data: {
-              qty: existingItem.qty + orderData.quantity,
-              selectedColor: orderData.selectedColor || existingItem.selectedColor // Update color if new one provided? Or keep old? 
-              // Usually if merging, we just sum up. Let's strictly update QTY.
-            },
-          });
-        } else {
-          // Add new item to existing order
-          await tx.orderItem.create({
-            data: {
-              orderId: recentOrder.id,
-              productId: product.id,
-              slug: product.slug,
-              name: product.name,
-              qty: orderData.quantity,
-              image: product.images[0],
-              price: product.price,
-              shippingPrice: product.shippingPrice,
-              selectedColor: orderData.selectedColor,
-            },
-          });
-        }
-
-        // Recalculate Total Price
-        // We need to fetch items again or calc in memory? 
-        // Better fetch or sum carefully.
-        const updatedItems = await tx.orderItem.findMany({ where: { orderId: recentOrder.id } });
-        const newTotalPrice = updatedItems.reduce((acc, item) => acc + ((Number(item.price) + Number(item.shippingPrice)) * item.qty), 0);
-
-        await tx.order.update({
-          where: { id: recentOrder.id },
-          data: {
-            totalPrice: newTotalPrice,
-            // Update other fields? Address might have changed? 
-            // Prompt says "update the order". 
-            // Let's update address/phone info to latest provided? 
-            // Safe to keep existing or update. Let's update info to be "latest".
-            fullName: orderData.fullName,
-            governorate: orderData.governorate,
-            address: orderData.address,
-            // phoneNumber is search key, so it's same.
-          }
-        });
-      });
-
-      return {
-        success: true,
-        message: "Order Updated Successfully",
-        redirectTo: `/thank-you?orderId=${recentOrder.id}`,
-      };
-    }
-
-    // ORIGINAL CREATE LOGIC
-    // Create Order
-    const price = (Number(product.price) + Number(product.shippingPrice)) * orderData.quantity;
-
-    // Create a transaction to create order and order items in database
-    const insertedOrderId = await prisma.$transaction(async (tx) => {
-      // Create order
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { selectedColor, ...orderDataWithoutColor } = orderData;
-      const insertedOrder = await tx.order.create({
-        data: {
-          ...orderDataWithoutColor,
-          totalPrice: price,
-        }
-      });
-
-      // Create order item
-      await tx.orderItem.create({
-        data: {
-          orderId: insertedOrder.id,
-          productId: product.id,
-          slug: product.slug,
-          name: product.name,
-          qty: orderData.quantity,
-          image: product.images[0], // Assuming at least one image
-          price: product.price,
-          shippingPrice: product.shippingPrice,
-          selectedColor: orderData.selectedColor,
-        },
-      });
-
-      return insertedOrder.id;
-    });
-
-    if (!insertedOrderId) throw new Error("Order not created");
-
-    return {
-      success: true,
-      message: "Order created",
-      redirectTo: `/thank-you?orderId=${insertedOrderId}`,
-    };
-  } catch (error) {
-    if (isRedirectError(error)) throw error;
-    const { success, formError } = formatError(error);
-    return { success, message: formError };
-  }
-}
 
 // Get Order Profit Stats
 export async function getOrderProfitStats({ from, to }: { from: Date; to: Date }) {
@@ -717,18 +794,4 @@ export async function getOrderProfitStats({ from, to }: { from: Date; to: Date }
   return Array.from(statsMap.values()).sort((a, b) => b.totalProfit - a.totalProfit);
 }
 
-// Save Guest Shipping Info (Cookie)
-export async function saveGuestShippingInfo(data: z.infer<typeof shippingAddressSchema>) {
-  try {
-    const address = shippingAddressSchema.parse(data);
-    const cookieStore = await cookies();
-    cookieStore.set("guest-shipping-info", JSON.stringify(address), {
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      path: "/",
-    });
-    return { success: true, message: "Guest info saved" };
-  } catch (error) {
-    const { success, formError } = formatError(error);
-    return { success, message: formError };
-  }
-}
+

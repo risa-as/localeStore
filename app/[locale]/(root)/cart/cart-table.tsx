@@ -116,30 +116,39 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
               </TableBody>
             </Table>
           </div>
-          <Card>
-            <CardContent className="p-4 gap-4">
-              <div className="pb-3 text-xl">
-                {t('subtotal')} ( {cart.items.reduce((a, c) => a + c.qty, 0)})
-                <span className="font-bold">
-                  {formatCurrency(cart.itemsPrice)}
-                </span>
-              </div>
-              <Button
-                className="w-full"
-                disabled={isPending}
-                onClick={() =>
-                  startTransition(() => router.push("/place-order"))
-                }
-              >
-                {isPending ? (
-                  <Loader className="w-4 h-4 animate-spin" />
-                ) : (
-                  <ArrowRight className="w-4 h-4" />
-                )}{" "}
-                {t('proceedToCheckout')}
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="relative h-fit">
+            <Card className="border-none shadow-lg bg-gradient-to-b from-muted/20 to-muted/50 overflow-hidden">
+              <CardContent className="p-6 space-y-6">
+                <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+                  {t('cartSummary')}
+                </h3>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center pb-4 border-b">
+                    <span className="text-muted-foreground">{t('subtotal')} ({cart.items.length} {t('items')}):</span>
+                    <span className="text-2xl font-bold font-mono tracking-tight">
+                      {formatCurrency(cart.itemsPrice)}
+                    </span>
+                  </div>
+                </div>
+
+                <Button
+                  className="w-full text-lg py-6 font-semibold shadow-md transition-all hover:scale-[1.02] hover:shadow-lg"
+                  disabled={isPending}
+                  onClick={() =>
+                    startTransition(() => router.push("/place-order"))
+                  }
+                >
+                  {isPending ? (
+                    <Loader className="w-5 h-5 animate-spin mr-2" />
+                  ) : (
+                    <ArrowRight className="w-5 h-5 mr-2" />
+                  )}
+                  {t('proceedToCheckout')}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
     </>

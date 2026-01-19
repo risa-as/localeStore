@@ -12,9 +12,9 @@ const calcPrice = (items: CartItem[]) => {
   const itemsPrice = round2(
     items.reduce((acc, item) => acc + Number(item.price) * item.qty, 0)
   ),
-    shippingPrice = round2(
-      items.reduce((acc, item) => acc + Number(item.shippingPrice) * item.qty, 0)
-    ),
+    shippingPrice = items.length > 0
+      ? Math.max(...items.map((item) => Number(item.shippingPrice)))
+      : 0,
     totalPrice = round2(itemsPrice + shippingPrice);
   return {
     itemsPrice: itemsPrice.toFixed(2),

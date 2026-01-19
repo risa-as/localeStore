@@ -79,7 +79,7 @@ const ProfitPage = async (props: {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            stats.map((item) => (
+                            stats.map((item: any) => (
                                 <TableRow key={item.productId}>
                                     <TableCell>{item.name}</TableCell>
                                     <TableCell className="text-right">{item.totalQty}</TableCell>

@@ -1,5 +1,13 @@
 "use client";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+} from "recharts";
 
 const Charts = ({
   data: { salesData },
@@ -8,7 +16,14 @@ const Charts = ({
 }) => {
   return (
     <ResponsiveContainer width="100%" height={350}>
-      <BarChart data={salesData}>
+      <AreaChart data={salesData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+        <defs>
+          <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
+            <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
+          </linearGradient>
+        </defs>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} />
         <XAxis
           dataKey="month"
           stroke="#888888"
@@ -21,15 +36,23 @@ const Charts = ({
           fontSize={12}
           tickLine={false}
           axisLine={false}
-          tickFormatter={(value) => `${value * 1000} د.ع`}
+          tickMargin={40}
+          width={80}
+          tickFormatter={(value) => `${(value * 1000).toLocaleString()}`}
         />
-        <Bar
+        <Tooltip
+          contentStyle={{ backgroundColor: 'var(--background)', borderColor: 'var(--border)' }}
+          itemStyle={{ color: 'var(--foreground)' }}
+          formatter={(value: any) => [`${(value * 1000).toLocaleString()} IQD`, "Sales"]}
+        />
+        <Area
+          type="monotone"
           dataKey="totalSales"
-          fill="currentColor"
-          radius={[4, 4, 0, 0]}
-          className="fill-primary"
+          stroke="#8884d8"
+          fillOpacity={1}
+          fill="url(#colorSales)"
         />
-      </BarChart>
+      </AreaChart>
     </ResponsiveContainer>
   );
 };

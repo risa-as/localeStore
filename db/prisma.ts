@@ -27,7 +27,7 @@ const prismaClientSingleton = () => {
         },
         shippingPrice: {
           compute(product) {
-            return product.shippingPrice?.toString() ?? "0";
+            return (product as any).shippingPrice?.toString() ?? "0";
           },
         },
         rating: {
@@ -69,6 +69,11 @@ const prismaClientSingleton = () => {
         price: {
           compute(orderItem) {
             return orderItem.price?.toString() ?? "0";
+          },
+        },
+        shippingPrice: {
+          compute(orderItem) {
+            return (orderItem as any).shippingPrice?.toString() ?? "0";
           },
         },
       },

@@ -97,12 +97,12 @@ export default function OrdersTable({
             {selectedOrders.length > 0 && (
                 <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
                     <span className="text-sm font-medium">
-                        {selectedOrders.length} {t("selected")}
+                        {selectedOrders.length} {t("Orders.selected")}
                     </span>
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" disabled={isPending}>
-                                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("moveTo")} <ChevronDown className="ml-2 h-4 w-4" />
+                                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : t("Orders.moveTo")} <ChevronDown className="ml-2 h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
@@ -128,6 +128,7 @@ export default function OrdersTable({
                                     checked={isAllSelected}
                                     onCheckedChange={toggleAll}
                                     aria-label="Select all"
+                                    className="mx-2"
                                 />
                             </TableHead>
                             <TableHead>{t("id")}</TableHead>
@@ -153,6 +154,7 @@ export default function OrdersTable({
                                             toggleOrder(order.id, checked as boolean)
                                         }
                                         aria-label={`Select order ${order.id}`}
+                                        className="mx-2"
                                     />
                                 </TableCell>
                                 <TableCell>{formatId(order.id)}</TableCell>

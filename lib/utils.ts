@@ -40,10 +40,18 @@ export function formatError(error: unknown) {
     error.name === "PrismaClientKnownRequestError" &&
     (error.code === "23505" || error.code === "P2002")
   ) {
+    const target = (error as any).meta?.target;
+    if (Array.isArray(target) && target.includes("slug")) {
+      return {
+        success: false,
+        fieldErrors: {},
+        formError: "Product with this slug already exists",
+      }
+    }
     return {
       success: false,
       fieldErrors: {},
-      formError: "Product with this name or slug already exists",
+      formError: "This record already exists",
     };
   }
 

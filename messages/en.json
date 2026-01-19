@@ -85,6 +85,8 @@
         "quantity": "Quantity",
         "price": "Price",
         "subtotal": "Products Total",
+        "cartSummary": "Cart Summary",
+        "items": "Items",
         "proceedToCheckout": "Proceed To Checkout"
     },
     "Checkout": {
@@ -268,7 +270,7 @@
         "title": "Order Confirmed",
         "description": "Thank you for your refined choice.",
         "orderReference": "Order Reference",
-        "message": "We've received your order and are meticulously preparing it for shipment. You will receive a confirmation email shortly.",
+        "message": "We've received your order and are meticulously preparing it for shipment.",
         "continueShopping": "Continue Shopping",
         "redirecting": "Redirecting in"
     },

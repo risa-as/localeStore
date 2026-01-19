@@ -8,10 +8,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { QuickOrderForm } from "./quick-order-form";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 
 export default function LandingPage({ product }: { product: Product }) {
     const t = useTranslations('LandingPage');
+    const locale = useLocale();
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const images = product.images && product.images.length > 0 ? product.images : ['/images/placeholder.jpg'];
 
@@ -98,7 +99,7 @@ export default function LandingPage({ product }: { product: Product }) {
 
                         {/* Thumbnails */}
                         {images.length > 1 && (
-                            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide pr-1">
+                            <div className={`flex gap-3 overflow-x-auto pb-2 scrollbar-hide ${locale === 'ar' ? 'pr-1' : 'pl-1'}`}>
                                 {images.map((img, idx) => (
                                     <button
                                         key={idx}

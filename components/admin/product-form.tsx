@@ -37,6 +37,7 @@ import Image from "next/image";
 import { Checkbox } from "../ui/checkbox";
 import { UploadButton } from "@/lib/uploadthing";
 import { useTranslations } from "next-intl";
+import { X } from "lucide-react";
 
 type ProductFormValues =
   | z.infer<typeof insertProductSchema>
@@ -352,14 +353,27 @@ const ProductForm = ({
                     <CardContent className="space-y-2 mt-2 min-h-48">
                       <div className="flex-start space-x-2">
                         {images.map((image: string) => (
-                          <Image
-                            key={image}
-                            src={image}
-                            alt="product image"
-                            className="w-20 h-20 object-cover object-center rounded-sm"
-                            width={100}
-                            height={100}
-                          />
+                          <div key={image} className="relative w-20 h-20">
+                            <Image
+                              src={image}
+                              alt="product image"
+                              className="w-full h-full object-cover object-center rounded-sm"
+                              width={100}
+                              height={100}
+                            />
+                            <Button
+                              type="button"
+                              className="absolute top-0 right-0 p-1 h-6 w-6 rounded-full bg-rose-500 hover:bg-rose-600 text-white"
+                              onClick={() => {
+                                form.setValue(
+                                  "images",
+                                  images.filter((img) => img !== image)
+                                );
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
                         ))}
                         <FormControl>
                           <UploadButton
