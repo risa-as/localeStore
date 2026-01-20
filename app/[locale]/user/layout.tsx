@@ -1,14 +1,21 @@
+import { auth } from "@/auth";
 import { APP_NAME } from "@/lib/constants";
+import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
 
-export default function UserLayout({
+export default async function UserLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+  if (!session) {
+    redirect("/sign-in");
+  }
+
   return (
     <div className="flex flex-col">
       <div className="border-b container mx-auto">

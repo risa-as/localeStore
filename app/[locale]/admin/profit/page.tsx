@@ -27,7 +27,7 @@ const ProfitPage = async (props: {
 }) => {
     const session = await auth();
     if (session?.user?.role !== "admin") {
-        redirect("/");
+        redirect("/unauthorized");
     }
 
     const searchParams = await props.searchParams;

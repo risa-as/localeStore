@@ -141,7 +141,7 @@ export default function UpdateOrderForm({
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select Status" />
+                                        <SelectValue placeholder={t("Orders.selectStatus")} />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>

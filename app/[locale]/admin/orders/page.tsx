@@ -17,9 +17,8 @@ const AdminOrdersPage = async (props: {
 }) => {
   await requireAdmin();
   const { page = "1", query: searchText = "", status = 'home' } = await props.searchParams;
-  const session = await auth();
-  if (session?.user?.role !== "admin")
-    throw new Error("User Is Not Authorized");
+  /* if (session?.user?.role !== "admin")
+    throw new Error("User Is Not Authorized"); */
   const orders = await getAllOrders({
     page: Number(page),
     limit: 5,

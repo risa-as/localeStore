@@ -6,6 +6,7 @@ import "@/assets/styles/globals.css";
 import { APP_DESCRIPTION, APP_NAME, SERVER_URL } from "@/lib/constants";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
+import AuthSessionProvider from "@/components/shared/auth-session-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -49,15 +50,17 @@ export default async function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NextIntlClientProvider messages={messages}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem={true}
-            disableTransitionOnChange={true}
-          >
-            {children}
-            <Toaster />
-          </ThemeProvider>
+          <AuthSessionProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem={true}
+              disableTransitionOnChange={true}
+            >
+              {children}
+              <Toaster />
+            </ThemeProvider>
+          </AuthSessionProvider>
         </NextIntlClientProvider>
       </body>
     </html>

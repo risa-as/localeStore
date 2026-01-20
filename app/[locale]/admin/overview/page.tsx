@@ -18,9 +18,9 @@ export const metadata: Metadata = {
 const AdminOverviewPage = async () => {
   await requireAdmin();
   const session = await auth();
-  if (session?.user?.role !== "admin") {
+  /* if (session?.user?.role !== "admin") {
     throw new Error("User is not authorized to access this page.");
-  }
+  } */
   const summary = await getOrderSummery();
   const t = await getTranslations('Admin');
 

@@ -18,10 +18,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createCategory } from "@/lib/actions/category.actions";
 import slugify from "slugify";
+import { useTranslations } from "next-intl";
 
 const CategoryForm = () => {
     const router = useRouter();
     const { toast } = useToast();
+    const t = useTranslations('Categories');
 
     const form = useForm<z.infer<typeof insertCategorySchema>>({
         resolver: zodResolver(insertCategorySchema),
@@ -55,9 +57,9 @@ const CategoryForm = () => {
                     name="name"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>{t('name')}</FormLabel>
                             <FormControl>
-                                <Input placeholder="Category Name" {...field} />
+                                <Input placeholder={t('placeholderName')} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -68,10 +70,10 @@ const CategoryForm = () => {
                     name="slug"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Slug</FormLabel>
+                            <FormLabel>{t('slug')}</FormLabel>
                             <FormControl>
                                 <div className="relative">
-                                    <Input placeholder="Category Slug" {...field} />
+                                    <Input placeholder={t('placeholderSlug')} {...field} />
                                     <Button
                                         type="button"
                                         className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 mt-2"
@@ -82,7 +84,7 @@ const CategoryForm = () => {
                                             );
                                         }}
                                     >
-                                        Generate
+                                        {t('generate')}
                                     </Button>
                                 </div>
                             </FormControl>
@@ -91,7 +93,7 @@ const CategoryForm = () => {
                     )}
                 />
                 <Button type="submit" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Submitting..." : "Create Category"}
+                    {form.formState.isSubmitting ? t('submitting') : t('create')}
                 </Button>
             </form>
         </Form>

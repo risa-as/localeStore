@@ -7,7 +7,8 @@
         "admin": "لوحة التحكم",
         "signIn": "تسجيل الدخول",
         "signOut": "تسجيل الخروج",
-        "profile": "الملف الشخصي"
+        "profile": "الملف الشخصي",
+        "orderHistory": "سجل الطلبات"
     },
     "Theme": {
         "light": "فاتح",
@@ -138,6 +139,7 @@
         "products": "المنتجات",
         "orders": "الطلبات",
         "Orders": {
+            "selectStatus": "اختر الحالة",
             "Status": {
                 "home": "الرئيسية",
                 "account": "حساب",
@@ -159,6 +161,7 @@
         "actions": "إجراءات",
         "details": "التفاصيل",
         "overview": "نظرة عامة",
+        "createUser": "إنشاء مستخدم جديد",
         "createProduct": "إنشاء منتج",
         "filteredBy": "تصفية حسب",
         "removeFilter": "إزالة التصفية",
@@ -181,6 +184,7 @@
         "role": "الدور",
         "user": "مستخدم",
         "admin": "مسؤول",
+        "employee": "موظف",
         "deletedUser": "مستخدم محذوف",
         "searchPlaceholder": "بحث...",
         "deleteConfirm": "هل أنت متأكد؟",
@@ -201,7 +205,14 @@
         "noData": "لا توجد بيانات للفترة المحددة."
     },
     "Categories": {
-        "selectCategory": "اختر فئة"
+        "selectCategory": "اختر فئة",
+        "name": "الاسم",
+        "slug": "الاسم اللطيف (Slug)",
+        "generate": "توليد",
+        "create": "إنشاء فئة",
+        "submitting": "جاري الإرسال...",
+        "placeholderName": "اسم الفئة",
+        "placeholderSlug": "الاسم اللطيف للفئة"
     },
     "AdminProduct": {
         "titleCreate": "إنشاء منتج",
@@ -293,5 +304,22 @@
         "Muthanna": "المثنى",
         "Saladin": "صلاح الدين",
         "Dohuk": "دهوك"
+    },
+    "Unauthorized": {
+        "title": "دخول غير مصرح به",
+        "description": "ليس لديك الصلاحية للوصول إلى هذه الصفحة.",
+        "returnHome": "العودة للرئيسية"
+    },
+    "Review": {
+        "buttonTitle": "أكتب مراجعة",
+        "title": "أكتب مراجعة",
+        "description": "شارك أفكارك مع العملاء الآخرين",
+        "titleLabel": "العنوان",
+        "descriptionLabel": "الوصف",
+        "ratingLabel": "التقييم",
+        "submit": "إرسال",
+        "submitting": "جاري الإرسال...",
+        "enterTitle": "أدخل العنوان",
+        "enterDescription": "أدخل الوصف"
     }
 }

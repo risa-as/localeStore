@@ -38,6 +38,7 @@ import {
   createUpdateReview,
   getReviewByProductId,
 } from "@/lib/actions/review.actions";
+import { useTranslations } from "next-intl";
 
 const ReviewForm = ({
   userId,
@@ -57,6 +58,8 @@ const ReviewForm = ({
     resolver: zodResolver(insertReviewSchema) as Resolver<ReviewValues>,
     defaultValues: reviewFormDefaultValues,
   });
+
+  const t = useTranslations('Review');
 
   // Open Form Handler
   const handleOpenForm = async () => {
@@ -99,15 +102,15 @@ const ReviewForm = ({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button onClick={handleOpenForm} variant="default" className="mt-2">
-        Write a Review
+        {t('buttonTitle')}
       </Button>
       <DialogContent className="sm:max-w-[425px]">
         <Form {...form}>
           <form method="post" onSubmit={form.handleSubmit(onSubmit)}>
             <DialogHeader>
-              <DialogTitle>Write a Review</DialogTitle>
+              <DialogTitle>{t('title')}</DialogTitle>
               <DialogDescription>
-                Share your thoughts with other customers
+                {t('description')}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -116,9 +119,9 @@ const ReviewForm = ({
                 name="title"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Title</FormLabel>
+                    <FormLabel>{t('titleLabel')}</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter title" {...field} />
+                      <Input placeholder={t('enterTitle')} {...field} />
                     </FormControl>
                   </FormItem>
                 )}
@@ -129,9 +132,9 @@ const ReviewForm = ({
                 render={({ field }) => {
                   return (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel>{t('descriptionLabel')}</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Enter description" {...field} />
+                        <Textarea placeholder={t('enterDescription')} {...field} />
                       </FormControl>
                     </FormItem>
                   );
@@ -143,7 +146,7 @@ const ReviewForm = ({
                 render={({ field }) => {
                   return (
                     <FormItem>
-                      <FormLabel>Rating</FormLabel>
+                      <FormLabel>{t('ratingLabel')}</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         value={field.value.toString()}
@@ -178,7 +181,7 @@ const ReviewForm = ({
                 className="w-full"
                 disabled={form.formState.isSubmitting}
               >
-                {form.formState.isSubmitting ? "Submitting..." : "Submit"}
+                {form.formState.isSubmitting ? t('submitting') : t('submit')}
               </Button>
             </DialogFooter>
           </form>

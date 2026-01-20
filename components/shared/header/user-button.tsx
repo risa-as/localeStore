@@ -10,15 +10,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserIcon } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 const UserButton = async () => {
   const session = await auth();
-  /* console.log(session?.user?.role); */
+  const tHeader = await getTranslations("Header");
+
   if (!session) {
     return (
       <Button asChild>
         <Link href="/sign-in">
-          <UserIcon /> Sign In
+          <UserIcon /> {tHeader('signIn')}
         </Link>
       </Button>
     );
@@ -53,19 +55,19 @@ const UserButton = async () => {
 
           <DropdownMenuItem>
             <Link href="/user/profile" className="w-full">
-              User Profile
+              {tHeader('profile')}
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem>
             <Link href="/user/orders" className="w-full">
-              Order History
+              {tHeader('orderHistory')}
             </Link>
           </DropdownMenuItem>
 
-          {session?.user?.role === "admin" && (
+          {(session?.user?.role === "admin" || session?.user?.role === "employee") && (
             <DropdownMenuItem>
               <Link href="/admin/overview" className="w-full">
-                Admin
+                {tHeader('admin')}
               </Link>
             </DropdownMenuItem>
           )}
@@ -76,7 +78,7 @@ const UserButton = async () => {
                 className="w-full py-4 px-2 h-4 justify-start"
                 variant="ghost"
               >
-                Sign Out
+                {tHeader('signOut')}
               </Button>
             </form>
           </DropdownMenuItem>

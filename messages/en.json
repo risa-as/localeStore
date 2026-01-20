@@ -7,7 +7,8 @@
         "admin": "Admin",
         "signIn": "Sign In",
         "signOut": "Sign Out",
-        "profile": "Profile"
+        "profile": "Profile",
+        "orderHistory": "Order History"
     },
     "Theme": {
         "light": "Light",
@@ -138,6 +139,7 @@
         "products": "Products",
         "orders": "Orders",
         "Orders": {
+            "selectStatus": "Select Status",
             "Status": {
                 "home": "Home",
                 "account": "Account",
@@ -159,6 +161,7 @@
         "actions": "Actions",
         "details": "Details",
         "overview": "Overview",
+        "createUser": "Create New User",
         "createProduct": "Create Product",
         "filteredBy": "Filtered by",
         "removeFilter": "Remove Filter",
@@ -181,6 +184,7 @@
         "role": "Role",
         "user": "User",
         "admin": "Admin",
+        "employee": "Employee",
         "deletedUser": "Deleted User",
         "searchPlaceholder": "Search...",
         "deleteConfirm": "Are You Sure?",
@@ -201,7 +205,14 @@
         "noData": "No data found for the selected period."
     },
     "Categories": {
-        "selectCategory": "Select a Category"
+        "selectCategory": "Select a Category",
+        "name": "Name",
+        "slug": "Slug",
+        "generate": "Generate",
+        "create": "Create Category",
+        "submitting": "Submitting...",
+        "placeholderName": "Category Name",
+        "placeholderSlug": "Category Slug"
     },
     "AdminProduct": {
         "titleCreate": "Create Product",
@@ -293,5 +304,22 @@
         "Muthanna": "Muthanna",
         "Saladin": "Saladin",
         "Dohuk": "Dohuk"
+    },
+    "Unauthorized": {
+        "title": "Unauthorized Access",
+        "description": "You do not have permission to access this page.",
+        "returnHome": "Return Home"
+    },
+    "Review": {
+        "buttonTitle": "Write a Review",
+        "title": "Write a Review",
+        "description": "Share your thoughts with other customers",
+        "titleLabel": "Title",
+        "descriptionLabel": "Description",
+        "ratingLabel": "Rating",
+        "submit": "Submit",
+        "submitting": "Submitting...",
+        "enterTitle": "Enter title",
+        "enterDescription": "Enter description"
     }
 }

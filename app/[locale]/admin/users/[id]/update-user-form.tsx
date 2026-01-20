@@ -25,6 +25,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { ControllerRenderProps, useForm } from "react-hook-form";
 import { z } from "zod";
+import { useTranslations } from "next-intl";
 
 const UpdateUserForm = ({
   user,
@@ -33,6 +34,7 @@ const UpdateUserForm = ({
 }) => {
   const router = useRouter();
   const { toast } = useToast();
+  const t = useTranslations('Admin');
 
   const form = useForm<z.infer<typeof updateUserSchema>>({
     resolver: zodResolver(updateUserSchema),
@@ -146,7 +148,7 @@ const UpdateUserForm = ({
                   <SelectContent>
                     {USER_ROLES.map((role) => (
                       <SelectItem key={role} value={role}>
-                        {role.charAt(0).toUpperCase() + role.slice(1)}
+                        {t(role)}
                       </SelectItem>
                     ))}
                   </SelectContent>

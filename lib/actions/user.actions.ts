@@ -204,11 +204,11 @@ export async function getAllUsers({
   const queryFilter: Prisma.UserWhereInput =
     query && query !== "all"
       ? {
-          email: {
-            contains: query,
-            mode: "insensitive",
-          } as Prisma.StringFilter,
-        }
+        email: {
+          contains: query,
+          mode: "insensitive",
+        } as Prisma.StringFilter,
+      }
       : {};
   const data = await prisma.user.findMany({
     where: {
@@ -262,5 +262,37 @@ export async function updateUser(user: z.infer<typeof updateUserSchema>) {
   } catch (error) {
     const { formError } = formatError(error);
     return { success: false, message: formError };
+  }
+}
+
+// Create User (Admin)
+export async function createUser(data: z.infer<typeof signUpFormSchema> & { role: string }) {
+  try {
+    const user = signUpFormSchema.parse(data);
+    const hashPassword = hashSync(user.password);
+
+    const existingUser = await prisma.user.findFirst({
+      where: { email: user.email },
+    });
+
+    if (existingUser) {
+      return { success: false, message: "User with this email already exists" };
+    }
+
+    await prisma.user.create({
+      data: {
+        name: user.name,
+        email: user.email,
+        password: hashPassword,
+        role: data.role,
+      },
+    });
+
+    revalidatePath("/admin/users");
+
+    return { success: true, message: "User Created Successfully" };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError };
   }
 }

@@ -2,7 +2,9 @@ import { deleteUser, getAllUsers } from "@/lib/actions/user.actions";
 import { Metadata } from "next";
 import { formatId } from "@/lib/utils";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
+import { requireAdmin } from "@/lib/auth-guard";
 import {
   Table,
   TableBody,
@@ -28,6 +30,8 @@ const AdminUserPage = async (props: {
   }>;
 }) => {
   const { page = "1", query: searchText } = await props.searchParams;
+  const session = await requireAdmin();
+  if (session?.user?.role !== "admin") redirect("/unauthorized");
   const users = await getAllUsers({
     page: Number(page),
     query: searchText,
@@ -39,8 +43,13 @@ const AdminUserPage = async (props: {
   return (
     <>
       <div className="space-y-2">
-        <div className="flex items-center  gap-3">
+        <div className="flex items-center justify-between  gap-3">
           <h1 className="h2-bold">{t('users')}</h1>
+          <Button asChild variant="default">
+            <Link href="/admin/users/create">
+              {t('createUser')}
+            </Link>
+          </Button>
           {searchText && (
             <div>
               {t('filteredBy')} <i>&quot;{searchText}&quot;</i>{" "}
@@ -72,8 +81,10 @@ const AdminUserPage = async (props: {
                   <TableCell>
                     {user.role === "user" ? (
                       <Badge variant={"secondary"}>{t('user')}</Badge>
-                    ) : (
+                    ) : user.role === "admin" ? (
                       <Badge variant={"default"}>{t('admin')}</Badge>
+                    ) : (
+                      <Badge variant={"default"}>{t(user.role)}</Badge>
                     )}
                   </TableCell>
                   <TableCell>

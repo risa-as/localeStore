@@ -2,6 +2,8 @@ import { Metadata } from "next";
 import { getMyOrders } from "@/lib/actions/order.actions";
 import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
 import Link from "next/link";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -19,6 +21,10 @@ const OrdersPage = async (props: {
   searchParams: Promise<{ page: string }>;
 }) => {
   const { page } = await props.searchParams;
+  const session = await auth();
+  if (!session) {
+    redirect("/sign-in");
+  }
   const orders = await getMyOrders({
     page: Number(page) || 1,
   });
