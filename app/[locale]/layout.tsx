@@ -7,6 +7,8 @@ import { APP_DESCRIPTION, APP_NAME, SERVER_URL } from "@/lib/constants";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import AuthSessionProvider from "@/components/shared/auth-session-provider";
+// import FacebookPixelWrapper from "./facebook-pixel-wrapper";
+import { FacebookPixelProvider } from './facebook-pixel-provider';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -43,13 +45,19 @@ export default async function RootLayout({
   }
 
   const messages = await getMessages();
+  console.log("Rendering [locale] layout, locale:", locale, "messages keys:", Object.keys(messages));
 
   return (
     <html lang={locale} dir={locale === 'ar' ? 'rtl' : 'ltr'} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://connect.facebook.net" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <NextIntlClientProvider messages={messages}>
+        <NextIntlClientProvider messages={messages} locale={locale} timeZone="Asia/Baghdad">
           <AuthSessionProvider>
             <ThemeProvider
               attribute="class"
@@ -57,6 +65,7 @@ export default async function RootLayout({
               enableSystem={true}
               disableTransitionOnChange={true}
             >
+              <FacebookPixelProvider />
               {children}
               <Toaster />
             </ThemeProvider>

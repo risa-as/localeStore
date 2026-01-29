@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/carousel";
 import { Product } from "@/types";
 import Autoplay from "embla-carousel-autoplay";
-import Image from "next/image";
+import { AccessibleImage } from "@/components/ui/accessible-image";
 import Link from "next/link";
 const ProductCarousel = ({ data }: { data: Product[] }) => {
   return (
@@ -27,16 +27,17 @@ const ProductCarousel = ({ data }: { data: Product[] }) => {
       ]}
     >
       <CarouselContent>
-        {data.map((product: Product) => (
+        {data.map((product: Product, index: number) => (
           <CarouselItem key={product.id}>
             <Link href={`/product/${product.slug}`}>
               <div className="relative mx-auto">
-                <Image
+                <AccessibleImage
                   src={product.banner!}
                   alt={product.name}
                   height="0"
                   width="0"
                   sizes="100vw"
+                  priority={index === 0}
                   className="w-full h-auto"
                 />
                 <div className="absolute inset-0 flex items-end justify-center">

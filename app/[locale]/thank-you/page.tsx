@@ -1,25 +1,83 @@
-
-"use client";
-
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+"use client"
+import { useEffect, useMemo, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { v4 as uuidv4 } from 'uuid';
+import { motion } from "framer-motion";
 import { CheckCircle2, ShoppingBag, ArrowRight } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
-import { useTranslations } from "next-intl";
 
-export default function ThankYouPage() {
+// UI Components
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+
+// Pixel Integrations
+import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
+import FbPixel from "@/components/shared/facebook-pixel";
+
+// مكون فرعي لاستخدام useSearchParams بأمان
+function ThankYouContent() {
     const t = useTranslations('ThankYou');
     const router = useRouter();
     const searchParams = useSearchParams();
     const orderId = searchParams.get('orderId');
-    const [timeLeft, setTimeLeft] = useState(5);
+    const [timeLeft, setTimeLeft] = useState(155);
 
+
+    // --- إعدادات التتبع ---
+    const [eventId] = useState(() => uuidv4());
+    const [orderData, setOrderData] = useState<any>(null);
+
+    // جلب البيانات (يحدث مرة واحد)
+    useEffect(() => {
+        if (orderId) {
+            import("@/lib/actions/order.actions").then(({ getOrderById }) => {
+                getOrderById(orderId).then((order) => {
+                    if (order) {
+                        setOrderData(order);
+
+                        // Send CAPI Event with Real Data
+                        sendCAPIEvent("Purchase", eventId, {
+                            eventSourceUrl: window.location.href,
+                            value: Number(order.totalPrice),
+                            currency: "USD",
+                            // Add User Data
+                            email: order.user?.email,
+                            phone: order.phoneNumber,
+                            firstName: order.fullName?.split(" ")[0],
+                            lastName: order.fullName?.split(" ").slice(1).join(" "),
+                            city: order.governorate, // Assuming governorate maps to city/region
+                            country: "IQ", // Assuming Iraq based on context
+                        }).catch(console.error);
+                    } else {
+                        console.error("Order not found or null returned");
+                    }
+                }).catch(err => console.error("Error fetching order:", err));
+            });
+        }
+    }, [orderId, eventId]);
+
+    // 2. تجهيز بيانات البكسل (يتم إنشاؤها فقط عند توفر الطلب)
+    // استخدام useMemo يمنع إعادة إنشاء الكائن عند تغير العداد timeLeft
+    const pixelData = useMemo(() => {
+        // إذا لم تتوفر البيانات بعد، نرجع null
+        if (!orderData) return null;
+
+        return {
+            value: Number(orderData.totalPrice),
+            currency: "USD",
+            content_name: "Order " + orderData.id,
+            content_type: "product",
+            content_ids: orderData.orderitems?.map((item: any) => item.productId) || [],
+            num_items: orderData.orderitems?.length || 0
+        };
+    }, [orderData]); // <--- يراقب orderData فقط
+    // End API Code
+
+    // 3. العداد التنازلي
     useEffect(() => {
         if (timeLeft === 0) {
-            router.push('/en'); // Redirect to store home
+            router.push('/ar'); // Redirect to store home
             return;
         }
 
@@ -32,6 +90,16 @@ export default function ThankYouPage() {
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-white p-6">
+            {/* Start Pixel Code */}
+
+            {orderData && pixelData && (
+                <FbPixel
+                    eventName="Purchase"
+                    eventId={eventId}
+                    data={pixelData}
+                />
+            )}
+            {/* End Pixel Code */}
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -84,5 +152,13 @@ export default function ThankYouPage() {
                 </Card>
             </motion.div>
         </div>
+    );
+}
+
+export default function ThankYouPage() {
+    return (
+        <Suspense fallback={<div>Loading...</div>}>
+            <ThankYouContent />
+        </Suspense>
     );
 }

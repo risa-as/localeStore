@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AccessibleButton } from "@/components/ui/accessible-button";
 import {
   Select,
   SelectContent,
@@ -40,9 +40,11 @@ const Search = async () => {
           placeholder={t('placeholder')}
           className="md:w-[100px] lg:w-[300px]"
         />
-        <Button>
-          <SearchIcon />
-        </Button>
+        <AccessibleButton
+          type="submit"
+          label={t('search')}
+          icon={<SearchIcon />}
+        />
       </div>
     </form>
   );

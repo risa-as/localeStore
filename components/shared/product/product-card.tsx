@@ -1,23 +1,23 @@
 import Link from "next/link";
-import Image from "next/image";
+import { AccessibleImage } from "@/components/ui/accessible-image";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
 import Rating from "./rating";
 import { useTranslations } from "next-intl";
 
-const ProductCard = ({ product }: { product: Product }) => {
+const ProductCard = ({ product, priority = false }: { product: Product; priority?: boolean }) => {
   const t = useTranslations('Product');
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="p-0">
         <Link href={`/product/${product.slug}`}>
-          <Image
+          <AccessibleImage
             src={product.images[0]}
             alt={product.name}
             width={300}
             height={300}
-            priority={true}
+            priority={priority}
             className="aspect-square object-cover rounded-t-lg"
           />
         </Link>

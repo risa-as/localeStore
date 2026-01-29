@@ -59,64 +59,87 @@ export const config = {
     ...authConfig.callbacks, // دمج الـ authorized callback من الملف الخفيف
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async session({ session, user, trigger, token }: any) {
-      // Set The User ID From The Token
-      // session.user.id = token.id
-      session.user.id = token.sub;
-      session.user.role = token.role;
-      session.user.name = token.name;
-      // console.log("token",token)
-      // If There Is An Update , Set The User Name
-      if (trigger === "update") {
-        session.user.name = user.name;
+      try {
+        // Set The User ID From The Token
+        // session.user.id = token.id
+        if (token && token.sub) {
+          session.user.id = token.sub;
+        }
+        if (token && token.role) {
+          session.user.role = token.role;
+        }
+        if (token && token.name) {
+          session.user.name = token.name;
+        }
+        // console.log("token",token)
+        // If There Is An Update , Set The User Name
+        if (trigger === "update" && user) {
+          session.user.name = user.name;
+        }
+        return session;
+      } catch (error) {
+        // Log the error safely
+        console.error("DEBUG: Auth Session Error", error);
+
+        // Return session with partial data if possible, or just the original session
+        return session;
       }
-      return session;
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async jwt({ token, user, trigger, session }: any) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
+      try {
+        if (user) {
+          token.id = user.id;
+          token.role = user.role;
 
-        if (user && trigger === "signIn") {
-          // if user has no name then use the email
-          if (user.name === "NO_NAME") {
-            token.name = user.email.split("@")[0];
-            // update database to reflect the token name
-            // تنبيه: عمليات قاعدة البيانات هنا تبطئ الأداء
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { name: token.name },
-            });
+          if (user && trigger === "signIn") {
+            // if user has no name then use the email
+            if (user.name === "NO_NAME") {
+              token.name = user.email.split("@")[0];
+              // update database to reflect the token name
+              // تنبيه: عمليات قاعدة البيانات هنا تبطئ الأداء
+              try {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: { name: token.name },
+                });
+              } catch (dbError) {
+                console.error("Auth JWT DB Update Error", dbError);
+              }
+            }
           }
-        }
-        if (trigger === "signIn" || trigger === "signUp") {
-          const cookiesObject = await cookies();
-          const sessionCartId = cookiesObject.get("sessionCartId")?.value;
-          if (sessionCartId) {
-            const sessionCart = await prisma.cart.findFirst({
-              where: {
-                sessionCartId,
-              },
-            });
-            if (sessionCart) {
-              // Delete current user cart
-              await prisma.cart.deleteMany({
-                where: { userId: user.id },
+          if (trigger === "signIn" || trigger === "signUp") {
+            const cookiesObject = await cookies();
+            const sessionCartId = cookiesObject.get("sessionCartId")?.value;
+            if (sessionCartId) {
+              const sessionCart = await prisma.cart.findFirst({
+                where: {
+                  sessionCartId,
+                },
               });
-              // Assign new cart
-              await prisma.cart.update({
-                where: { id: sessionCart.id },
-                data: { userId: user.id },
-              });
+              if (sessionCart) {
+                // Delete current user cart
+                await prisma.cart.deleteMany({
+                  where: { userId: user.id },
+                });
+                // Assign new cart
+                await prisma.cart.update({
+                  where: { id: sessionCart.id },
+                  data: { userId: user.id },
+                });
+              }
             }
           }
         }
+        // handle session update
+        if (session?.user?.name && trigger === "update") {
+          token.name = session.user.name;
+        }
+        return token;
+      } catch (error) {
+        console.error("DEBUG: Auth JWT Error", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+        return token;
       }
-      // handle session update
-      if (session?.user?.name && trigger === "update") {
-        token.name = session.user.name;
-      }
-      return token;
     },
   },
 };

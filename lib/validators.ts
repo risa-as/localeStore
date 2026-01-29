@@ -127,6 +127,7 @@ export const updateOrderSchema = insertOrderSchema.extend({
   id: z.string().min(1, "ID is required"),
   status: z.string().min(1, "Status is required"),
   totalPrice: currency,
+  notes: z.string().optional().nullable(),
 });
 
 // Schema for inserting an order item

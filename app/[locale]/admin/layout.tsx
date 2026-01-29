@@ -3,13 +3,18 @@ import Image from "next/image";
 import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
+import { getMessages, getLocale } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
 
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const messages = await getMessages();
+  const locale = await getLocale();
+
   return (
     <div className="flex flex-col">
       <div className="border-b container mx-auto">
@@ -24,7 +29,9 @@ export default function AdminLayout({
           </Link>
           <MainNav className="ms-6" />
           <div className="ms-auto items-center flex gap-4">
-            <Menu />
+            <NextIntlClientProvider locale={locale} messages={messages}>
+              <Menu />
+            </NextIntlClientProvider>
           </div>
         </div>
       </div>

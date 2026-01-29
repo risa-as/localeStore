@@ -8,6 +8,11 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import SearchFilters from "@/components/shared/product/search-filters";
 import { Product } from "@/types";
+import dynamic from "next/dynamic";
+
+const MobileFilters = dynamic(() => import("@/components/shared/product/mobile-filters"), {
+  ssr: true, // Still want SSR for SEO? Or false for pure mobile perf? Drawer is interactive. Keep SSR true or leave dynamic defaults. User recommendation said "HeavyComponent = dynamic...". Drawer is somewhat heavy.
+});
 
 
 
@@ -136,21 +141,38 @@ const SearchPage = async (props: {
 
   return (
     <div className="grid md:grid-cols-5 md:gap-5">
-      <SearchFilters
-        categories={categories}
-        prices={prices}
-        ratings={ratings}
-        translations={{
-          category: t('category'),
-          price: t('price'),
-          customerRatings: t('customerRatings'),
-          any: t('any'),
-          starsAndUp: t('starsAndUp'),
-        }}
-      />
+      <div className="hidden md:block">
+        <SearchFilters
+          categories={categories}
+          prices={prices}
+          ratings={ratings}
+          translations={{
+            category: t('category'),
+            price: t('price'),
+            customerRatings: t('customerRatings'),
+            any: t('any'),
+            starsAndUp: t('starsAndUp'),
+          }}
+        />
+      </div>
       <div className="md:col-span-4 space-y-4">
         <div className="flex-between flex-col md:flex-row my-4">
           <div className="flex items-center gap-2">
+            <div className="md:hidden mb-2">
+              <MobileFilters
+                categories={categories}
+                prices={prices}
+                ratings={ratings}
+                translations={{
+                  category: t('category'),
+                  price: t('price'),
+                  customerRatings: t('customerRatings'),
+                  any: t('any'),
+                  starsAndUp: t('starsAndUp'),
+                  filter: t('filter'),
+                }}
+              />
+            </div>
             {q !== "all" && q !== "" && (
               <span className="bg-gray-100 p-1 px-2 rounded-md">
                 {t('query')}: {q}
@@ -196,8 +218,8 @@ const SearchPage = async (props: {
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {products.data.length === 0 && <div>{t('noResults')}</div>}
-          {products.data.map((product: Product) => (
-            <ProductCard key={product.id} product={product} />
+          {products.data.map((product: Product, index: number) => (
+            <ProductCard key={product.id} product={product} priority={index < 4} />
           ))}
         </div>
       </div>

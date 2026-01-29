@@ -133,6 +133,7 @@
     },
     "Admin": {
         "dashboard": "Dashboard",
+        "exportExcel": "Export to Excel",
         "totalRevenue": "Total Revenue",
         "sales": "Sales",
         "customers": "Customers",
@@ -146,7 +147,8 @@
                 "pending": "Pending",
                 "completed": "Completed",
                 "returned": "Returned",
-                "waiting": "Waiting"
+                "waiting": "Waiting",
+                "banned": "Banned"
             },
             "selected": "selected",
             "moveTo": "Move to",
@@ -165,6 +167,8 @@
         "createProduct": "Create Product",
         "filteredBy": "Filtered by",
         "removeFilter": "Remove Filter",
+        "notes": "Notes",
+        "enterNotes": "Enter notes here...",
         "id": "ID",
         "name": "Name",
         "price": "Price",
@@ -261,7 +265,8 @@
         "rating": "Rating",
         "noResults": "No products found",
         "starsAndUp": "stars & up",
-        "priceTo": "to"
+        "priceTo": "to",
+        "filter": "Filter"
     },
     "LandingPage": {
         "premiumCollection": "Premium Collection",

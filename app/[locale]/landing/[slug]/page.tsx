@@ -1,4 +1,3 @@
-
 import { getProductBySlug } from "@/lib/actions/product.actions";
 import { notFound } from "next/navigation";
 import LandingPage from "@/components/shared/product/landing-page";
@@ -27,5 +26,5 @@ export default async function LandingPageRoute(props: {
         notFound();
     }
 
-    return <LandingPage product={product} />;
+    return <LandingPage product={product} />
 }

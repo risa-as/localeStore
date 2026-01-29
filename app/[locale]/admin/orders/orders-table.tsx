@@ -89,7 +89,7 @@ export default function OrdersTable({
         });
     };
 
-    const statuses = ['home', 'account', 'pending', 'completed', 'returned', 'waiting'];
+    const statuses = ['home', 'account', 'pending', 'completed', 'returned', 'waiting', 'banned'];
 
     return (
         <div className="space-y-4">
@@ -140,6 +140,7 @@ export default function OrdersTable({
                             <TableHead>Address</TableHead>
                             <TableHead>Qty</TableHead>
                             <TableHead>Price</TableHead>
+                            <TableHead>{t("notes")}</TableHead>
                             <TableHead>{t("status")}</TableHead>
                             <TableHead className="w-[100px]">{t("actions")}</TableHead>
                         </TableRow>
@@ -172,10 +173,13 @@ export default function OrdersTable({
                                 <TableCell>{order.address}</TableCell>
                                 <TableCell>{order.quantity}</TableCell>
                                 <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
+                                <TableCell className="max-w-[200px] truncate" title={order.notes || ""}>
+                                    {order.notes || "-"}
+                                </TableCell>
                                 <TableCell>
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
                                         order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                            order.status === 'returned' ? 'bg-red-100 text-red-800' :
+                                            order.status === 'returned' || order.status === 'banned' ? 'bg-red-100 text-red-800' :
                                                 'bg-gray-100 text-gray-800'
                                         }`}>
                                         {t(`Orders.Status.${order.status}`) || order.status}

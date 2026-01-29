@@ -1,5 +1,5 @@
 "use server";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
@@ -12,6 +12,36 @@ import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+
+// Helper to check for fraud
+async function checkForFraud(ip: string, newPhone: string, newGov: string): Promise<boolean> {
+  if (!ip) return false;
+
+  // Get all previous orders from this IP
+  const existingOrders = await prisma.order.findMany({
+    where: { ip },
+    select: { phoneNumber: true, governorate: true }
+  });
+
+  if (existingOrders.length === 0) return false;
+
+  // Collect unique phone numbers and governorates
+  const phoneNumbers = new Set(existingOrders.map(o => o.phoneNumber));
+  const governorates = new Set(existingOrders.map(o => o.governorate));
+
+  // Add the new details
+  phoneNumbers.add(newPhone);
+  governorates.add(newGov);
+
+  // Fraud Logic: 
+  // 1. More than 2 different phone numbers
+  // 2. More than 1 different governorate (i.e. different governorates)
+  if (phoneNumbers.size > 2 || governorates.size > 1) {
+    return true;
+  }
+
+  return false;
+}
 
 // Create Quick Order (Direct from Landing Page)
 export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, productId: string) {
@@ -137,6 +167,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
 
 
 
+    // Capture IP
+    const ip = (await headers()).get('x-forwarded-for');
+
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
       // Create order
@@ -147,8 +180,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
           ...orderDataWithoutColor,
           quantity: orderData.quantity,
           totalPrice: price,
-          status: "home", // Default status
+          status: await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate) ? "banned" : "home",
           userId,
+          ip: ip as string,
         }
       });
 
@@ -313,6 +347,9 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       };
     }
 
+    // Capture IP
+    const ip = (await headers()).get('x-forwarded-for');
+
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
       // Create order
@@ -323,7 +360,8 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
           ...orderDataWithoutColor,
           totalPrice: price,
           userId,
-          status: "home", // Default status
+          status: await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate) ? "banned" : "home", // Check fraud
+          ip: ip as string,
         }
       });
       // Create order items from the cart items
@@ -386,6 +424,7 @@ export async function getOrderById(orderId: string) {
     where: { id: orderId },
     include: {
       orderitems: true,
+      user: true,
     },
   });
   return convertToPlainObject(data);
@@ -406,10 +445,12 @@ export async function getAllOrders({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-        fullName: {
-          contains: query,
-          mode: "insensitive",
-        },
+        OR: [
+          { fullName: { contains: query, mode: "insensitive" } },
+          { phoneNumber: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { governorate: { contains: query, mode: "insensitive" } },
+        ]
       }
       : {};
 
@@ -434,6 +475,43 @@ export async function getAllOrders({
     totalPages: Math.ceil(dataCount / limit),
   };
 
+}
+
+// Get All Orders For Export (No Pagination)
+export async function getAllOrdersForExport({
+  query,
+  status,
+}: {
+  query: string;
+  status?: string;
+}) {
+  const queryFilter: Prisma.OrderWhereInput =
+    query && query !== "all"
+      ? {
+        OR: [
+          { fullName: { contains: query, mode: "insensitive" } },
+          { phoneNumber: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { governorate: { contains: query, mode: "insensitive" } },
+        ]
+      }
+      : {};
+
+  if (status && status !== 'all') {
+    (queryFilter as any).status = status;
+  }
+
+  const data = await prisma.order.findMany({
+    where: {
+      ...queryFilter,
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      orderitems: true,
+    }
+  });
+
+  return convertToPlainObject(data);
 }
 
 // Get My Orders
@@ -501,7 +579,8 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
         address: order.address,
         quantity: order.quantity,
         totalPrice: order.totalPrice,
-        status: order.status
+        status: order.status,
+        notes: order.notes
       }
     });
 

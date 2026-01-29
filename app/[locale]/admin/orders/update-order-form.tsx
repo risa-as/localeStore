@@ -157,6 +157,25 @@ export default function UpdateOrderForm({
                     )}
                 />
 
+                <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{t("notes")}</FormLabel>
+                            <FormControl>
+                                <textarea
+                                    className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                    placeholder={t("enterNotes")}
+                                    {...field}
+                                    value={field.value || ''}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
                 <div className="flex justify-end pt-4">
                     <Button type="submit" disabled={isPending}>
                         {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

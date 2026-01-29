@@ -41,6 +41,7 @@
     "date-fns": "^4.1.0",
     "embla-carousel-autoplay": "^8.6.0",
     "embla-carousel-react": "^8.6.0",
+    "facebook-nodejs-business-sdk": "^24.0.1",
     "framer-motion": "^12.26.2",
     "lucide-react": "^0.556.0",
     "next": "^16.0.10",
@@ -53,6 +54,7 @@
     "react-day-picker": "^9.13.0",
     "react-dom": "19.2.0",
     "react-email": "^5.2.2",
+    "react-facebook-pixel": "^1.0.4",
     "react-hook-form": "^7.69.0",
     "recharts": "^3.6.0",
     "resend": "^6.7.0",
@@ -61,8 +63,10 @@
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
     "uploadthing": "^7.7.4",
+    "uuid": "^13.0.0",
     "vaul": "^1.1.2",
     "ws": "^8.18.3",
+    "xlsx": "^0.18.5",
     "zod": "^4.2.1"
   },
   "devDependencies": {
@@ -92,5 +96,12 @@
   "overrides": {
     "effect": "3.18.4",
     "undici": "5.28.4"
-  }
+  },
+  "browserslist": [
+    ">0.3%",
+    "not dead",
+    "not op_mini all",
+    "not ie > 0",
+    "not ie_mob > 0"
+  ]
 }

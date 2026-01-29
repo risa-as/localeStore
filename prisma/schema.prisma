@@ -113,6 +113,8 @@ model Order {
   userId        String?     @db.Uuid
   user          User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   orderitems    OrderItem[]
+  notes         String?
+  ip            String?
 }
 
 model OrderItem {

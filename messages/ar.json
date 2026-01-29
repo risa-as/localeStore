@@ -133,6 +133,7 @@
     },
     "Admin": {
         "dashboard": "لوحة التحكم",
+        "exportExcel": "تصدير إلى Excel",
         "totalRevenue": "إجمالي الإيرادات",
         "sales": "المبيعات",
         "customers": "العملاء",
@@ -146,7 +147,8 @@
                 "pending": "معلق",
                 "completed": "مكتمل",
                 "returned": "راجع",
-                "waiting": "انتظار"
+                "waiting": "انتظار",
+                "banned": "تم حظرهم"
             },
             "selected": "محدد",
             "moveTo": "نقل إلى",
@@ -165,6 +167,8 @@
         "createProduct": "إنشاء منتج",
         "filteredBy": "تصفية حسب",
         "removeFilter": "إزالة التصفية",
+        "notes": "ملاحظات",
+        "enterNotes": "أدخل الملاحظات هنا...",
         "id": "المعرف",
         "name": "الاسم",
         "price": "السعر",
@@ -255,13 +259,14 @@
         "category": "الفئة",
         "clear": "مسح التصفية",
         "sortBy": "ترتيب حسب",
-        "newest": "الأحدث",
-        "lowest": "الأقل سعراً",
-        "highest": "الأعلى سعراً",
+        "newest": "الجديد",
+        "lowest": "اقل سعرا",
+        "highest": "اعلى سعرا",
         "rating": "التقييم",
         "noResults": "لم يتم العثور على منتجات",
         "starsAndUp": "نجوم فأكثر",
-        "priceTo": "إلى"
+        "priceTo": "إلى",
+        "filter": "تصفية"
     },
     "LandingPage": {
         "premiumCollection": "مجموعة متميزة",

@@ -2,14 +2,18 @@
 
 import { formatCurrency } from "@/lib/utils";
 import { Product } from "@/types";
-import { Check, Star, ShieldCheck, Truck, RotateCcw, ArrowRight, ChevronLeft, ChevronRight, Tag } from "lucide-react";
+import { Star, ShieldCheck, Truck, RotateCcw, ChevronLeft, ChevronRight, Tag } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { QuickOrderForm } from "./quick-order-form";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslations, useLocale } from "next-intl";
-
+// Start Pixel Code
+import { v4 as uuidv4 } from 'uuid';
+import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
+import FbPixel from "../facebook-pixel";
+// End Pixel Code
 export default function LandingPage({ product }: { product: Product }) {
     const t = useTranslations('LandingPage');
     const locale = useLocale();
@@ -24,14 +28,28 @@ export default function LandingPage({ product }: { product: Product }) {
         setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
     };
 
+
+    //Start API Code
+    const [eventId] = useState(() => uuidv4());
+
+    useEffect(() => {
+        sendCAPIEvent("PageView", eventId, {
+            eventSourceUrl: window.location.href,
+        }).catch(console.error);
+    }, [eventId]);
+    //End API Code
+
     return (
         <div className="min-h-screen relative overflow-x-hidden bg-[#F8F9FA] text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
+            {/* Start Pixel Code */}
+            <FbPixel eventName="PageView" eventId={eventId} data={{ url: "/" }} />
+            {/* End Pixel Code */}
             {/* Background Elements */}
             <div className="fixed inset-0 z-0 pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-blue-100/50 rounded-full blur-[120px] mix-blend-multiply opacity-70 animate-blob"></div>
                 <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-purple-100/50 rounded-full blur-[120px] mix-blend-multiply opacity-70 animate-blob animation-delay-2000"></div>
                 <div className="absolute bottom-[-20%] left-[20%] w-[50%] h-[50%] bg-indigo-100/50 rounded-full blur-[120px] mix-blend-multiply opacity-70 animate-blob animation-delay-4000"></div>
-                <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02]"></div>
+                {/* <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.02]"></div> */}
             </div>
 
             <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-20 lg:pt-16 lg:pb-32">

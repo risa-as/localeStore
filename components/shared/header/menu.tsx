@@ -45,7 +45,7 @@ const Menu = async () => {
                 </div>
             </Link>
             <Sheet>
-                <SheetTrigger className="align-middle">
+                <SheetTrigger className="align-middle" aria-label={t('Menu.menu')}>
                     <EllipsisVertical />
                 </SheetTrigger>
                 <SheetContent className="flex flex-col items-start">
