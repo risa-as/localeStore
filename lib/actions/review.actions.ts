@@ -6,14 +6,16 @@ import { formatError } from "../utils";
 import { auth } from "@/auth";
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
+import { getTranslations } from "next-intl/server";
 
 // Create & Update Reviews
 export async function createUpdateReview(
   data: z.infer<typeof insertReviewSchema>
 ) {
   try {
+    const t = await getTranslations("Toast");
     const session = await auth();
-    if (!session) throw new Error("User is not authenticated");
+    if (!session) throw new Error(t("userNotAuthenticated"));
 
     // Validate and store the review
     const review = insertReviewSchema.parse({
@@ -26,7 +28,7 @@ export async function createUpdateReview(
       where: { id: review.productId },
     });
 
-    if (!product) throw new Error("Product not found");
+    if (!product) throw new Error(t("productNotFound"));
 
     // Check if user already reviewed
     const reviewExists = await prisma.review.findFirst({
@@ -77,7 +79,7 @@ export async function createUpdateReview(
 
     return {
       success: true,
-      message: "Review Updated Successfully",
+      message: t("reviewUpdated"),
     };
   } catch (error) {
     const { formError } = formatError(error);

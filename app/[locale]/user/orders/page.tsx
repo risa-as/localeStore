@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { getMyOrders } from "@/lib/actions/order.actions";
+import { getTranslations } from "next-intl/server";
 import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -25,22 +26,23 @@ const OrdersPage = async (props: {
   if (!session) {
     redirect("/sign-in");
   }
+  const t = await getTranslations("UserOrders");
   const orders = await getMyOrders({
     page: Number(page) || 1,
   });
   return (
     <div className="space-y-2">
-      <h2 className="h2-bold">Orders</h2>
+      <h2 className="h2-bold">{t("title")}</h2>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Total</TableHead>
-              <TableHead>Paid</TableHead>
-              <TableHead>Delivered</TableHead>
-              <TableHead>Action</TableHead>
+              <TableHead>{t("id")}</TableHead>
+              <TableHead>{t("date")}</TableHead>
+              <TableHead>{t("total")}</TableHead>
+              <TableHead>{t("paid")}</TableHead>
+              <TableHead>{t("delivered")}</TableHead>
+              <TableHead>{t("action")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -54,16 +56,16 @@ const OrdersPage = async (props: {
                 <TableCell>
                   {order.isPaid && order.paidAt
                     ? formatDateTime(order.paidAt).dateTime
-                    : "Not Paid"}
+                    : t("notPaid")}
                 </TableCell>
                 <TableCell>
                   {order.isDelivered && order.deliveredAt
                     ? formatDateTime(order.deliveredAt).dateTime
-                    : "Not Delivered"}
+                    : t("notDelivered")}
                 </TableCell>
                 <TableCell>
                   <Link href={`/order/${order.id}`}>
-                    <span className="px-2">Details</span>
+                    <span className="px-2">{t("details")}</span>
                   </Link>
                 </TableCell>
               </TableRow>

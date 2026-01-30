@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import z from "zod";
+import { useTranslations } from "next-intl";
 
 const ProfileForm = () => {
   const { data: session, update } = useSession();
@@ -26,6 +27,8 @@ const ProfileForm = () => {
     },
   });
   const { toast } = useToast();
+  const t = useTranslations("Profile");
+
   const onSubmit = async (values: z.infer<typeof updateProfileSchema>) => {
     const res = await updateProfile(values);
     if (!res.success) {
@@ -63,7 +66,7 @@ const ProfileForm = () => {
                 <FormControl>
                   <Input
                     disabled
-                    placeholder="Email"
+                    placeholder={t("emailPlaceholder")}
                     className="input-field"
                     {...field}
                   />
@@ -79,7 +82,7 @@ const ProfileForm = () => {
               <FormItem className="w-full">
                 <FormControl>
                   <Input
-                    placeholder="Username"
+                    placeholder={t("usernamePlaceholder")}
                     className="input-field"
                     {...field}
                   />
@@ -95,7 +98,7 @@ const ProfileForm = () => {
           className="button col-span-2 w-full"
           disabled={form.formState.isSubmitting}
         >
-          {form.formState.isSubmitting ? "Submitting..." : "Update Profile"}
+          {form.formState.isSubmitting ? t("submitting") : t("buttonUpdate")}
         </Button>
       </form>
     </Form>

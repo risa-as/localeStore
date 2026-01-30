@@ -127,7 +127,7 @@ const AdminOverviewPage = async () => {
             <div className="mt-6">
               <Button asChild variant="outline" className="w-full">
                 <Link href="/admin/orders">
-                  View All Orders
+                  {t('viewAllOrders')}
                 </Link>
               </Button>
             </div>

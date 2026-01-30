@@ -10,6 +10,31 @@
         "profile": "Profile",
         "orderHistory": "Order History"
     },
+    "Profile": {
+        "title": "Profile",
+        "email": "Email",
+        "name": "Name",
+        "submitting": "Submitting...",
+        "buttonUpdate": "Update Profile",
+        "usernamePlaceholder": "Username",
+        "emailPlaceholder": "Email",
+        "orders": "Orders",
+        "settings": "Settings"
+    },
+    "UserOrders": {
+        "title": "Orders",
+        "description": "View and manage your orders",
+        "id": "ID",
+        "date": "Date",
+        "total": "Total",
+        "paid": "Paid",
+        "delivered": "Delivered",
+        "action": "Action",
+        "notPaid": "Not Paid",
+        "notDelivered": "Not Delivered",
+        "details": "Details",
+        "paidAt": "Paid At"
+    },
     "Theme": {
         "light": "Light",
         "dark": "Dark",
@@ -37,10 +62,22 @@
         "viewAll": "View All Products"
     },
     "Product": {
-        "outOfStock": "Out of Stock",
+        "title": "Newest Arrivals",
         "addToCart": "Add to Cart",
         "noProducts": "No products available.",
-        "title": "Newest Arrivals"
+        "description": "Description",
+        "price": "Price",
+        "shipping": "Shipping",
+        "free": "Free",
+        "status": "Status",
+        "inStock": "In Stock",
+        "reviews": "reviews",
+        "customerReviews": "Customer Reviews",
+        "noReviews": "No reviews yet",
+        "please": "Please",
+        "signIn": "sign in",
+        "toWriteReview": "to write a review",
+        "goToCart": "Go To Cart"
     },
     "Deal": {
         "title": "Deal Of The Month",
@@ -89,7 +126,9 @@
         "subtotal": "Products Total",
         "cartSummary": "Cart Summary",
         "items": "Items",
-        "proceedToCheckout": "Proceed To Checkout"
+        "proceedToCheckout": "Proceed To Checkout",
+        "productCount": "Product Count",
+        "totalUnits": "Total Pieces"
     },
     "Checkout": {
         "steps": {
@@ -207,7 +246,13 @@
         "cost": "Cost",
         "total": "Total",
         "netProfit": "Net Profit",
-        "noData": "No data found for the selected period."
+        "noData": "No data found for the selected period.",
+        "viewAllOrders": "View All Orders",
+        "product": "Product",
+        "governorate": "Governorate",
+        "address": "Address",
+        "quantity": "Qty",
+        "noItems": "No items"
     },
     "Categories": {
         "selectCategory": "Select a Category",
@@ -217,7 +262,12 @@
         "create": "Create Category",
         "submitting": "Submitting...",
         "placeholderName": "Category Name",
-        "placeholderSlug": "Category Slug"
+        "placeholderSlug": "Category Slug",
+        "noCategories": "No categories found.",
+        "restartServer": "If you just added the schema, please restart your server.",
+        "createdAt": "Created At",
+        "actions": "Actions",
+        "title": "Categories"
     },
     "AdminProduct": {
         "titleCreate": "Create Product",
@@ -310,6 +360,18 @@
         "Muthanna": "Muthanna",
         "Saladin": "Saladin",
         "Dohuk": "Dohuk"
+    },
+    "Toast": {
+        "addedToCart": "Added To Cart",
+        "updatedInCart": "Updated In Cart",
+        "removedFromCart": "Removed From Cart",
+        "productNotFound": "Product Not Found",
+        "cartSessionNotFound": "Cart Session Not Found",
+        "notEnoughStock": "Not Enough Stock",
+        "itemNotFound": "Item Not Found",
+        "cartNotFound": "Cart Not Found",
+        "reviewUpdated": "Review Updated Successfully",
+        "userNotAuthenticated": "User is not authenticated"
     },
     "Unauthorized": {
         "title": "Unauthorized Access",

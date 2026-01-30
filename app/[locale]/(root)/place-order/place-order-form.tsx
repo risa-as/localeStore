@@ -104,13 +104,25 @@ const PlaceOrderForm = ({
           </div>
         </>
       ) : (
-        <div className="space-y-2 border p-4 rounded-md">
-          <h3 className="font-semibold text-lg pb-2">{t('shippingAddress')}</h3>
-          <div className="grid grid-cols-1 gap-1">
-            <p><span className="font-medium">{t('fullName')}: </span>{defaultValues.fullName}</p>
-            <p><span className="font-medium">{t('phoneNumber')}: </span>{defaultValues.phoneNumber}</p>
-            <p><span className="font-medium">{t('governorate')}: </span>{defaultValues.governorate}</p>
-            <p><span className="font-medium">{t('address')}: </span>{defaultValues.address}</p>
+        <div className="bg-muted/40 p-5 rounded-lg border space-y-4">
+          <h3 className="font-bold text-lg border-b pb-3">{t('shippingAddress')}</h3>
+          <div className="grid gap-3 text-sm">
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span className="text-muted-foreground">{t('fullName')}</span>
+              <span className="font-medium">{defaultValues.fullName}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span className="text-muted-foreground">{t('phoneNumber')}</span>
+              <span className="font-medium dir-ltr text-right">{defaultValues.phoneNumber}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span className="text-muted-foreground">{t('governorate')}</span>
+              <span className="font-medium">{tGov(defaultValues.governorate as any) || defaultValues.governorate}</span>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:justify-between">
+              <span className="text-muted-foreground">{t('address')}</span>
+              <span className="font-medium">{defaultValues.address}</span>
+            </div>
           </div>
           {/* Hidden inputs to ensure form submission works */}
           <input type="hidden" {...register("fullName")} value={defaultValues.fullName} />

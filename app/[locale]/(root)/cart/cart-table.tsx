@@ -123,10 +123,18 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                   {t('cartSummary')}
                 </h3>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b">
-                    <span className="text-muted-foreground">{t('subtotal')} ({cart.items.length} {t('items')}):</span>
-                    <span className="text-2xl font-bold font-mono tracking-tight">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center text-sm text-muted-foreground">
+                    <span>{t("productCount")}</span>
+                    <span>{cart.items.length}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm text-muted-foreground border-b pb-2">
+                    <span>{t("totalUnits")}</span>
+                    <span>{cart.items.reduce((a, c) => a + c.qty, 0)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="font-semibold">{t("subtotal")}</span>
+                    <span className="text-2xl font-bold font-mono tracking-tight text-primary">
                       {formatCurrency(cart.itemsPrice)}
                     </span>
                   </div>

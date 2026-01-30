@@ -10,6 +10,31 @@
         "profile": "الملف الشخصي",
         "orderHistory": "سجل الطلبات"
     },
+    "Profile": {
+        "title": "الملف الشخصي",
+        "email": "البريد الإلكتروني",
+        "name": "الاسم",
+        "submitting": "جاري التحديث...",
+        "buttonUpdate": "تحديث الملف الشخصي",
+        "usernamePlaceholder": "اسم المستخدم",
+        "emailPlaceholder": "البريد الإلكتروني",
+        "orders": "الطلبات",
+        "settings": "الإعدادات"
+    },
+    "UserOrders": {
+        "title": "الطلبات",
+        "description": "عرض وإدارة طلباتك",
+        "id": "المعرف",
+        "date": "التاريخ",
+        "total": "المجموع",
+        "paid": "مدفوع",
+        "delivered": "تم التوصيل",
+        "action": "إجراء",
+        "notPaid": "غير مدفوع",
+        "notDelivered": "لم يتم التوصيل",
+        "details": "التفاصيل",
+        "paidAt": "تاريخ الدفع"
+    },
     "Theme": {
         "light": "فاتح",
         "dark": "داكن",
@@ -37,10 +62,22 @@
         "viewAll": "عرض جميع المنتجات"
     },
     "Product": {
-        "outOfStock": "غير متوفر",
+        "title": "أحدث المنتجات",
         "addToCart": "أضف إلى السلة",
         "noProducts": "لا توجد منتجات متاحة.",
-        "title": "أحدث المنتجات"
+        "description": "الوصف",
+        "price": "السعر",
+        "shipping": "الشحن",
+        "free": "مجاني",
+        "status": "حالة التوفر",
+        "inStock": "متوفر",
+        "reviews": "مراجعات",
+        "customerReviews": "مراجعات العملاء",
+        "noReviews": "لا توجد مراجعات بعد",
+        "please": "الرجاء",
+        "signIn": "تسجيل الدخول",
+        "toWriteReview": "لكتابة مراجعة",
+        "goToCart": "الذهاب للسلة"
     },
     "Deal": {
         "title": "صفقة الشهر",
@@ -82,14 +119,16 @@
     "Cart": {
         "title": "عربة التسوق",
         "empty": "عربة التسوق فارغة.",
-        "goShopping": "اذهب للتسوق",
+        "goShopping": "تصفح المنتجات",
         "item": "المنتج",
-        "quantity": "الكمية",
+        "quantity": "العدد",
         "price": "السعر",
-        "subtotal": "مجموع المنتجات",
-        "cartSummary": "ملخص السلة",
-        "items": "عناصر",
-        "proceedToCheckout": "متابعة الدفع"
+        "subtotal": "الإجمالي",
+        "cartSummary": "ملخص الطلب",
+        "items": "منتجات",
+        "proceedToCheckout": "إتمام الشراء",
+        "productCount": "عدد المنتجات",
+        "totalUnits": "عدد القطع"
     },
     "Checkout": {
         "steps": {
@@ -207,7 +246,13 @@
         "cost": "التكلفة",
         "total": "المجموع",
         "netProfit": "صافي الربح",
-        "noData": "لا توجد بيانات للفترة المحددة."
+        "noData": "لا توجد بيانات للفترة المحددة.",
+        "viewAllOrders": "عرض جميع الطلبات",
+        "product": "المنتج",
+        "governorate": "المحافظة",
+        "address": "العنوان",
+        "quantity": "الكمية",
+        "noItems": "لا يوجد عناصر"
     },
     "Categories": {
         "selectCategory": "اختر فئة",
@@ -217,7 +262,12 @@
         "create": "إنشاء فئة",
         "submitting": "جاري الإرسال...",
         "placeholderName": "اسم الفئة",
-        "placeholderSlug": "الاسم اللطيف للفئة"
+        "placeholderSlug": "الاسم اللطيف للفئة",
+        "noCategories": "لم يتم العثور على فئات.",
+        "restartServer": "إذا كنت قد أضفت المخطط للتو، يرجى إعادة تشغيل الخادم.",
+        "createdAt": "تاريخ الإنشاء",
+        "actions": "الإجراءات",
+        "title": "الفئات"
     },
     "AdminProduct": {
         "titleCreate": "إنشاء منتج",
@@ -295,21 +345,33 @@
         "Baghdad": "بغداد",
         "Basra": "البصرة",
         "Nineveh": "نينوى",
-        "Erbil": "أربيل",
+        "Erbil": "اربيل",
         "Kirkuk": "كركوك",
         "Sulaymaniyah": "السليمانية",
         "Diyala": "ديالى",
-        "Babylon": "بابل",
-        "Anbar": "الأنبار",
-        "Dhi Qar": "ذي قار",
+        "Babylon": "الحلة - بابل",
+        "Anbar": "الانبار",
+        "Dhi Qar": "الناصرية - ذي قار",
         "Karbala": "كربلاء",
         "Najaf": "النجف",
-        "Wasit": "واسط",
-        "Qadisiyah": "القادسية",
-        "Maysan": "ميسان",
-        "Muthanna": "المثنى",
+        "Wasit": "الكوت - واسط",
+        "Qadisiyah": "الديوانية - القادسية",
+        "Maysan": "العمارة - ميسان",
+        "Muthanna": "السماوة - المثنى",
         "Saladin": "صلاح الدين",
         "Dohuk": "دهوك"
+    },
+    "Toast": {
+        "addedToCart": "أضيف إلى السلة",
+        "updatedInCart": "تم التحديث في السلة",
+        "removedFromCart": "تم الحذف من السلة",
+        "productNotFound": "المنتج غير موجود",
+        "cartSessionNotFound": "جلسة السلة غير موجودة",
+        "notEnoughStock": "المخزون غير كاف",
+        "itemNotFound": "العنصر غير موجود",
+        "cartNotFound": "السلة غير موجودة",
+        "reviewUpdated": "تم تحديث المراجعة بنجاح",
+        "userNotAuthenticated": "المستخدم غير مصادق عليه"
     },
     "Unauthorized": {
         "title": "دخول غير مصرح به",

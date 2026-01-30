@@ -17,6 +17,7 @@ export default function OrdersExportButton({
 }) {
     const [loading, setLoading] = useState(false);
     const t = useTranslations('Admin');
+    const tGov = useTranslations('Governorates');
 
     const handleExport = async () => {
         try {
@@ -27,11 +28,11 @@ export default function OrdersExportButton({
                 "اسم الزبون": order.fullName,
                 "رقم الهاتف الاساسي": order.phoneNumber,
                 "رقم الهاتف الثانوي": order.phoneNumber,
-                "المحافظة": order.governorate,
+                "المحافظة": tGov(order.governorate as any),
                 "المنطقة": order.address,
                 "نوع البضاعه": order.orderitems.map((item: any) => `${item.name}`).join(", "),
-                "عدد القطع": order.orderitems.map((item: any) => `${item.qty}`).join(", "),
-                "السعر مع التوصيل": order.totalPrice,
+                "عدد القطع": order.orderitems[0]?.qty,
+                "السعر مع التوصيل": order.totalPrice * 1000,
                 "حجم الطلب": "عادي",
                 "الملاحظات": order.notes || "",
                 "نوع الطلب": "طلب جديد",

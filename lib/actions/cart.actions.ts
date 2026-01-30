@@ -7,6 +7,7 @@ import { prisma } from "@/db/prisma";
 import { cartItemSchema, insertCartSchema } from "../validators";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
 // Calculate cart prices
 const calcPrice = (items: CartItem[]) => {
   const itemsPrice = round2(
@@ -24,9 +25,10 @@ const calcPrice = (items: CartItem[]) => {
 };
 export async function addItemToCart(data: CartItem) {
   try {
+    const t = await getTranslations("Toast");
     // Check for cart cookie
     const sessionCartId = (await cookies()).get("sessionCartId")?.value;
-    if (!sessionCartId) throw new Error("Cart Session Not Found");
+    if (!sessionCartId) throw new Error(t("cartSessionNotFound"));
     // Get session and user id
     const session = await auth();
     const userId = session?.user?.id ? (session?.user.id as string) : undefined;
@@ -40,7 +42,7 @@ export async function addItemToCart(data: CartItem) {
         id: item.productId,
       },
     });
-    if (!product) throw new Error("Product Not Found");
+    if (!product) throw new Error(t("productNotFound"));
 
     // Ensure price and shippingPrice matches product
     item.price = product.price.toString();
@@ -62,7 +64,7 @@ export async function addItemToCart(data: CartItem) {
       revalidatePath(`/product/${product.slug}`);
       return {
         success: true,
-        message: `${product.name} Added To Cart`,
+        message: `${product.name} ${t("addedToCart")}`,
       };
     } else {
       // Check If item is already in cart
@@ -72,7 +74,7 @@ export async function addItemToCart(data: CartItem) {
       if (existItem) {
         // Check stock
         if (product.stock < existItem.qty + 1) {
-          throw new Error("Not Enough Stock");
+          throw new Error(t("notEnoughStock"));
         }
         // Increase the quantity
         (cart.items as CartItem[]).find(
@@ -82,7 +84,7 @@ export async function addItemToCart(data: CartItem) {
         // If Item does not exist in cart
         // Check stock
         if (product.stock < 1) {
-          throw new Error("Not Enough Stock");
+          throw new Error(t("notEnoughStock"));
         }
         cart.items.push(item);
       }
@@ -99,8 +101,8 @@ export async function addItemToCart(data: CartItem) {
 
       return {
         success: true,
-        message: `${product.name} ${existItem ? "Updated In" : "Added To"
-          } Cart`,
+        message: `${product.name} ${existItem ? t("updatedInCart") : t("addedToCart")
+          }`,
       };
     }
   } catch (error) {
@@ -113,7 +115,7 @@ export async function addItemToCart(data: CartItem) {
 export async function getMyCart() {
   // Check for cart cookie
   const sessionCartId = (await cookies()).get("sessionCartId")?.value;
-  if (!sessionCartId) throw new Error("Cart Session Not Found");
+  //   if (!sessionCartId) throw new Error("Cart Session Not Found");
   // Get session and user id
   const session = await auth();
   const userId = session?.user?.id ? (session?.user.id as string) : undefined;
@@ -134,22 +136,23 @@ export async function getMyCart() {
 
 export async function removeItemFromCart(productId: string) {
   try {
+    const t = await getTranslations("Toast");
     // check for cart cookie
     const sessionCartId = (await cookies()).get("sessionCartId")?.value;
-    if (!sessionCartId) throw new Error("Cart Session Not Found");
+    if (!sessionCartId) throw new Error(t("cartSessionNotFound"));
     // Get Product
     const product = await prisma.product.findFirst({
       where: { id: productId },
     });
-    if (!product) throw new Error("Product Not Found");
+    if (!product) throw new Error(t("productNotFound"));
     //Get User Cart
     const cart = await getMyCart();
-    if (!cart) throw new Error("Cart Not Found");
+    if (!cart) throw new Error(t("cartNotFound"));
     // Check for item
     const exist = (cart.items as CartItem[]).find(
       (x) => x.productId === productId
     );
-    if (!exist) throw new Error("Item Not found");
+    if (!exist) throw new Error(t("itemNotFound"));
     // check if only one in qty
     if (exist.qty === 1) {
       cart.items = (cart.items as CartItem[]).filter(
@@ -171,8 +174,8 @@ export async function removeItemFromCart(productId: string) {
     revalidatePath(`/product/${product.slug}`);
     return {
       success: true,
-      message: `${product.name} ${exist.qty > 1 ? "Updated In" : "Remove From"
-        } Cart`,
+      message: `${product.name} ${exist.qty > 1 ? t("updatedInCart") : t("removedFromCart")
+        }`,
     };
   } catch (error) {
     // Use Function From Utils To Handle Error

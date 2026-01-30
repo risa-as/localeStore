@@ -3,18 +3,21 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
+import { useTranslations } from "next-intl";
 const MainNav = ({
   className,
   ...props
 }: React.HTMLAttributes<HTMLElement>) => {
+  const t = useTranslations("Profile");
+
   const links = [
-    { title: "Orders", href: "/user/orders" },
-    { title: "Profile", href: "/user/profile" },
+    { title: t("orders"), href: "/user/orders" },
+    { title: t("title"), href: "/user/profile" },
   ];
   const pathname = usePathname();
   return (
     <nav
-      className={cn("flex items-center space-x-4 lg:space-x-6", className)}
+      className={cn("flex items-center gap-4", className)}
       {...props}
     >
       {links.map((item) => (

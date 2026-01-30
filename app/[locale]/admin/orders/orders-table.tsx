@@ -43,6 +43,7 @@ export default function OrdersTable({
     count: number;
 }) {
     const t = useTranslations("Admin");
+    const tGov = useTranslations("Governorates");
     const { toast } = useToast();
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
     const [isPending, startTransition] = useTransition();
@@ -134,12 +135,12 @@ export default function OrdersTable({
                             <TableHead>{t("id")}</TableHead>
                             <TableHead>{t("date")}</TableHead>
                             <TableHead>{t("name")}</TableHead>
-                            <TableHead>Product</TableHead>
+                            <TableHead>{t("product")}</TableHead>
                             <TableHead>{t("phoneNumber")}</TableHead>
-                            <TableHead>Governorate</TableHead>
-                            <TableHead>Address</TableHead>
-                            <TableHead>Qty</TableHead>
-                            <TableHead>Price</TableHead>
+                            <TableHead>{t("governorate")}</TableHead>
+                            <TableHead>{t("address")}</TableHead>
+                            <TableHead>{t("quantity")}</TableHead>
+                            <TableHead>{t("price")}</TableHead>
                             <TableHead>{t("notes")}</TableHead>
                             <TableHead>{t("status")}</TableHead>
                             <TableHead className="w-[100px]">{t("actions")}</TableHead>
@@ -166,10 +167,10 @@ export default function OrdersTable({
                                 <TableCell>
                                     {order.orderitems && order.orderitems.length > 0
                                         ? order.orderitems.map((item: any) => item.name).join(", ")
-                                        : "No items"}
+                                        : t("noItems")}
                                 </TableCell>
                                 <TableCell>{order.phoneNumber}</TableCell>
-                                <TableCell>{order.governorate}</TableCell>
+                                <TableCell>{tGov(order.governorate as any)}</TableCell>
                                 <TableCell>{order.address}</TableCell>
                                 <TableCell>{order.quantity}</TableCell>
                                 <TableCell>{formatCurrency(order.totalPrice)}</TableCell>

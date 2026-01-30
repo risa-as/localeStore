@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { getProductBySlug } from "@/lib/actions/product.actions";
 import { notFound } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 import ProductPrice from "@/components/shared/product/product-price";
 import ProductImages from "@/components/shared/product/product-images";
 import AddToCart from "@/components/shared/product/add-to-cart";
@@ -21,6 +22,7 @@ const ProductDetailsPage = async (props: {
   const session = await auth();
   const userId = session?.user?.id;
   const cart = await getMyCart();
+  const t = await getTranslations("Product");
   return (
     <>
       <section>
@@ -37,7 +39,7 @@ const ProductDetailsPage = async (props: {
               </p>
               <h1 className="h3-bold">{product.name}</h1>
               <Rating value={Number(product.rating)} />
-              <p>{product.numReviews} reviews</p>
+              <p>{product.numReviews} {t("reviews")}</p>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <ProductPrice
                   value={parseFloat(product.price)}
@@ -46,7 +48,7 @@ const ProductDetailsPage = async (props: {
               </div>
             </div>
             <div className="mt-10">
-              <p className="font-semibold mb-3">Description</p>
+              <p className="font-semibold mb-3">{t("description")}</p>
               <p className="text-sm text-muted-foreground">
                 {product.description}
               </p>
@@ -57,27 +59,27 @@ const ProductDetailsPage = async (props: {
             <Card>
               <CardContent className="p-4">
                 <div className="mb-2 flex justify-between">
-                  <div>Price</div>
+                  <div>{t("price")}</div>
                   <div>
                     <ProductPrice value={parseFloat(product.price)} />
                   </div>
                 </div>
                 <div className="mb-2 flex justify-between">
-                  <div>Shipping</div>
+                  <div>{t("shipping")}</div>
                   <div>
                     {Number(product.shippingPrice) === 0 ? (
-                      <Badge variant="secondary">Free</Badge>
+                      <Badge variant="secondary">{t("free")}</Badge>
                     ) : (
                       <ProductPrice value={parseFloat(product.shippingPrice)} />
                     )}
                   </div>
                 </div>
                 <div className="mb-2 flex justify-between">
-                  <div>Status</div>
+                  <div>{t("status")}</div>
                   {product.stock > 0 ? (
-                    <Badge variant="outline">In Stock</Badge>
+                    <Badge variant="outline">{t("inStock")}</Badge>
                   ) : (
-                    <Badge variant="destructive">Out of Stock</Badge>
+                    <Badge variant="destructive">{t("outOfStock")}</Badge>
                   )}
                 </div>
                 {product.stock > 0 && (
@@ -100,7 +102,7 @@ const ProductDetailsPage = async (props: {
         </div>
       </section>
       <section className="mt-10">
-        <h2 className="h2-bold">Customer Reviews</h2>
+        <h2 className="h2-bold">{t("customerReviews")}</h2>
         <ReviewList
           userId={userId || ""}
           productId={product.id}

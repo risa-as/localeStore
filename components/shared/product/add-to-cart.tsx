@@ -7,10 +7,12 @@ import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { addItemToCart, removeItemFromCart } from "@/lib/actions/cart.actions";
 import { useTransition } from "react";
+import { useTranslations } from "next-intl";
 const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
+  const t = useTranslations("Product");
   // Start Handle Add To Cart
   const handleAddToCart = async () => {
     const res = await addItemToCart(item);
@@ -31,7 +33,7 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
             altText="Go Cart"
             onClick={() => router.push("/cart")}
           >
-            Go To Cart
+            {t("goToCart")}
           </ToastAction>
         ),
       });
@@ -94,7 +96,7 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
       ) : (
         <Plus className="h-4 w-4" />
       )}{" "}
-      Add To Cart
+      {t("addToCart")}
     </Button>
   );
 };

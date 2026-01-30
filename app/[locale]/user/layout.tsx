@@ -19,7 +19,7 @@ export default async function UserLayout({
   return (
     <div className="flex flex-col">
       <div className="border-b container mx-auto">
-        <div className="flex items-center h-16 px-4">
+        <div className="flex items-center h-16 px-4 gap-12">
           <Link href="/" className="w-22">
             <Image
               src="/images/logo.svg"
@@ -28,7 +28,7 @@ export default async function UserLayout({
               height={48}
             />
           </Link>
-          <MainNav className="ml-6" />
+          <MainNav />
           <div className="ml-auto items-center flex space-x-4">
             <Menu />
           </div>
