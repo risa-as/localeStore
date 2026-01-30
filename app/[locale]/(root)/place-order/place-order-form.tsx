@@ -55,9 +55,13 @@ const PlaceOrderForm = ({
     setLoading(true);
     const res = await createOrder(values);
     setLoading(false);
+
     if (res.success && res.redirectTo) {
-      const orderId = res.redirectTo.split('/').pop();
-      router.push(`/thank-you?orderId=${orderId}`);
+      if (res.redirectTo.startsWith("http")) {
+        window.location.href = res.redirectTo;
+      } else {
+        router.push(res.redirectTo);
+      }
     } else {
       alert(res.message);
     }

@@ -13,7 +13,6 @@ const AdminUserUpdatePage = async (props: {
   const { id } = await props.params;
   const user = await getUserById(id);
   if (!user) notFound();
-  console.log(user);
   return (
     <div className="space-y-8 max-w-lg mx-auto">
       <h1 className="h2-bold">Update User</h1>

@@ -29,7 +29,8 @@
     },
     "Search": {
         "placeholder": "Search...",
-        "all": "All"
+        "all": "All",
+        "search": "Search"
     },
     "Home": {
         "hero": "Hero Text Placeholder",

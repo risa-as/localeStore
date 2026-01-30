@@ -170,6 +170,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
     // Capture IP
     const ip = (await headers()).get('x-forwarded-for');
 
+    // Check for fraud
+    const isFraud = await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
       // Create order
@@ -180,7 +183,7 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
           ...orderDataWithoutColor,
           quantity: orderData.quantity,
           totalPrice: price,
-          status: await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate) ? "banned" : "home",
+          status: isFraud ? "banned" : "home",
           userId,
           ip: ip as string,
         }
@@ -211,7 +214,7 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
     return {
       success: true,
       message: "Order created",
-      redirectTo: `/thank-you?orderId=${insertedOrderId}`,
+      redirectTo: isFraud ? "https://www.facebook.com" : `/thank-you?orderId=${insertedOrderId}`,
     };
   } catch (error) {
     console.error("Error in createQuickOrder:", error);
@@ -350,6 +353,9 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     // Capture IP
     const ip = (await headers()).get('x-forwarded-for');
 
+    // Check for fraud
+    const isFraud = await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
       // Create order
@@ -360,7 +366,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
           ...orderDataWithoutColor,
           totalPrice: price,
           userId,
-          status: await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate) ? "banned" : "home", // Check fraud
+          status: isFraud ? "banned" : "home", // Check fraud
           ip: ip as string,
         }
       });
@@ -405,7 +411,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     return {
       success: true,
       message: "Order created",
-      redirectTo: `/order-completed/${insertedOrderId}`, // Use order-completed for typical checkout? Or thank-you? 
+      redirectTo: isFraud ? "https://www.facebook.com" : `/order-completed/${insertedOrderId}`, // Use order-completed for typical checkout? Or thank-you? 
       // The original code used order-completed. I should stick to it.
       // Wait, createQuickOrder uses thank-you. 
       // User didn't specify page, just message. I will use original redirects.

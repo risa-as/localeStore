@@ -17,9 +17,9 @@ const Search = async () => {
 
   return (
     <form action="/search" method="GET">
-      <div className="flex w-full max-w-sm items-center space-x-2">
+      <div className="flex w-full max-w-sm items-center gap-2">
         <Select name="category" >
-          <SelectTrigger className="w-[180px] ml-2">
+          <SelectTrigger className="md:w-[130px] lg:w-[150px]">
             <SelectValue placeholder={t('all')} />
           </SelectTrigger>
           <SelectContent>
@@ -43,7 +43,8 @@ const Search = async () => {
         <AccessibleButton
           type="submit"
           label={t('search')}
-          icon={<SearchIcon />}
+          // variant="default" is implied
+          icon={<SearchIcon className="h-4 w-4" />}
         />
       </div>
     </form>

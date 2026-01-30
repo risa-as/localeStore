@@ -50,6 +50,8 @@ export async function sendCAPIEvent(
     if (eventData.lastName) userData.setLastName(eventData.lastName);
     if (eventData.city) userData.setCity(eventData.city);
     if (eventData.country) userData.setCountry(eventData.country);
+    if (eventData.externalId) (userData as any).setExternalId(eventData.externalId); // إضافة External ID
+
 
     // 2. تجهيز بيانات الحدث
     const eventSourceUrl = eventData.eventSourceUrl || requestHeaders.get('referer');

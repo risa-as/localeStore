@@ -29,7 +29,8 @@
     },
     "Search": {
         "placeholder": "بحث...",
-        "all": "الكل"
+        "all": "الكل",
+        "search": "بحث"
     },
     "Home": {
         "hero": "نص البطل",

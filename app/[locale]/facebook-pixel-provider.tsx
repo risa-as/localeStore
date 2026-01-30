@@ -34,7 +34,7 @@ export function FacebookPixelProvider() {
         return null;
     }
 
-    console.log("🟢 FacebookPixelProvider: Rendering Script component...");
+
 
     return (
         <>

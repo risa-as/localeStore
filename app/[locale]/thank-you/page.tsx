@@ -48,7 +48,8 @@ function ThankYouContent() {
                             lastName: order.fullName?.split(" ").slice(1).join(" "),
                             city: order.governorate, // Assuming governorate maps to city/region
                             country: "IQ", // Assuming Iraq based on context
-                        }).catch(console.error);
+                            externalId: order.id, // Add External ID
+                        }).catch(() => { });
                     } else {
                         console.error("Order not found or null returned");
                     }
