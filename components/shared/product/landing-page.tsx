@@ -10,7 +10,6 @@ import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useTranslations, useLocale } from "next-intl";
 // Start Pixel Code
-import { v4 as uuidv4 } from 'uuid';
 import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
 import FbPixel from "../facebook-pixel";
 // End Pixel Code
@@ -30,12 +29,21 @@ export default function LandingPage({ product }: { product: Product }) {
 
 
     //Start API Code
-    const [eventId] = useState(() => uuidv4());
+    const [eventId] = useState<string>(() => {
+        if (typeof crypto !== "undefined") {
+            return crypto.randomUUID();
+        } else {
+            return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
+    });
 
     useEffect(() => {
-        sendCAPIEvent("PageView", eventId, {
-            eventSourceUrl: window.location.href,
-        }).catch(console.error);
+        const t = setTimeout(() => {
+            sendCAPIEvent("PageView", eventId, {
+                eventSourceUrl: window.location.href,
+            }).catch(console.error);
+        }, 2000)
+        return () => clearTimeout(t);
     }, [eventId]);
     //End API Code
 
