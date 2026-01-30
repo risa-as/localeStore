@@ -25,6 +25,6 @@ export default async function LandingPageRoute(props: {
     if (!product) {
         notFound();
     }
-
-    return <LandingPage product={product} />
+    const serializedProduct = JSON.parse(JSON.stringify(product));
+    return <LandingPage product={serializedProduct} />
 }
