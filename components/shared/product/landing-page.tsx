@@ -88,6 +88,7 @@ export default function LandingPage({ product }: { product: Product }) {
                                         fill
                                         className="object-contain"
                                         priority
+                                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
                                     />
                                 </motion.div>
                             </AnimatePresence>
@@ -142,6 +143,7 @@ export default function LandingPage({ product }: { product: Product }) {
                                             alt={`View ${idx + 1}`}
                                             fill
                                             className="object-cover rounded-lg"
+                                            sizes="80px"
                                         />
                                     </button>
                                 ))}
