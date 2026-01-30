@@ -7,6 +7,7 @@ import { APP_DESCRIPTION, APP_NAME, SERVER_URL } from "@/lib/constants";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import AuthSessionProvider from "@/components/shared/auth-session-provider";
+import { Analytics } from "@vercel/analytics/react"
 // import FacebookPixelWrapper from "./facebook-pixel-wrapper";
 import { FacebookPixelProvider } from './facebook-pixel-provider';
 
@@ -56,6 +57,7 @@ export default async function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <Analytics />
         <NextIntlClientProvider messages={messages} locale={locale} timeZone="Asia/Baghdad">
           <AuthSessionProvider>
             <ThemeProvider
