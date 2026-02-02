@@ -134,6 +134,40 @@ export default function UpdateOrderForm({
                 />
                 <FormField
                     control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{t("quantity")}</FormLabel>
+                            <FormControl>
+                                <Input
+                                    type="number"
+                                    placeholder={t("quantity")}
+                                    {...field}
+                                    onChange={(e) => field.onChange(parseInt(e.target.value))}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="totalPrice"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{t("price")}</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder={t("price")}
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
                     name="status"
                     render={({ field }) => (
                         <FormItem>

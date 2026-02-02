@@ -198,7 +198,7 @@ export default function OrdersTable({
                                                     <Pencil className="w-4 h-4" />
                                                 </Button>
                                             </DialogTrigger>
-                                            <DialogContent>
+                                            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                                                 <DialogHeader>
                                                     <DialogTitle>{t("edit")}</DialogTitle>
                                                 </DialogHeader>
