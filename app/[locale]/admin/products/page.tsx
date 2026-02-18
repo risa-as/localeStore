@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Eye, Pencil } from "lucide-react";
 import { getAllProducts, deleteProduct } from "@/lib/actions/product.actions";
 import { formatCurrency, formatId } from "@/lib/utils";
+import Image from "next/image";
+import { PAGE_SIZE } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -66,6 +68,8 @@ const AdminProductsPage = async (props: {
             <TableRow>
               <TableHead>{t('id')}</TableHead>
               <TableHead>{t('name')}</TableHead>
+              <TableHead>{t('image')}</TableHead>
+
               <TableHead className="text-end">{t('price')}</TableHead>
               <TableHead className="text-end">{t('costPrice')}</TableHead>
               <TableHead className="text-end">{t('shippingPrice')}</TableHead>
@@ -78,10 +82,23 @@ const AdminProductsPage = async (props: {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {products.data.map((product: any) => (
+            {products.data.map((product: any, index: number) => (
               <TableRow key={product.id}>
-                <TableCell>{formatId(product.id)}</TableCell>
+                <TableCell>{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                 <TableCell>{product.name}</TableCell>
+
+                <TableCell>
+                  {product.images && product.images.length > 0 && (
+                    <Image
+                      src={product.images[0]}
+                      alt={product.name}
+                      width={50}
+                      height={50}
+                      className="rounded-md object-cover"
+                      unoptimized
+                    />
+                  )}
+                </TableCell>
                 <TableCell className="text-end">
                   {formatCurrency(product.price)}
                 </TableCell>

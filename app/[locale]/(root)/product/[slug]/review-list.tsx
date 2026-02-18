@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+// import { useEffect } from "react";
 import { Review } from "@/types";
 import Link from "next/link";
 import { useState } from "react";
@@ -22,22 +22,17 @@ const ReviewList = ({
   userId,
   productId,
   productSlug,
+  initialReviews,
 }: {
   userId: string;
   productId: string;
   productSlug: string;
+  initialReviews: Review[];
 }) => {
-  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviews, setReviews] = useState<Review[]>(initialReviews);
   const t = useTranslations("Product");
 
-  useEffect(() => {
-    const loadReviews = async () => {
-      const res = await getReviews({ productId });
-      setReviews(res.data);
-    };
-
-    loadReviews();
-  }, [productId]);
+  // useEffect removed - using server data
 
   // Reload reviews after created or updated
   const reload = async () => {

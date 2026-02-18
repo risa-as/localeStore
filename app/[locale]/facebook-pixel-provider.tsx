@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Script from "next/script";
 
 export function FacebookPixelProvider() {
     const pathname = usePathname();
-    const searchParams = useSearchParams();
     const [loaded, setLoaded] = useState(false);
     // تتبع التنقل بين الصفحات (PageView)
     useEffect(() => {
@@ -14,37 +13,29 @@ export function FacebookPixelProvider() {
 
         // لا تقم بإرسال PageView في صفحة شكرا (لأننا نرسل Purchase فقط حسب الطلب)
         if (pathname?.includes('/thank-you')) {
-            console.log("🚫 Skipping Global PageView on Thank You page.");
             return;
         }
 
         if ((window as any).fbq) {
-            console.log("📍 Global PageView Triggered");
             (window as any).fbq('track', 'PageView');
-        } else {
-            console.warn("❌ fbq not found during global PageView trigger");
         }
-    }, [pathname, searchParams, loaded]);
+    }, [pathname, loaded]);
 
     const pixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
 
     // حماية: إذا لم يوجد ID لا تقم بتحميل السكربت
     if (!pixelId) {
-        console.error("⚠️ Facebook Pixel ID is missing or invalid in Provider.");
         return null;
     }
-
-
 
     return (
         <>
             {/* استخدام مكون Script الرسمي من Next.js */}
             <Script
                 id="fb-pixel"
-                strategy="afterInteractive" // الخيار الأفضل للبكسل
+                strategy="afterInteractive"
                 onLoad={() => {
                     setLoaded(true);
-                    console.log('✅ Facebook Pixel Loaded & Initialized');
                 }}
                 dangerouslySetInnerHTML={{
                     __html: `

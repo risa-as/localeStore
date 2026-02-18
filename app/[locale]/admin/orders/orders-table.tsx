@@ -16,6 +16,7 @@ import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { bulkUpdateOrderStatus, deleteOrder } from "@/lib/actions/order.actions";
 import DeleteDialog from "@/components/shared/delete-dialog";
+import { PAGE_SIZE } from "@/lib/constants";
 import {
     Dialog,
     DialogContent,
@@ -30,22 +31,40 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Loader2, Pencil, Eye } from "lucide-react";
+import { ChevronDown, Loader2, Pencil, Eye, MessageCircle } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 export default function OrdersTable({
     orders,
     page,
     count,
+    sort,
 }: {
     orders: any[];
     page: number;
     count: number;
+    sort?: string;
 }) {
     const t = useTranslations("Admin");
+
+    // ... existing hooks ...
     const tGov = useTranslations("Governorates");
     const { toast } = useToast();
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+
+    const createSortUrl = (key: string) => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (params.get("sort") === key) {
+            params.delete("sort");
+        } else {
+            params.set("sort", key);
+        }
+        return `?${params.toString()}`;
+    };
+
     const [isPending, startTransition] = useTransition();
     const [editingOrder, setEditingOrder] = useState<any | null>(null);
     const [openEdit, setOpenEdit] = useState(false);
@@ -94,7 +113,7 @@ export default function OrdersTable({
 
     return (
         <div className="space-y-4">
-            {/* Bulk Action Bar */}
+            {/* Bulk Action Bar - kept same */}
             {selectedOrders.length > 0 && (
                 <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
                     <span className="text-sm font-medium">
@@ -132,10 +151,20 @@ export default function OrdersTable({
                                     className="mx-2"
                                 />
                             </TableHead>
-                            <TableHead>{t("id")}</TableHead>
+                            <TableHead>{t("sequence")}</TableHead>
                             <TableHead>{t("date")}</TableHead>
                             <TableHead>{t("name")}</TableHead>
-                            <TableHead>{t("product")}</TableHead>
+                            <TableHead>
+                                <Link
+                                    href={createSortUrl('product')}
+                                    className={`flex items-center gap-1 hover:text-primary ${sort === 'product' ? 'text-primary font-bold' : ''}`}
+                                    title={t("sortByProduct")}
+                                >
+                                    {t("product")}
+                                    {sort === 'product' && <ChevronDown className="w-3 h-3" />}
+                                </Link>
+                            </TableHead>
+                            <TableHead>{t("whatsapp")}</TableHead>
                             <TableHead>{t("phoneNumber")}</TableHead>
                             <TableHead>{t("governorate")}</TableHead>
                             <TableHead>{t("address")}</TableHead>
@@ -147,7 +176,7 @@ export default function OrdersTable({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {orders.map((order) => (
+                        {orders.map((order, index) => (
                             <TableRow key={order.id} data-state={selectedOrders.includes(order.id) ? "selected" : undefined}>
                                 <TableCell>
                                     <Checkbox
@@ -159,7 +188,7 @@ export default function OrdersTable({
                                         className="mx-2"
                                     />
                                 </TableCell>
-                                <TableCell>{formatId(order.id)}</TableCell>
+                                <TableCell>{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                                 <TableCell>
                                     {formatDateTime(order.createdAt).dateTime}
                                 </TableCell>
@@ -168,6 +197,17 @@ export default function OrdersTable({
                                     {order.orderitems && order.orderitems.length > 0
                                         ? order.orderitems.map((item: any) => item.name).join(", ")
                                         : t("noItems")}
+                                </TableCell>
+                                <TableCell>
+                                    <a
+                                        href={`https://wa.me/${order.phoneNumber?.replace(/\D/g, '')}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+                                        title={t("whatsapp")}
+                                    >
+                                        <MessageCircle className="w-5 h-5 fill-current" />
+                                    </a>
                                 </TableCell>
                                 <TableCell>{order.phoneNumber}</TableCell>
                                 <TableCell>{tGov(order.governorate as any)}</TableCell>

@@ -11,7 +11,7 @@ const AdminUserCreatePage = async () => {
     const t = await getTranslations('Admin');
     return (
         <div className="space-y-8 max-w-lg mx-auto">
-            <h1 className="h2-bold">{t('createUser')}</h1>
+            <h1 className="h2-bold">{t('User.create')}</h1>
             <CreateUserForm />
         </div>
     );

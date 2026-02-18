@@ -8,6 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import Charts from "./charts";
 import { requireAdmin } from "@/lib/auth-guard";
+import { redirect } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 
 export const metadata: Metadata = {
@@ -21,6 +22,10 @@ const AdminOverviewPage = async () => {
   /* if (session?.user?.role !== "admin") {
     throw new Error("User is not authorized to access this page.");
   } */
+
+  if (session?.user?.role === 'employee') {
+    redirect('/admin/orders');
+  }
   const summary = await getOrderSummery();
   const t = await getTranslations('Admin');
 

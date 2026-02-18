@@ -21,7 +21,7 @@ function ThankYouContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const orderId = searchParams.get('orderId');
-    const [timeLeft, setTimeLeft] = useState(155);
+    const [timeLeft, setTimeLeft] = useState(30);
 
 
     // --- إعدادات التتبع ---

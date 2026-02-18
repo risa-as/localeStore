@@ -10,6 +10,7 @@ import { getMyCart } from "@/lib/actions/cart.actions";
 import { auth } from "@/auth";
 import ReviewList from "./review-list";
 import Rating from "@/components/shared/product/rating";
+import { getReviews } from "@/lib/actions/review.actions";
 
 const ProductDetailsPage = async (props: {
   params: Promise<{ slug: string }>;
@@ -23,6 +24,7 @@ const ProductDetailsPage = async (props: {
   const userId = session?.user?.id;
   const cart = await getMyCart();
   const t = await getTranslations("Product");
+  const reviews = await getReviews({ productId: product.id }); // Fetch reviews server-side
   return (
     <>
       <section>
@@ -107,6 +109,7 @@ const ProductDetailsPage = async (props: {
           userId={userId || ""}
           productId={product.id}
           productSlug={product.slug}
+          initialReviews={reviews.data}
         />
       </section>
     </>

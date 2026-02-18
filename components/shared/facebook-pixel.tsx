@@ -9,52 +9,37 @@ type PixelProps = {
 };
 
 export default function FbPixel({ eventName, eventId, data = {} }: PixelProps) {
-    const hasSentRef = useRef(false); // الحارس لمنع التكرار
+    const hasSentRef = useRef(false);
 
     useEffect(() => {
-        // إذا تم الإرسال سابقاً، توقف فوراً
         if (hasSentRef.current) {
             return;
         }
 
         const sendEvent = () => {
             if (typeof window !== 'undefined' && (window as any).fbq) {
-                // إرسال الحدث
                 (window as any).fbq("track", eventName, data, { eventID: eventId });
-
-                // وضع علامة بأنه تم الإرسال
                 hasSentRef.current = true;
                 return true;
             }
             return false;
         };
 
-        // محاولة الإرسال (مع إعادة المحاولة في حال تأخر تحميل السكربت)
-        // دالة المحاولة
-        const trySend = () => {
-            if (sendEvent()) return;
+        // محاولة الإرسال فوراً
+        if (sendEvent()) return;
 
-            let attempts = 0;
-            // إذا لم ينجح، نحاول كل 500 مللي ثانية لمدة 5 ثواني
-            const interval = setInterval(() => {
-                attempts++;
-                if (sendEvent()) {
-                    clearInterval(interval);
-                }
-            }, 500);
-
-
-            // إيقاف المحاولة بعد 10 ثواني لتجنب الذاكرة
-            setTimeout(() => {
-                if (!hasSentRef.current) console.error(`🚨 Failed to fire ${eventName} after 10s timeout.`);
+        // إعادة المحاولة كل 1 ثانية لمدة 5 ثوانٍ
+        let attempts = 0;
+        const maxAttempts = 5;
+        const interval = setInterval(() => {
+            attempts++;
+            if (sendEvent() || attempts >= maxAttempts) {
                 clearInterval(interval);
-            }, 10000);
+            }
+        }, 1000);
 
-            return () => clearInterval(interval);
-        };
-
-        trySend();
+        return () => clearInterval(interval);
     }, [eventName, eventId, data]);
 
-    return null; // لا يُرجع أي واجهة
+    return null;
 }

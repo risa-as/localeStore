@@ -11,9 +11,11 @@ import { useTranslations } from "next-intl";
 export default function OrdersExportButton({
     query,
     status,
+    sort,
 }: {
     query: string;
-    status: string;
+    status?: string;
+    sort?: string;
 }) {
     const [loading, setLoading] = useState(false);
     const t = useTranslations('Admin');
@@ -22,7 +24,7 @@ export default function OrdersExportButton({
     const handleExport = async () => {
         try {
             setLoading(true);
-            const orders = await getAllOrdersForExport({ query, status });
+            const orders = await getAllOrdersForExport({ query, status, sort });
 
             const data = orders.map((order: any) => ({
                 "اسم الزبون": order.fullName,

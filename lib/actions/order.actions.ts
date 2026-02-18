@@ -171,7 +171,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
     const ip = (await headers()).get('x-forwarded-for');
 
     // Check for fraud
-    const isFraud = await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+    // Exempt Admin and Employees
+    const isAdminOrEmployee = session?.user?.role === 'admin' || session?.user?.role === 'employee';
+    const isFraud = isAdminOrEmployee ? false : await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -354,7 +356,9 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const ip = (await headers()).get('x-forwarded-for');
 
     // Check for fraud
-    const isFraud = await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+    // Exempt Admin and Employees
+    const isAdminOrEmployee = session?.user?.role === 'admin' || session?.user?.role === 'employee';
+    const isFraud = isAdminOrEmployee ? false : await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -437,16 +441,19 @@ export async function getOrderById(orderId: string) {
 }
 
 // Get All Orders
+// Get All Orders
 export async function getAllOrders({
   limit = PAGE_SIZE,
   page,
   query,
   status,
+  sort,
 }: {
   limit?: number;
   page: number;
   query: string;
   status?: string;
+  sort?: string;
 }) {
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
@@ -463,6 +470,50 @@ export async function getAllOrders({
   if (status && status !== 'all') {
     (queryFilter as any).status = status;
   }
+
+  // Handle Product Sorting
+  if (sort === 'product') {
+    // 1. Fetch all matching orders with their items (lightweight)
+    const allMatching = await prisma.order.findMany({
+      where: { ...queryFilter },
+      select: {
+        id: true,
+        orderitems: {
+          select: { name: true },
+          take: 1
+        }
+      }
+    });
+
+    // 2. Sort in memory
+    allMatching.sort((a, b) => {
+      const nameA = a.orderitems[0]?.name || "";
+      const nameB = b.orderitems[0]?.name || "";
+      return nameA.localeCompare(nameB, 'ar');
+    });
+
+    // 3. Paginate
+    const totalCount = allMatching.length;
+    const startIndex = (page - 1) * limit;
+    const slicedIds = allMatching.slice(startIndex, startIndex + limit).map(o => o.id);
+
+    // 4. Fetch full data for the page
+    // Note: findMany with 'in' does NOT guarantee order. We must re-sort manually.
+    const pageData = await prisma.order.findMany({
+      where: { id: { in: slicedIds } },
+      include: { orderitems: true },
+    });
+
+    // Re-sort to match the sliced order
+    const sortedPageData = slicedIds.map(id => pageData.find(o => o.id === id)!);
+
+    return {
+      data: convertToPlainObject(sortedPageData),
+      totalPages: Math.ceil(totalCount / limit),
+    };
+  }
+
+  // Default Sorting (Date)
   const data = await prisma.order.findMany({
     where: {
       ...queryFilter,
@@ -475,21 +526,23 @@ export async function getAllOrders({
     skip: (page - 1) * limit,
   });
 
-  const dataCount = await prisma.order.count();
+  const dataCount = await prisma.order.count({ where: queryFilter });
   return {
     data: convertToPlainObject(data),
     totalPages: Math.ceil(dataCount / limit),
   };
-
 }
 
+// Get All Orders For Export (No Pagination)
 // Get All Orders For Export (No Pagination)
 export async function getAllOrdersForExport({
   query,
   status,
+  sort,
 }: {
   query: string;
   status?: string;
+  sort?: string;
 }) {
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
@@ -516,6 +569,14 @@ export async function getAllOrdersForExport({
       orderitems: true,
     }
   });
+
+  if (sort === 'product') {
+    data.sort((a, b) => {
+      const nameA = a.orderitems[0]?.name || "";
+      const nameB = b.orderitems[0]?.name || "";
+      return nameA.localeCompare(nameB, 'ar');
+    });
+  }
 
   return convertToPlainObject(data);
 }
@@ -877,6 +938,138 @@ export async function getOrderProfitStats({ from, to }: { from: Date; to: Date }
   }
 
   return Array.from(statsMap.values()).sort((a, b) => b.totalProfit - a.totalProfit);
+}
+
+// Import Orders from Excel
+export async function importOrders(data: any[]) {
+  try {
+    if (!data || data.length === 0) {
+      return { success: false, message: "No data found in file" };
+    }
+
+    const session = await auth();
+    const userId = session?.user?.id;
+
+    // Governorate Mapping (Arabic -> English Keys)
+    const governorateMap: { [key: string]: string } = {
+      "بغداد": "Baghdad",
+      "البصرة": "Basra",
+      "نينوى": "Nineveh",
+      "الموصل": "Nineveh",
+      "أربيل": "Erbil",
+      "اربيل": "Erbil",
+      "كركوك": "Kirkuk",
+      "السليمانية": "Sulaymaniyah",
+      "ديالى": "Diyala",
+      "بابل": "Babylon",
+      "الحلة": "Babylon",
+      "الأنبار": "Anbar",
+      "الانبار": "Anbar",
+      "ذي قار": "Dhi Qar",
+      "الناصرية": "Dhi Qar",
+      "كربلاء": "Karbala",
+      "النجف": "Najaf",
+      "واسط": "Wasit",
+      "الكوت": "Wasit",
+      "القادسية": "Qadisiyah",
+      "الديوانية": "Qadisiyah",
+      "ميسان": "Maysan",
+      "العمارة": "Maysan",
+      "المثنى": "Muthanna",
+      "السماوة": "Muthanna",
+      "صلاح الدين": "Saladin",
+      "دهوك": "Dohuk",
+    };
+
+    let successCount = 0;
+
+    // Process each row
+    for (const row of data) {
+      // 1. Extract & Map Data
+      const fullName = row["اسم الزبون"] || "Unknown";
+      const phoneNumber = row["رقم الزبون"] || row["رقم الهاتف"] || "";
+      const govArabic = row["المحافظة"] || "";
+      const governorate = governorateMap[govArabic] || govArabic || "Baghdad"; // Fallback
+      const address = row["اقرب نقطة دالة"] || "";
+      const notes = row["الملاحظات"] || "";
+      const totalPrice = (Number(row["السعر مع التوصيل"]) / 1000) || 0;
+      const qty = Number(row["عدد القطع"]) || 1;
+      const productName = row["اسم المنتج"] || "";
+
+      // 2. Find Product (Best Effort)
+      let product = null;
+      if (productName) {
+        // Try exact match first
+        product = await prisma.product.findFirst({
+          where: { name: { equals: productName, mode: "insensitive" } }
+        });
+
+        // Try contains if not found (take the first one)
+        if (!product) {
+          const firstPart = productName.split(",")[0].trim();
+          if (firstPart) {
+            product = await prisma.product.findFirst({
+              where: { name: { contains: firstPart, mode: "insensitive" } }
+            });
+          }
+        }
+      }
+
+      if (product) {
+        // Calculate price from DB if not provided or to match user request "fetch price"
+        // If "السعر مع التوصيل" in Excel is roughly (price * qty), we might prefer DB for accuracy.
+        // Assuming "add product price to the table" means use the DB price.
+
+        const itemPrice = Number(product.price);
+        const shipping = Number(product.shippingPrice);
+        // If totalPrice from Excel is 0, use calculated. 
+        // Or just overwrite? The user said "fetch the price ... and add it".
+        // I'll prefer the calculated price to ensure it matches the product in DB.
+        const calculatedTotalPrice = (itemPrice * qty) + shipping;
+
+        const finalTotalPrice = totalPrice > 0 ? totalPrice : calculatedTotalPrice;
+
+        await prisma.$transaction(async (tx) => {
+          // Create Order
+          const order = await tx.order.create({
+            data: {
+              userId: userId,
+              fullName,
+              phoneNumber: String(phoneNumber),
+              governorate,
+              address,
+              notes,
+              totalPrice: finalTotalPrice,
+              status: 'home',
+              quantity: qty,
+            }
+          });
+
+          // Create Order Item
+          await tx.orderItem.create({
+            data: {
+              orderId: order.id,
+              productId: product.id,
+              slug: product.slug,
+              name: product.name,
+              price: product.price,
+              qty: qty,
+              image: product.images[0] || "",
+              shippingPrice: product.shippingPrice
+            }
+          });
+        });
+        successCount++;
+      }
+    }
+
+    revalidatePath("/admin/orders");
+    return { success: true, count: successCount, message: "Done" };
+
+  } catch (error) {
+    console.error("Import Error:", error);
+    return { success: false, message: "Failed to process file" };
+  }
 }
 
 

@@ -5,6 +5,7 @@ import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
 import { getMessages, getLocale } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
+import { auth } from "@/auth";
 
 
 export default async function AdminLayout({
@@ -14,6 +15,7 @@ export default async function AdminLayout({
 }>) {
   const messages = await getMessages();
   const locale = await getLocale();
+  const session = await auth();
 
   return (
     <div className="flex flex-col">
@@ -27,7 +29,7 @@ export default async function AdminLayout({
               height={48}
             />
           </Link>
-          <MainNav className="ms-6" />
+          <MainNav className="ms-6" role={session?.user?.role} />
           <div className="ms-auto items-center flex gap-4">
             <NextIntlClientProvider locale={locale} messages={messages}>
               <Menu />

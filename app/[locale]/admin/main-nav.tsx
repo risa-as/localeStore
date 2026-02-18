@@ -3,19 +3,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { useTranslations } from "next-intl";
 import { useSession } from "next-auth/react";
+import { useTranslations } from "next-intl";
 
 const MainNav = ({
   className,
+  role: roleProp,
   ...props
-}: React.HTMLAttributes<HTMLElement>) => {
+}: React.HTMLAttributes<HTMLElement> & { role?: string }) => {
   const t = useTranslations('Admin');
   const { data: session } = useSession();
-  const role = session?.user?.role;
+  const role = session?.user?.role || roleProp;
 
   const links = [
-    { title: t('overview'), href: "/admin/overview" },
+    { title: t('overview'), href: "/admin/overview", hide: role !== "admin" },
     { title: t('products'), href: "/admin/products" },
     { title: t('categories'), href: "/admin/categories" },
     { title: t('orders'), href: "/admin/orders" },

@@ -10,6 +10,7 @@ import { getTranslations, getMessages, getLocale } from "next-intl/server";
 import OrdersTable from "./orders-table";
 import AdminSearch from "@/components/admin/admin-search";
 import OrdersExportButton from "@/components/admin/orders-export-button";
+import OrdersImportButton from "@/components/admin/orders-import-button";
 import { PAGE_SIZE } from "@/lib/constants";
 import { NextIntlClientProvider } from "next-intl";
 
@@ -18,16 +19,17 @@ export const metadata: Metadata = {
 };
 
 const AdminOrdersPage = async (props: {
-  searchParams: Promise<{ page: string; query: string; status: string }>;
+  searchParams: Promise<{ page: string; query: string; status: string; sort: string }>;
 }) => {
   await requireAdmin();
-  const { page = "1", query: searchText = "", status = 'home' } = await props.searchParams;
+  const { page = "1", query: searchText = "", status = 'home', sort = 'date' } = await props.searchParams;
 
   const orders = await getAllOrders({
     page: Number(page),
     limit: PAGE_SIZE,
     query: searchText,
     status,
+    sort,
   });
 
   const t = await getTranslations('Admin');
@@ -76,7 +78,10 @@ const AdminOrdersPage = async (props: {
 
         </div>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <OrdersExportButton query={searchText} status={status} />
+          <div className="flex gap-2">
+            <OrdersImportButton />
+            <OrdersExportButton query={searchText} status={status} sort={sort} />
+          </div>
         </NextIntlClientProvider>
       </div>
 
@@ -84,6 +89,7 @@ const AdminOrdersPage = async (props: {
         orders={orders.data}
         page={Number(page) || 1}
         count={orders.totalPages}
+        sort={sort}
       />
 
       {orders.totalPages > 1 && (

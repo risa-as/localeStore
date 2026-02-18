@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import AuthSessionProvider from "@/components/shared/auth-session-provider";
 import { Analytics } from "@vercel/analytics/react"
+import { Suspense } from "react";
 // import FacebookPixelWrapper from "./facebook-pixel-wrapper";
 import { FacebookPixelProvider } from './facebook-pixel-provider';
 
@@ -66,7 +67,9 @@ export default async function RootLayout({
               enableSystem={true}
               disableTransitionOnChange={true}
             >
-              <FacebookPixelProvider />
+              <Suspense fallback={null}>
+                <FacebookPixelProvider />
+              </Suspense>
               {children}
               <Toaster />
             </ThemeProvider>

@@ -79,9 +79,9 @@ const CreateUserForm = () => {
                     name="name"
                     render={({ field }) => (
                         <FormItem className="w-full">
-                            <FormLabel>Name</FormLabel>
+                            <FormLabel>{t('User.name')}</FormLabel>
                             <FormControl>
-                                <Input placeholder="Enter user name" {...field} />
+                                <Input placeholder={t('User.enterName')} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -93,9 +93,9 @@ const CreateUserForm = () => {
                     name="email"
                     render={({ field }) => (
                         <FormItem className="w-full">
-                            <FormLabel>Email</FormLabel>
+                            <FormLabel>{t('User.email')}</FormLabel>
                             <FormControl>
-                                <Input placeholder="Enter user email" {...field} />
+                                <Input placeholder={t('User.enterEmail')} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -107,9 +107,9 @@ const CreateUserForm = () => {
                     name="password"
                     render={({ field }) => (
                         <FormItem className="w-full">
-                            <FormLabel>Password</FormLabel>
+                            <FormLabel>{t('User.password')}</FormLabel>
                             <FormControl>
-                                <Input type="password" placeholder="Enter password" {...field} />
+                                <Input type="password" placeholder={t('User.enterPassword')} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -121,9 +121,9 @@ const CreateUserForm = () => {
                     name="confirmPassword"
                     render={({ field }) => (
                         <FormItem className="w-full">
-                            <FormLabel>Confirm Password</FormLabel>
+                            <FormLabel>{t('User.confirmPassword')}</FormLabel>
                             <FormControl>
-                                <Input type="password" placeholder="Confirm password" {...field} />
+                                <Input type="password" placeholder={t('User.confirmPasswordPlaceholder')} {...field} />
                             </FormControl>
                             <FormMessage />
                         </FormItem>
@@ -135,11 +135,11 @@ const CreateUserForm = () => {
                     name="role"
                     render={({ field }) => (
                         <FormItem className="w-full">
-                            <FormLabel>Role</FormLabel>
+                            <FormLabel>{t('User.role')}</FormLabel>
                             <Select onValueChange={field.onChange} defaultValue={field.value}>
                                 <FormControl>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select a role" />
+                                        <SelectValue placeholder={t('User.selectRole')} />
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
@@ -155,7 +155,7 @@ const CreateUserForm = () => {
                     )}
                 />
                 <Button type="submit" className="w-full" disabled={form.formState.isSubmitting}>
-                    {form.formState.isSubmitting ? "Creating..." : "Create User"}
+                    {form.formState.isSubmitting ? t('User.creating') : t('User.submit')}
                 </Button>
             </form>
         </Form>

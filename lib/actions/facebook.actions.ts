@@ -35,6 +35,13 @@ export async function sendCAPIEvent(
     // نعتمد على الهيدر القادم من الطلب
     const clientUserAgent = requestHeaders.get("user-agent") || "";
 
+    // 🔴 حماية: عدم تتبع البوتات (Crawlers)
+    const isBot = /bot|googlebot|crawler|spider|robot|crawling/i.test(clientUserAgent);
+    if (isBot) {
+        console.log(`🤖 CAPI Skipped: Bot detected (${clientUserAgent})`);
+        return { success: false, error: "Bot detected" };
+    }
+
     const userData = (new UserData())
         .setClientIpAddress(clientIp)
         .setClientUserAgent(clientUserAgent);
