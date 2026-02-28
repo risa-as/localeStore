@@ -222,11 +222,15 @@ const ProductForm = ({
                     <Input
                       placeholder={t('placeholderColors')}
                       value={field.value?.length > 0 ? field.value.join(", ") : ""}
-                      onChange={(e) =>
-                        field.onChange(
-                          e.target.value.split(",").map((c) => c.trim())
-                        )
-                      }
+                      onChange={(e) => {
+                        const inputValue = e.target.value;
+                        if (!inputValue.trim()) {
+                          field.onChange([]);
+                        } else {
+                          const colorsArray = inputValue.split(",").map((color) => color.trim()).filter((color) => color.length > 0);
+                          field.onChange(colorsArray);
+                        }
+                      }}
                     />
                   </FormControl>
                   <FormMessage />
