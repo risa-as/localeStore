@@ -200,7 +200,7 @@ export default function OrdersTable({
                                 </TableCell>
                                 <TableCell>
                                     <a
-                                        href={`https://wa.me/${order.phoneNumber?.replace(/\D/g, '')}`}
+                                        href={`https://wa.me/964${order.phoneNumber?.replace(/\D/g, '')}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="inline-flex items-center justify-center p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
