@@ -20,10 +20,15 @@ async function checkForFraud(ip: string, newPhone: string, newGov: string): Prom
   // Get all previous orders from this IP
   const existingOrders = await prisma.order.findMany({
     where: { ip },
-    select: { phoneNumber: true, governorate: true }
+    select: { phoneNumber: true, governorate: true, status: true }
   });
 
   if (existingOrders.length === 0) return false;
+
+  // Check if any previous order from this IP is already banned
+  if (existingOrders.some(o => o.status === "banned")) {
+    return true;
+  }
 
   // Collect unique phone numbers and governorates
   const phoneNumbers = new Set(existingOrders.map(o => o.phoneNumber));
