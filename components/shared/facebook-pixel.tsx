@@ -39,7 +39,7 @@ export default function FbPixel({ eventName, eventId, data = {} }: PixelProps) {
         }, 1000);
 
         return () => clearInterval(interval);
-    }, [eventName, eventId, data]);
+    }, [eventName, eventId]);
 
     return null;
 }

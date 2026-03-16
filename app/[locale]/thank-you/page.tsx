@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useMemo, useState, Suspense } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { v4 as uuidv4 } from 'uuid';
@@ -75,19 +75,24 @@ function ThankYouContent() {
     }, [orderData]); // <--- يراقب orderData فقط
     // End API Code
 
-    // 3. العداد التنازلي
-    useEffect(() => {
-        if (timeLeft === 0) {
-            router.push('/ar'); // Redirect to store home
-            return;
-        }
+    // 3. العداد التنازلي — يعمل interval واحد فقط طوال عمر المكوّن
+    const routerRef = useRef(router);
+    useEffect(() => { routerRef.current = router; }, [router]);
 
+    useEffect(() => {
         const intervalId = setInterval(() => {
-            setTimeLeft((prev) => prev - 1);
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(intervalId);
+                    routerRef.current.push('/ar');
+                    return 0;
+                }
+                return prev - 1;
+            });
         }, 1000);
 
         return () => clearInterval(intervalId);
-    }, [timeLeft, router]);
+    }, []);
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-white p-6">

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/create-new-feature.ps1\" \"Vercel Cost Drain Fix & Performance Audit Remediation for ProStore\" -Json -ShortName \"fix-cost-drain\" \"Fix Vercel cost drain and performance issues\")",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/create-new-feature.ps1\" -Json -ShortName \"fix-cost-drain\" \"Fix Vercel cost drain and performance issues\")",
+      "Bash(powershell.exe -Command \"& { & '.specify/scripts/powershell/create-new-feature.ps1' -Json -ShortName 'fix-cost-drain' -FeatureDescription 'Fix Vercel cost drain and performance issues' }\")",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/setup-plan.ps1\" -Json)",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/update-agent-context.ps1\" -AgentType claude 2>&1)",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json)",
+      "Bash(powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
+      "Bash(cd:*)"
+    ]
+  }
+}
