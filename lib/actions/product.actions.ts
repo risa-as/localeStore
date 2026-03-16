@@ -3,20 +3,23 @@ import React from 'react';
 import { prisma } from "@/db/prisma";
 import { convertToPlainObject, formatError } from "../utils";
 import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "../constants";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { insertProductSchema, updateProductSchema } from "../validators";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 
 // Get latest products
-export async function getLatestProducts() {
-  const data = await prisma.product.findMany({
-    take: LATEST_PRODUCTS_LIMIT,
-    orderBy: { createdAt: "desc" },
-  });
-
-  return convertToPlainObject(data) as any;
-}
+export const getLatestProducts = unstable_cache(
+  async () => {
+    const data = await prisma.product.findMany({
+      take: LATEST_PRODUCTS_LIMIT,
+      orderBy: { createdAt: "desc" },
+    });
+    return convertToPlainObject(data) as any;
+  },
+  ["latest-products"],
+  { revalidate: 3600, tags: ["products"] }
+);
 
 // Get single product by it's slug
 export const getProductBySlug = React.cache(async (slug: string) => {
@@ -128,6 +131,7 @@ export async function deleteProduct(id: string) {
     await prisma.product.delete({ where: { id } });
 
     revalidatePath("/admin/products");
+    revalidateTag("products", {});
 
     return {
       success: true,
@@ -146,6 +150,7 @@ export async function createProduct(data: z.infer<typeof insertProductSchema>) {
     await prisma.product.create({ data: product });
 
     revalidatePath("/admin/products");
+    revalidateTag("products", {});
 
     return {
       success: true,
@@ -174,6 +179,7 @@ export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
     });
 
     revalidatePath("/admin/products");
+    revalidateTag("products", {});
 
     return {
       success: true,
@@ -196,12 +202,15 @@ export async function getAllCategories() {
 }
 
 // Get featured products
-export async function getFeaturedProducts() {
-  const data = await prisma.product.findMany({
-    where: { isFeatured: true },
-    orderBy: { createdAt: "desc" },
-    take: 4,
-  });
-
-  return convertToPlainObject(data) as any;
-}
+export const getFeaturedProducts = unstable_cache(
+  async () => {
+    const data = await prisma.product.findMany({
+      where: { isFeatured: true },
+      orderBy: { createdAt: "desc" },
+      take: 4,
+    });
+    return convertToPlainObject(data) as any;
+  },
+  ["featured-products"],
+  { revalidate: 1800, tags: ["products"] }
+);

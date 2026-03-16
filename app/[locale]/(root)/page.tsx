@@ -1,3 +1,5 @@
+export const revalidate = 3600;
+
 import DealCountdown from "@/components/deal-countdown";
 import IconBoxes from "@/components/icon-boxes";
 import ProductCarousel from "@/components/shared/product/product-carousel.";

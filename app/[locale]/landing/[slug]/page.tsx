@@ -1,3 +1,5 @@
+export const revalidate = 3600;
+
 import { getProductBySlug } from "@/lib/actions/product.actions";
 import { notFound } from "next/navigation";
 import LandingPage from "@/components/shared/product/landing-page";
