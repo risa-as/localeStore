@@ -10,7 +10,9 @@
       "Bash(powershell.exe -File \".specify/scripts/powershell/update-agent-context.ps1\" -AgentType claude 2>&1)",
       "Bash(powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json)",
       "Bash(powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node -e \"const pkg = require\\(''./node_modules/next/package.json''\\); console.log\\(pkg.version\\)\")"
     ]
   }
 }

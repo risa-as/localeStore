@@ -1,5 +1,4 @@
 "use server";
-import React from 'react';
 import { prisma } from "@/db/prisma";
 import { convertToPlainObject, formatError } from "../utils";
 import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "../constants";
@@ -22,13 +21,16 @@ export const getLatestProducts = unstable_cache(
 );
 
 // Get single product by it's slug
-export const getProductBySlug = React.cache(async (slug: string) => {
-  const data = await prisma.product.findFirst({
-    where: { slug: slug },
-  });
-
-  return convertToPlainObject(data) as any;
-});
+export const getProductBySlug = unstable_cache(
+  async (slug: string) => {
+    const data = await prisma.product.findFirst({
+      where: { slug },
+    });
+    return convertToPlainObject(data) as any;
+  },
+  ["product-by-slug"],
+  { revalidate: 3600, tags: ["products"] }
+);
 
 // Get single product by it's ID
 export async function getProductById(productId: string) {

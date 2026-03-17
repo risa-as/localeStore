@@ -191,11 +191,71 @@ Total: **14 tasks**, **8 files modified**, **0 new files**, **0 new dependencies
 
 ---
 
+---
+
+## Phase 7: Phase 2 Fixes — New Issues (2026-03-17)
+
+**Context**: Post-initial-fix observation — 215k requests/24hrs, 96.84 Neon CU-hrs, "Too Many Requests" on normal browsing. 5 new root causes identified.
+
+**Prerequisites**: All Phase 1–6 tasks complete (marked ✅ above).
+
+---
+
+### Phase 7A: Fix Rate Limit Threshold (P0 — Fix User 429 NOW)
+
+**Goal**: Stop the rate limiter from blocking legitimate users browsing the store normally.
+
+- [x] T015 [US5] In `middleware.ts` line 13: change `const MAX_REQUESTS = 60` to `const MAX_REQUESTS = 120` — Next.js RSC navigation sends additional background requests per page transition, causing normal browsing to exceed 60 req/min
+
+**Checkpoint**: Browse 10+ pages consecutively without receiving a 429 response.
+
+---
+
+### Phase 7B: Fix Prisma Singleton (P1 — Reduce Neon CU-hrs)
+
+**Goal**: Prevent new PrismaClient instances from being created on every serverless cold start, reducing unnecessary Neon connection churn.
+
+- [x] T016 [US1] Rewrite `db/prisma-db.ts` to use `globalThis` singleton pattern: (1) add `declare global { var prisma: PrismaClient | undefined }`, (2) extract adapter creation into `createPrismaClient()` function, (3) export `const prisma = globalThis.prisma ?? createPrismaClient()`, (4) add `if (process.env.NODE_ENV !== "production") globalThis.prisma = prisma` — the production guard prevents the global assignment (module cache handles reuse in prod); the dev guard prevents hot-reload from spawning unbounded clients
+
+**Checkpoint**: `next build` passes with no TypeScript errors. In dev, hot-reload does not create duplicate PrismaClient instances.
+
+---
+
+### Phase 7C: Fix Product Slug Caching (P1 — Reduce DB Queries)
+
+**Goal**: Cache `getProductBySlug` results across requests (not just within one render) to eliminate per-visitor Neon queries on landing and product pages.
+
+- [x] T017 [US3] In `lib/actions/product.actions.ts`: replace the `React.cache` wrapper on `getProductBySlug` (line 25) with `unstable_cache` using key `["product-by-slug"]`, `revalidate: 3600`, and `tags: ["products"]` — remove the `import React from 'react'` if it is no longer needed after this change
+- [x] T018 [US3] Confirmed `revalidateTag("products", {})` is correct for Next.js 16 — the type signature is `revalidateTag(tag: string, profile: string | CacheLifeConfig)` where `{}` satisfies the optional `CacheLifeConfig`. No change needed.
+
+**Checkpoint**: Product landing page served from Data Cache on second request — Vercel dashboard shows cache HIT. Admin product update correctly invalidates the cache (product change visible within 60s of update).
+
+---
+
+### Phase 7D: Fix Category Caching (P2 — Reduce DB Queries)
+
+**Goal**: Cache the category list so pages that display categories do not hit Neon on every visitor request.
+
+- [x] T019 [US3] In `lib/actions/category.actions.ts`: (1) add `import { unstable_cache, revalidatePath, revalidateTag } from 'next/cache'` (replace existing `revalidatePath`-only import), (2) convert `getAllCategories` from a plain `async function` to an `unstable_cache`-wrapped `const` with key `["all-categories"]`, `revalidate: 3600`, `tags: ["categories"]`, (3) add `revalidateTag("categories")` after `revalidatePath` in both `createCategory` and `deleteCategory`
+
+**Checkpoint**: `next build` succeeds. Category list is served from cache on repeated requests. Admin category create/delete invalidates the cache.
+
+---
+
+## Phase 8: Final Validation (Phase 2)
+
+- [x] T020 [P] Run `next build` to confirm zero TypeScript errors across all 5 newly modified files: `middleware.ts`, `db/prisma-db.ts`, `lib/actions/product.actions.ts`, `lib/actions/category.actions.ts`
+- [ ] T021 [P] Manual smoke test: browse 10+ pages in the live store without receiving a 429 — confirm SC-008 passes. Check Vercel dashboard after 1 hour to confirm invocation count is below 10/hr with no human traffic — confirm SC-001 still passes.
+
+**Checkpoint (Phase 2 complete)**: No 429 on normal browsing. Neon CU-hrs trending down. Build passes. All SC-001–SC-009 criteria met.
+
+---
+
 ## Notes
 
 - `[P]` tasks can be done in the same editing session or by different developers simultaneously
 - `[Story]` label maps each task to the user story it satisfies for traceability
-- The `unstable_cache` wrapping (T005, T006) changes the function from a named `async function` to a `const` — verify no import patterns break in callers
-- The rate limiter Map (T011) is per-Edge-worker-instance; this is sufficient for single-region Vercel Pro deployments
+- The `unstable_cache` wrapping (T005, T006, T017, T019) changes functions from named `async function` to `const` — verify no import patterns break in callers
+- The rate limiter Map (T011) is per-Edge-worker-instance; in-memory is unreliable across parallel Vercel Edge instances — Upstash Redis is the long-term solution but out of scope for this phase
 - All changes are backward-compatible — no migrations, no API contract changes, no schema updates
 - Commit after each phase checkpoint to enable easy rollback per fix

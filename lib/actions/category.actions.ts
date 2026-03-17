@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { insertCategorySchema } from "../validators";
 import { formatError } from "../utils";
 import { prisma } from "@/db/prisma";
@@ -14,6 +14,7 @@ export async function createCategory(data: z.infer<typeof insertCategorySchema>)
         const category = insertCategorySchema.parse(data);
         await prisma.category.create({ data: category });
         revalidatePath("/admin/categories");
+        revalidateTag("categories", {});
         return { success: true, message: "Category created successfully" };
     } catch (error) {
         const { formError } = formatError(error);
@@ -22,17 +23,16 @@ export async function createCategory(data: z.infer<typeof insertCategorySchema>)
 }
 
 // Get all categories
-export async function getAllCategories() {
-    if (!prisma.category) {
-        console.error("Prisma Category model is missing. Please restart your server.");
-        // Return empty array to avoid crash, but this implies system is broken
-        return [] as Category[];
-    }
-    const data = await prisma.category.findMany({
-        orderBy: { createdAt: "desc" },
-    });
-    return data as Category[];
-}
+export const getAllCategories = unstable_cache(
+    async () => {
+        const data = await prisma.category.findMany({
+            orderBy: { createdAt: "desc" },
+        });
+        return data as Category[];
+    },
+    ["all-categories"],
+    { revalidate: 3600, tags: ["categories"] }
+);
 
 // Delete a category
 export async function deleteCategory(id: string) {
@@ -41,6 +41,7 @@ export async function deleteCategory(id: string) {
             where: { id },
         });
         revalidatePath("/admin/categories");
+        revalidateTag("categories", {});
         return { success: true, message: "Category deleted successfully" };
     } catch (error) {
         const { formError } = formatError(error);

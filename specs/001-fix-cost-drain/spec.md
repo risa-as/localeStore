@@ -2,8 +2,9 @@
 
 **Feature Branch**: `001-fix-cost-drain`
 **Created**: 2026-03-16
-**Status**: Draft
-**Input**: Deep audit of ProStore Next.js e-commerce app — 3M requests in 20 days on free tier, 1,750 function invocations and $0.60 spend immediately on Pro with zero real human traffic
+**Updated**: 2026-03-17
+**Status**: Active — Phase 2 (new issues discovered post-initial-fixes)
+**Input**: Deep audit of ProStore Next.js e-commerce app — 3M requests in 20 days on free tier, 1,750 function invocations and $0.60 spend immediately on Pro with zero real human traffic. Post-fix observation (2026-03-17): 215,467 Vercel requests / 67,278 invocations in 24 hours, 96.84 Neon CU-hrs in billing cycle, "Too Many Requests" errors on normal store browsing.
 
 ---
 
@@ -127,6 +128,8 @@ As the store owner, I need API endpoints and server actions to be resilient agai
 - **FR-013**: Rate-limited responses MUST return HTTP 429 with a `Retry-After` header specifying seconds until the window resets
 - **FR-014**: Stripe webhook routes MUST be excluded from rate limiting
 - **FR-015**: Next.js static asset paths (`/_next/static`, `/images`, `/favicon`) MUST be excluded from rate limiting
+- **FR-020** *(new)*: The rate limit threshold MUST be set to at least 120 requests per minute per IP to avoid throttling legitimate users who trigger RSC navigation requests on each page transition
+- **FR-021** *(new)*: API routes (`/api/*`) MUST be included in the rate-limiting scope — the current middleware matcher excludes them, allowing bots to spam endpoints like `/api/auth/session` without any throttle
 
 #### R6 — Security Headers
 - **FR-016**: All HTML page responses MUST include `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin`
@@ -135,6 +138,17 @@ As the store owner, I need API endpoints and server actions to be resilient agai
 #### R7 — ISR Page Exports
 - **FR-018**: The home page MUST export a `revalidate` constant to enable background regeneration
 - **FR-019**: Product listing and product detail pages MUST export `revalidate` to avoid per-visitor server function invocations for content that rarely changes
+
+#### R8 — Prisma Singleton *(new)*
+- **FR-022**: The Prisma client in `db/prisma-db.ts` MUST use a `globalThis` singleton pattern to prevent a new `PrismaClient` instance (and new Neon connection) from being created on every serverless cold start
+- **FR-023**: The singleton MUST only be persisted to `globalThis` in `NODE_ENV !== 'production'` to protect against hot-reload leaks in development while still reusing the module-level instance in production
+
+#### R9 — Product Slug Caching *(new)*
+- **FR-024**: `getProductBySlug` MUST be wrapped in `unstable_cache` (not `React.cache`) with a `revalidate` of 3600 seconds and the `products` cache tag so its result is shared across requests, not just within a single render
+- **FR-025**: `revalidateTag` calls in `createProduct`, `updateProduct`, and `deleteProduct` MUST pass only the tag string — the current `revalidateTag("products", {})` call passes an invalid second argument and must be corrected to `revalidateTag("products")`
+
+#### R10 — Category Caching *(new)*
+- **FR-026**: `getAllCategories` in `category.actions.ts` MUST be wrapped in `unstable_cache` with a `revalidate` of 3600 seconds and a `categories` cache tag to avoid a live Neon query on every page that renders the category list
 
 ### Key Entities
 
@@ -152,9 +166,11 @@ As the store owner, I need API endpoints and server actions to be resilient agai
 - **SC-002**: The home page and product listing serve 95% of requests from cache, triggering at most 1 database query per revalidation cycle rather than one per visitor
 - **SC-003**: The thank-you page countdown runs for its full 30-second duration with CPU usage below 5% and no memory growth visible in DevTools profiler
 - **SC-004**: Facebook Events Manager shows a duplicate event rate below 2% for PageView and Purchase events (down from near-100% duplication caused by Strict Mode double-mount)
-- **SC-005**: A scripted bot sending 100 requests/minute from one IP is throttled after the first 30 requests — 70+ requests return 429
+- **SC-005**: A scripted bot sending 100 requests/minute from one IP is throttled — requests beyond the threshold return 429
 - **SC-006**: All product pages reflect admin changes within 60 minutes of update (ISR revalidation SLA)
 - **SC-007**: Monthly Vercel Pro cost attributable to function invocations stays below $2 at normal traffic levels of fewer than 500 real daily visitors
+- **SC-008** *(new)*: A legitimate user browsing the store normally (loading 10+ pages) MUST NOT receive a 429 response — the rate limiter must be tuned to target bots, not human visitors
+- **SC-009** *(new)*: Neon CU-hrs drop below 20 CU-hrs/billing-cycle at normal traffic (currently 96.84 CU-hrs), achieved by Prisma singleton reducing unnecessary connections and `unstable_cache` reducing DB query frequency
 
 ---
 
@@ -162,7 +178,9 @@ As the store owner, I need API endpoints and server actions to be resilient agai
 
 1. Product data changes infrequently (fewer than 20 times/day) — a 1-hour ISR revalidation window is acceptable for product listings
 2. The `eventId` for CAPI events is already unique per user session/action — deduplication only needs to check within a single browser session
-3. Rate limiting will use a lightweight in-memory sliding window at the Edge layer for initial implementation; can be upgraded to a distributed store (e.g., Upstash Redis) if multiple Vercel regions are needed
+3. ~~Rate limiting will use a lightweight in-memory sliding window at the Edge layer for initial implementation~~ **REVISED (2026-03-17)**: In-memory Map rate limiting is fundamentally unreliable on Vercel because parallel Edge instances do not share memory. Each instance has its own Map, so bots hitting different instances bypass the limit entirely. Increasing the threshold (FR-020) is the immediate fix; Upstash Redis is the proper long-term solution for multi-instance rate limiting.
 4. Stripe webhooks originate from Stripe's infrastructure and are excluded from rate limiting by route path pattern, not by IP allowlist
 5. The `unoptimized` prop was added as a temporary workaround for an image loading issue — removing it is safe because `utfs.io` is already correctly configured as an allowed image domain
 6. React Strict Mode is enabled in development (causing double-mount) and is the primary source of duplicate CAPI fires in the test environment; fixes must handle both dev and production behavior
+7. *(new)* The `DealCountdown` component's `TARGET_DATE` is set to 2026-01-18, which is in the past. The component renders the "ended" state on every home page visit. It is NOT a cost driver (the interval stops in the first tick), but should be updated or removed to avoid confusing users.
+8. *(new)* The product detail page (`/product/[slug]`) calls `auth()` and `getMyCart()` which are session-dependent and cannot be statically cached at the page level. However, the product data query (`getProductBySlug`) CAN and MUST be independently cached via `unstable_cache` even if the page itself remains dynamic.
