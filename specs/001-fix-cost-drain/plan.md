@@ -376,6 +376,128 @@ export default NextAuth(authConfig).auth((req) => {
 
 ---
 
+---
+
+## Phase 2 Fixes — New Issues Discovered 2026-03-17
+
+Post-deployment observation: 215k requests / 96.84 Neon CU-hrs / "Too Many Requests" on normal browsing.
+Root causes identified after reading live code state.
+
+---
+
+### Fix 8 — Rate Limit Threshold Too Low
+**File**: `middleware.ts` (Line 13)
+
+**Before** (BROKEN — blocks legitimate users):
+```ts
+const MAX_REQUESTS = 60;
+```
+
+**After** (FIXED):
+```ts
+const MAX_REQUESTS = 120;
+```
+
+**Why**: Next.js App Router sends RSC (React Server Components) fetch requests on every client-side navigation IN ADDITION to the initial page request. A user browsing 8–10 pages in a minute easily exceeds 60 requests. The limit must accommodate human browsing patterns. 120/min still throttles bots that typically send hundreds of requests per minute.
+
+---
+
+### Fix 9 — Prisma Global Singleton
+**File**: `db/prisma-db.ts`
+
+**Before** (BROKEN — new connection per cold start):
+```ts
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
+export const prisma = new PrismaClient({ adapter })
+```
+
+**After** (FIXED):
+```ts
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+declare global {
+  // eslint-disable-next-line no-var
+  var prisma: PrismaClient | undefined;
+}
+
+function createPrismaClient() {
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+  return new PrismaClient({ adapter });
+}
+
+export const prisma = globalThis.prisma ?? createPrismaClient();
+
+if (process.env.NODE_ENV !== "production") globalThis.prisma = prisma;
+```
+
+**Why this reduces Neon CU-hrs**: Without singleton, every serverless cold start creates a new PrismaClient → new TCP connection → Neon compute wakes up and stays active. With singleton, the module-level instance is reused across requests within the same warm function instance, reducing unnecessary connection churn.
+
+---
+
+### Fix 10 — getProductBySlug: React.cache → unstable_cache
+**File**: `lib/actions/product.actions.ts` (Line 25)
+
+**Before** (BROKEN — only dedupes within one render):
+```ts
+export const getProductBySlug = React.cache(async (slug: string) => {
+  const data = await prisma.product.findFirst({ where: { slug } });
+  return convertToPlainObject(data) as any;
+});
+```
+
+**After** (FIXED — caches across requests for 1 hour):
+```ts
+export const getProductBySlug = unstable_cache(
+  async (slug: string) => {
+    const data = await prisma.product.findFirst({ where: { slug } });
+    return convertToPlainObject(data) as any;
+  },
+  ["product-by-slug"],
+  { revalidate: 3600, tags: ["products"] }
+);
+```
+
+**Why**: `React.cache` is request-scoped — it only deduplicates duplicate calls within a single server render. Between separate requests (i.e., different visitors), each call hits Neon. `unstable_cache` persists the result in Next.js Data Cache across requests.
+
+---
+
+### Fix 11 — revalidateTag Second Argument (No Change Required)
+**File**: `lib/actions/product.actions.ts`
+
+**Finding**: `revalidateTag("products", {})` is CORRECT for Next.js 16. The type signature in this version is `revalidateTag(tag: string, profile: string | CacheLifeConfig): undefined` where `CacheLifeConfig = { expire?: number }`. Passing `{}` is a valid `CacheLifeConfig`. No modification needed — original code was intentionally correct.
+
+---
+
+### Fix 12 — getAllCategories Caching
+**File**: `lib/actions/category.actions.ts` (Line 25)
+
+**Before** (BROKEN — live Neon query on every call):
+```ts
+export async function getAllCategories() {
+  const data = await prisma.category.findMany({ orderBy: { createdAt: "desc" } });
+  return data as Category[];
+}
+```
+
+**After** (FIXED):
+```ts
+export const getAllCategories = unstable_cache(
+  async () => {
+    const data = await prisma.category.findMany({ orderBy: { createdAt: "desc" } });
+    return data as Category[];
+  },
+  ["all-categories"],
+  { revalidate: 3600, tags: ["categories"] }
+);
+```
+
+Also add `revalidateTag("categories")` in `createCategory` and `deleteCategory` after their `revalidatePath` calls.
+
+---
+
 ## Complexity Tracking
 
 No constitution violations. No unjustified complexity introduced.

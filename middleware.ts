@@ -10,7 +10,7 @@ const intlMiddleware = createMiddleware(routing);
 // --- Rate Limiting ---
 const rateLimitMap = new Map<string, { count: number; windowStart: number }>();
 const WINDOW_MS = 60_000; // 1 minute
-const MAX_REQUESTS = 60;
+const MAX_REQUESTS = 120;
 
 // Routes exempt from rate limiting (Stripe webhooks must always pass through)
 const RATE_LIMIT_EXEMPT = ['/api/webhooks/'];
