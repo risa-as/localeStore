@@ -44,9 +44,10 @@ export async function addItemToCart(data: CartItem) {
     });
     if (!product) throw new Error(t("productNotFound"));
 
-    // Ensure price and shippingPrice matches product
+    // Ensure price, shippingPrice, and costPrice match product
     item.price = product.price.toString();
     item.shippingPrice = product.shippingPrice.toString();
+    item.costPrice = product.costPrice.toString();
 
     // Create New Cart Object
     if (!cart) {

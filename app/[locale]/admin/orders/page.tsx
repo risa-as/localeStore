@@ -11,6 +11,7 @@ import OrdersTable from "./orders-table";
 import AdminSearch from "@/components/admin/admin-search";
 import OrdersExportButton from "@/components/admin/orders-export-button";
 import OrdersImportButton from "@/components/admin/orders-import-button";
+import BulkUpdateByDateDialog from "@/components/admin/bulk-update-by-date-dialog";
 import { PAGE_SIZE } from "@/lib/constants";
 import { NextIntlClientProvider } from "next-intl";
 
@@ -19,10 +20,20 @@ export const metadata: Metadata = {
 };
 
 const AdminOrdersPage = async (props: {
-  searchParams: Promise<{ page: string; query: string; status: string; sort: string }>;
+  searchParams: Promise<{
+    page: string;
+    query: string;
+    status: string;
+    sort: string;
+  }>;
 }) => {
   await requireAdmin();
-  const { page = "1", query: searchText = "", status = 'home', sort = 'date' } = await props.searchParams;
+  const {
+    page = "1",
+    query: searchText = "",
+    status = "home",
+    sort = "date",
+  } = await props.searchParams;
 
   const orders = await getAllOrders({
     page: Number(page),
@@ -32,24 +43,34 @@ const AdminOrdersPage = async (props: {
     sort,
   });
 
-  const t = await getTranslations('Admin');
+  const t = await getTranslations("Admin");
   const messages = await getMessages();
   const locale = await getLocale();
 
-  const statuses = ['home', 'account', 'pending', 'completed', 'returned', 'waiting', 'banned'];
+  const statuses = [
+    "home",
+    "account",
+    "pending",
+    "completed",
+    "completedAccountant",
+    "returned",
+    "waiting",
+    "unavailable",
+    "banned",
+  ];
 
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3 justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="h2-bold">{t('orders')}</h1>
+          <h1 className="h2-bold">{t("orders")}</h1>
 
           {searchText && (
             <div>
-              {t('filteredBy')} <i>&quot;{searchText}&quot;</i>{" "}
+              {t("filteredBy")} <i>&quot;{searchText}&quot;</i>{" "}
               <Link href={`/admin/orders?status=${status}`}>
                 <Button variant={"outline"} size="sm">
-                  {t('removeFilter')}
+                  {t("removeFilter")}
                 </Button>
               </Link>
             </div>
@@ -65,7 +86,9 @@ const AdminOrdersPage = async (props: {
               <Button
                 variant={status === s ? "default" : "outline"}
                 size="sm"
-                className={status === s ? "bg-primary text-primary-foreground" : ""}
+                className={
+                  status === s ? "bg-primary text-primary-foreground" : ""
+                }
               >
                 {t(`Orders.Status.${s}`)}
               </Button>
@@ -75,12 +98,16 @@ const AdminOrdersPage = async (props: {
           {/* <NextIntlClientProvider locale={locale} messages={messages}>
             <AdminSearch />
           </NextIntlClientProvider> */}
-
         </div>
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <BulkUpdateByDateDialog />
             <OrdersImportButton />
-            <OrdersExportButton query={searchText} status={status} sort={sort} />
+            <OrdersExportButton
+              query={searchText}
+              status={status}
+              sort={sort}
+            />
           </div>
         </NextIntlClientProvider>
       </div>
