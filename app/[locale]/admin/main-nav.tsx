@@ -22,6 +22,8 @@ const MainNav = ({
     { title: t('orders'), href: "/admin/orders" },
     { title: t('users'), href: "/admin/users", hide: role !== "admin" },
     { title: t('profitAnalysis'), href: "/admin/profit", hide: role !== "admin" },
+    { title: t('expenses'), href: "/admin/expenses", hide: role !== "admin" },
+    { title: t('shippingSettings'), href: "/admin/shipping-settings", hide: role !== "admin" },
   ];
   const pathname = usePathname();
   return (

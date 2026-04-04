@@ -80,6 +80,7 @@ export const cartItemSchema = z.object({
   image: z.string().min(1, "Image is required"),
   shippingPrice: currency,
   price: currency,
+  costPrice: currency,
 });
 
 export const insertCartSchema = z.object({
@@ -127,7 +128,9 @@ export const updateOrderSchema = insertOrderSchema.extend({
   id: z.string().min(1, "ID is required"),
   status: z.string().min(1, "Status is required"),
   totalPrice: currency,
+  shippingPrice: currency,
   notes: z.string().optional().nullable(),
+  actualShippingCost: currency,
 });
 
 // Schema for inserting an order item

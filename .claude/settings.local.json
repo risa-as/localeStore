@@ -12,7 +12,16 @@
       "Bash(powershell.exe -File \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
       "Bash(cd:*)",
       "Bash(npx tsc:*)",
-      "Bash(node -e \"const pkg = require\\(''./node_modules/next/package.json''\\); console.log\\(pkg.version\\)\")"
+      "Bash(node -e \"const pkg = require\\(''./node_modules/next/package.json''\\); console.log\\(pkg.version\\)\")",
+      "Bash(xargs cat:*)",
+      "Bash(sed:*)",
+      "Bash(npx prisma:*)",
+      "Bash(npx tsx:*)",
+      "Bash(taskkill /F /FI \"IMAGENAME eq node.exe\" /FI \"WINDOWTITLE eq *fix-order*\")",
+      "Bash(node -e ':*)",
+      "Bash(npx shadcn@latest add tabs --yes)",
+      "Bash(npx shadcn@latest add command popover --yes)",
+      "Bash(npx shadcn@latest add command --yes)"
     ]
   }
 }

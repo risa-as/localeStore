@@ -5,7 +5,11 @@ import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import { convertToPlainObject, formatError } from "../utils";
 import { getMyCart } from "./cart.actions";
-import { insertOrderSchema, shippingAddressSchema, updateOrderSchema } from "../validators";
+import {
+  insertOrderSchema,
+  shippingAddressSchema,
+  updateOrderSchema,
+} from "../validators";
 import { prisma } from "@/db/prisma";
 import { CartItem } from "@/types";
 import { revalidatePath } from "next/cache";
@@ -14,31 +18,35 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 
 // Helper to check for fraud
-async function checkForFraud(ip: string, newPhone: string, newGov: string): Promise<boolean> {
+async function checkForFraud(
+  ip: string,
+  newPhone: string,
+  newGov: string,
+): Promise<boolean> {
   if (!ip) return false;
 
   // Get all previous orders from this IP
   const existingOrders = await prisma.order.findMany({
     where: { ip },
-    select: { phoneNumber: true, governorate: true, status: true }
+    select: { phoneNumber: true, governorate: true, status: true },
   });
 
   if (existingOrders.length === 0) return false;
 
   // Check if any previous order from this IP is already banned
-  if (existingOrders.some(o => o.status === "banned")) {
+  if (existingOrders.some((o) => o.status === "banned")) {
     return true;
   }
 
   // Collect unique phone numbers and governorates
-  const phoneNumbers = new Set(existingOrders.map(o => o.phoneNumber));
-  const governorates = new Set(existingOrders.map(o => o.governorate));
+  const phoneNumbers = new Set(existingOrders.map((o) => o.phoneNumber));
+  const governorates = new Set(existingOrders.map((o) => o.governorate));
 
   // Add the new details
   phoneNumbers.add(newPhone);
   governorates.add(newGov);
 
-  // Fraud Logic: 
+  // Fraud Logic:
   // 1. More than 2 different phone numbers
   // 2. More than 1 different governorate (i.e. different governorates)
   if (phoneNumbers.size > 2 || governorates.size > 1) {
@@ -48,24 +56,43 @@ async function checkForFraud(ip: string, newPhone: string, newGov: string): Prom
   return false;
 }
 
+// Actual shipping cost paid to the delivery company — reads from DB settings
+async function getActualShippingCost(governorate: string): Promise<number> {
+  const settings = await prisma.shippingSettings.upsert({
+    where: { id: "default" },
+    create: { id: "default", baghdadCost: 4000, othersCost: 5000 },
+    update: {},
+  });
+  return governorate === "Baghdad"
+    ? Number(settings.baghdadCost)
+    : Number(settings.othersCost);
+}
+
 // Create Quick Order (Direct from Landing Page)
-export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, productId: string) {
+export async function createQuickOrder(
+  data: z.infer<typeof insertOrderSchema>,
+  productId: string,
+) {
   try {
     const orderData = insertOrderSchema.parse(data);
 
     // Set Guest Cookie for persistence
     const cookieStore = await cookies();
-    cookieStore.set("guest-shipping-info", JSON.stringify({
-      fullName: orderData.fullName,
-      streetAddress: orderData.address,
-      city: orderData.governorate, // Mapping governorate to city/address field as best fit
-      phoneNumber: orderData.phoneNumber,
-      postalCode: "00000", // Default or extract if available
-      country: "Iraq", // Default or extract
-    }), {
-      expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-      path: "/"
-    });
+    cookieStore.set(
+      "guest-shipping-info",
+      JSON.stringify({
+        fullName: orderData.fullName,
+        streetAddress: orderData.address,
+        city: orderData.governorate, // Mapping governorate to city/address field as best fit
+        phoneNumber: orderData.phoneNumber,
+        postalCode: "00000", // Default or extract if available
+        country: "Iraq", // Default or extract
+      }),
+      {
+        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+        path: "/",
+      },
+    );
 
     // Fetch product to ensure price and stock
     const product = await prisma.product.findUnique({
@@ -89,7 +116,7 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
       where: {
         phoneNumber: orderData.phoneNumber,
         createdAt: { gte: cutoffDate },
-        status: { in: ["home", "pending"] },
+        status: "home",
       },
       include: { orderitems: true },
     });
@@ -97,7 +124,7 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
     if (recentOrder) {
       // Checking if item exists
       const existingItem = recentOrder.orderitems.find(
-        (item) => item.productId === product.id
+        (item) => item.productId === product.id,
       );
 
       await prisma.$transaction(async (tx) => {
@@ -108,7 +135,7 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
               orderId_productId: {
                 orderId: recentOrder.id,
                 productId: existingItem.productId,
-              }
+              },
             },
             data: {
               qty: existingItem.qty + orderData.quantity,
@@ -125,34 +152,49 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
               qty: orderData.quantity,
               image: product.images[0] || "/placeholder.jpg",
               price: product.price,
+              costPrice: product.costPrice,
               selectedColor: orderData.selectedColor,
-              shippingPrice: product.shippingPrice, // Save shipping price
+              shippingPrice: product.shippingPrice,
             },
           });
         }
 
         // Recalculate total
-        const updatedItems = await tx.orderItem.findMany({ where: { orderId: recentOrder.id } });
+        const updatedItems = await tx.orderItem.findMany({
+          where: { orderId: recentOrder.id },
+        });
 
         // Items Price
-        const itemsPrice = updatedItems.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
+        const itemsPrice = updatedItems.reduce(
+          (acc, item) => acc + Number(item.price) * item.qty,
+          0,
+        );
 
         // Flat Shipping (Max of items)
-        const shippingPrice = updatedItems.length > 0
-          ? Math.max(...updatedItems.map((item) => Number(item.shippingPrice)))
-          : 0;
+        const shippingPrice =
+          updatedItems.length > 0
+            ? Math.max(
+                ...updatedItems.map((item) => Number(item.shippingPrice)),
+              )
+            : 0;
 
         const newTotalPrice = itemsPrice + shippingPrice;
+        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
 
         await tx.order.update({
           where: { id: recentOrder.id },
           data: {
             totalPrice: newTotalPrice,
+            shippingPrice: shippingPrice,
+            quantity: newQuantity,
             fullName: orderData.fullName,
             governorate: orderData.governorate,
             address: orderData.address,
-            userId: session?.user?.id, // Link to user if logged in
-          }
+            actualShippingCost: await getActualShippingCost(
+              orderData.governorate,
+            ),
+            userId: session?.user?.id,
+          },
         });
       });
 
@@ -163,22 +205,26 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
       };
     }
 
-
     // Create Order
     // Flat Rate Shipping: (Price * Qty) + Shipping
     const itemsPrice = Number(product.price) * orderData.quantity;
     const shippingPrice = Number(product.shippingPrice);
     const price = itemsPrice + shippingPrice;
 
-
-
     // Capture IP
-    const ip = (await headers()).get('x-forwarded-for');
+    const ip = (await headers()).get("x-forwarded-for");
 
     // Check for fraud
     // Exempt Admin and Employees
-    const isAdminOrEmployee = session?.user?.role === 'admin' || session?.user?.role === 'employee';
-    const isFraud = isAdminOrEmployee ? false : await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+    const isAdminOrEmployee =
+      session?.user?.role === "admin" || session?.user?.role === "employee";
+    const isFraud = isAdminOrEmployee
+      ? false
+      : await checkForFraud(
+          ip as string,
+          orderData.phoneNumber,
+          orderData.governorate,
+        );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -190,10 +236,14 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
           ...orderDataWithoutColor,
           quantity: orderData.quantity,
           totalPrice: price,
+          shippingPrice: shippingPrice,
           status: isFraud ? "banned" : "home",
+          actualShippingCost: await getActualShippingCost(
+            orderData.governorate,
+          ),
           userId,
           ip: ip as string,
-        }
+        },
       });
 
       // Create order item
@@ -206,8 +256,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
           qty: orderData.quantity,
           image: product.images[0] || "/placeholder.jpg",
           price: product.price,
+          costPrice: product.costPrice,
           selectedColor: orderData.selectedColor,
-          shippingPrice: product.shippingPrice, // Save Shipping Price
+          shippingPrice: product.shippingPrice,
         },
       });
 
@@ -221,7 +272,9 @@ export async function createQuickOrder(data: z.infer<typeof insertOrderSchema>, 
     return {
       success: true,
       message: "Order created",
-      redirectTo: isFraud ? "https://www.facebook.com" : `/thank-you?orderId=${insertedOrderId}`,
+      redirectTo: isFraud
+        ? "https://www.facebook.com"
+        : `/thank-you?orderId=${insertedOrderId}`,
     };
   } catch (error) {
     console.error("Error in createQuickOrder:", error);
@@ -247,19 +300,23 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const orderData = insertOrderSchema.parse(data);
 
     // Calculate total price from cart items
-    const itemsPrice = cart.items.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
-    const shippingPrice = cart.items.length > 0
-      ? Math.max(...cart.items.map((item) => Number(item.shippingPrice)))
-      : 0;
+    const itemsPrice = cart.items.reduce(
+      (acc, item) => acc + Number(item.price) * item.qty,
+      0,
+    );
+    const shippingPrice =
+      cart.items.length > 0
+        ? Math.max(...cart.items.map((item) => Number(item.shippingPrice)))
+        : 0;
     const price = itemsPrice + shippingPrice;
 
     // Get product details
     const productIds = cart.items.map((item) => item.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true }
+      select: { id: true },
     });
-    const productMap = new Map(products.map(p => [p.id, p]));
+    const productMap = new Map(products.map((p) => [p.id, p]));
 
     const session = await auth();
     const userId = session?.user?.id;
@@ -270,7 +327,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       where: {
         phoneNumber: orderData.phoneNumber,
         createdAt: { gte: cutoffDate },
-        status: { in: ["home", "pending"] },
+        status: "home",
       },
       include: { orderitems: true },
     });
@@ -280,7 +337,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       await prisma.$transaction(async (tx) => {
         for (const item of cart.items as CartItem[]) {
           const existingItem = recentOrder.orderitems.find(
-            (oi) => oi.productId === item.productId
+            (oi) => oi.productId === item.productId,
           );
 
           if (existingItem) {
@@ -290,9 +347,9 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
                 orderId_productId: {
                   orderId: recentOrder.id,
                   productId: existingItem.productId,
-                }
+                },
               },
-              data: { qty: existingItem.qty + item.qty }
+              data: { qty: existingItem.qty + item.qty },
             });
           } else {
             // Create new item
@@ -305,34 +362,49 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
                 qty: item.qty,
                 image: item.image,
                 price: item.price,
-                shippingPrice: item.shippingPrice, // Create with shipping
+                costPrice: item.costPrice,
+                shippingPrice: item.shippingPrice,
               },
             });
           }
         }
 
         // Recalculate Total Price
-        const updatedItems = await tx.orderItem.findMany({ where: { orderId: recentOrder.id } });
+        const updatedItems = await tx.orderItem.findMany({
+          where: { orderId: recentOrder.id },
+        });
 
         // Items Price
-        const newItemsPrice = updatedItems.reduce((acc, item) => acc + (Number(item.price) * item.qty), 0);
+        const newItemsPrice = updatedItems.reduce(
+          (acc, item) => acc + Number(item.price) * item.qty,
+          0,
+        );
 
         // Flat Shipping
-        const newShippingPrice = updatedItems.length > 0
-          ? Math.max(...updatedItems.map((item) => Number(item.shippingPrice)))
-          : 0;
+        const newShippingPrice =
+          updatedItems.length > 0
+            ? Math.max(
+                ...updatedItems.map((item) => Number(item.shippingPrice)),
+              )
+            : 0;
 
         const newTotalPrice = newItemsPrice + newShippingPrice;
+        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
 
         await tx.order.update({
           where: { id: recentOrder.id },
           data: {
             totalPrice: newTotalPrice,
+            shippingPrice: newShippingPrice,
+            quantity: newQuantity,
             fullName: orderData.fullName,
             governorate: orderData.governorate,
             address: orderData.address,
-            userId: userId ?? recentOrder.userId, // Link to user if logged in
-          }
+            actualShippingCost: await getActualShippingCost(
+              orderData.governorate,
+            ),
+            userId: userId ?? recentOrder.userId,
+          },
         });
 
         // Clear cart
@@ -358,12 +430,19 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     }
 
     // Capture IP
-    const ip = (await headers()).get('x-forwarded-for');
+    const ip = (await headers()).get("x-forwarded-for");
 
     // Check for fraud
     // Exempt Admin and Employees
-    const isAdminOrEmployee = session?.user?.role === 'admin' || session?.user?.role === 'employee';
-    const isFraud = isAdminOrEmployee ? false : await checkForFraud(ip as string, orderData.phoneNumber, orderData.governorate);
+    const isAdminOrEmployee =
+      session?.user?.role === "admin" || session?.user?.role === "employee";
+    const isFraud = isAdminOrEmployee
+      ? false
+      : await checkForFraud(
+          ip as string,
+          orderData.phoneNumber,
+          orderData.governorate,
+        );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -374,17 +453,17 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
         data: {
           ...orderDataWithoutColor,
           totalPrice: price,
+          shippingPrice: shippingPrice,
           userId,
-          status: isFraud ? "banned" : "home", // Check fraud
+          status: isFraud ? "banned" : "home",
+          actualShippingCost: await getActualShippingCost(
+            orderData.governorate,
+          ),
           ip: ip as string,
-        }
+        },
       });
       // Create order items from the cart items
       for (const item of cart.items as CartItem[]) {
-        const product = productMap.get(item.productId);
-        // Cost price removed as it's not in schema
-
-
         await tx.orderItem.create({
           data: {
             orderId: insertedOrder.id,
@@ -394,7 +473,8 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             qty: item.qty,
             image: item.image,
             price: item.price,
-            shippingPrice: item.shippingPrice, // Add shipping price
+            costPrice: item.costPrice,
+            shippingPrice: item.shippingPrice,
           },
         });
       }
@@ -420,9 +500,11 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     return {
       success: true,
       message: "Order created",
-      redirectTo: isFraud ? "https://www.facebook.com" : `/order-completed/${insertedOrderId}`, // Use order-completed for typical checkout? Or thank-you? 
+      redirectTo: isFraud
+        ? "https://www.facebook.com"
+        : `/order-completed/${insertedOrderId}`, // Use order-completed for typical checkout? Or thank-you?
       // The original code used order-completed. I should stick to it.
-      // Wait, createQuickOrder uses thank-you. 
+      // Wait, createQuickOrder uses thank-you.
       // User didn't specify page, just message. I will use original redirects.
     };
   } catch (error) {
@@ -463,21 +545,21 @@ export async function getAllOrders({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-        OR: [
-          { fullName: { contains: query, mode: "insensitive" } },
-          { phoneNumber: { contains: query, mode: "insensitive" } },
-          { address: { contains: query, mode: "insensitive" } },
-          { governorate: { contains: query, mode: "insensitive" } },
-        ]
-      }
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+          ],
+        }
       : {};
 
-  if (status && status !== 'all') {
+  if (status && status !== "all") {
     (queryFilter as any).status = status;
   }
 
   // Handle Product Sorting
-  if (sort === 'product') {
+  if (sort === "product") {
     // 1. Fetch all matching orders with their items (lightweight)
     const allMatching = await prisma.order.findMany({
       where: { ...queryFilter },
@@ -485,22 +567,24 @@ export async function getAllOrders({
         id: true,
         orderitems: {
           select: { name: true },
-          take: 1
-        }
-      }
+          take: 1,
+        },
+      },
     });
 
     // 2. Sort in memory
     allMatching.sort((a, b) => {
       const nameA = a.orderitems[0]?.name || "";
       const nameB = b.orderitems[0]?.name || "";
-      return nameA.localeCompare(nameB, 'ar');
+      return nameA.localeCompare(nameB, "ar");
     });
 
     // 3. Paginate
     const totalCount = allMatching.length;
     const startIndex = (page - 1) * limit;
-    const slicedIds = allMatching.slice(startIndex, startIndex + limit).map(o => o.id);
+    const slicedIds = allMatching
+      .slice(startIndex, startIndex + limit)
+      .map((o) => o.id);
 
     // 4. Fetch full data for the page
     // Note: findMany with 'in' does NOT guarantee order. We must re-sort manually.
@@ -510,7 +594,9 @@ export async function getAllOrders({
     });
 
     // Re-sort to match the sliced order
-    const sortedPageData = slicedIds.map(id => pageData.find(o => o.id === id)!);
+    const sortedPageData = slicedIds.map(
+      (id) => pageData.find((o) => o.id === id)!,
+    );
 
     return {
       data: convertToPlainObject(sortedPageData),
@@ -552,16 +638,16 @@ export async function getAllOrdersForExport({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-        OR: [
-          { fullName: { contains: query, mode: "insensitive" } },
-          { phoneNumber: { contains: query, mode: "insensitive" } },
-          { address: { contains: query, mode: "insensitive" } },
-          { governorate: { contains: query, mode: "insensitive" } },
-        ]
-      }
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+          ],
+        }
       : {};
 
-  if (status && status !== 'all') {
+  if (status && status !== "all") {
     (queryFilter as any).status = status;
   }
 
@@ -572,14 +658,14 @@ export async function getAllOrdersForExport({
     orderBy: { createdAt: "desc" },
     include: {
       orderitems: true,
-    }
+    },
   });
 
-  if (sort === 'product') {
+  if (sort === "product") {
     data.sort((a, b) => {
       const nameA = a.orderitems[0]?.name || "";
       const nameB = b.orderitems[0]?.name || "";
-      return nameA.localeCompare(nameB, 'ar');
+      return nameA.localeCompare(nameB, "ar");
     });
   }
 
@@ -617,7 +703,6 @@ export async function getMyOrders({
   };
 }
 
-
 // Delete an Order
 export async function deleteOrder(id: string) {
   try {
@@ -651,9 +736,11 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
         address: order.address,
         quantity: order.quantity,
         totalPrice: order.totalPrice,
+        shippingPrice: order.shippingPrice,
         status: order.status,
-        notes: order.notes
-      }
+        notes: order.notes,
+        actualShippingCost: order.actualShippingCost,
+      },
     });
 
     revalidatePath("/admin/orders");
@@ -661,9 +748,8 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
 
     return {
       success: true,
-      message: "Order Updated Successfully"
+      message: "Order Updated Successfully",
     };
-
   } catch (error) {
     const { success, formError } = formatError(error);
     return { success, message: formError };
@@ -676,26 +762,96 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
     await prisma.order.updateMany({
       where: {
         id: {
-          in: ids
-        }
+          in: ids,
+        },
       },
       data: {
-        status: status
-      }
+        status: status,
+      },
     });
 
     revalidatePath("/admin/orders");
     return {
       success: true,
-      message: "Orders Updated Successfully"
+      message: "Orders Updated Successfully",
     };
-
   } catch (error) {
     const { success, formError } = formatError(error);
     return { success, message: formError };
   }
 }
 
+// Count Orders By Date Range And Status (preview before bulk update)
+export async function countOrdersByDateAndStatus({
+  from,
+  to,
+  fromStatus,
+}: {
+  from: Date;
+  to: Date;
+  fromStatus: string;
+}) {
+  const toLocalMidnight = (d: Date, endOfDay: boolean) => {
+    const iso = d.toISOString().split("T")[0];
+    const [y, m, day] = iso.split("-").map(Number);
+    if (endOfDay) return new Date(Date.UTC(y, m - 1, day, 20, 59, 59, 999));
+    return new Date(Date.UTC(y, m - 1, day - 1, 21, 0, 0, 0));
+  };
+  const startDate = toLocalMidnight(new Date(from), false);
+  const endDate = toLocalMidnight(new Date(to), true);
+
+  const count = await prisma.order.count({
+    where: {
+      status: fromStatus,
+      createdAt: { gte: startDate, lte: endDate },
+    },
+  });
+  return count;
+}
+
+// Bulk Update Order Status By Date Range
+export async function bulkUpdateOrderStatusByDateRange({
+  from,
+  to,
+  fromStatus,
+  toStatus,
+}: {
+  from: Date;
+  to: Date;
+  fromStatus: string;
+  toStatus: string;
+}) {
+  try {
+    // Parse date string as local Iraq time (UTC+3)
+    const toLocalMidnight = (d: Date, endOfDay: boolean) => {
+      const iso = d.toISOString().split("T")[0]; // "YYYY-MM-DD"
+      const [y, m, day] = iso.split("-").map(Number);
+      // Iraq is UTC+3, so midnight local = 21:00 previous day UTC
+      // end of day local = 20:59:59 UTC same day
+      if (endOfDay) {
+        return new Date(Date.UTC(y, m - 1, day, 20, 59, 59, 999)); // 23:59:59 Iraq
+      }
+      return new Date(Date.UTC(y, m - 1, day - 1, 21, 0, 0, 0)); // 00:00:00 Iraq
+    };
+
+    const startDate = toLocalMidnight(new Date(from), false);
+    const endDate = toLocalMidnight(new Date(to), true);
+
+    const result = await prisma.order.updateMany({
+      where: {
+        status: fromStatus,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+      data: { status: toStatus },
+    });
+
+    revalidatePath("/admin/orders");
+    return { success: true, count: result.count };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError, count: 0 };
+  }
+}
 
 // Update Order To Paid
 export async function updateOrderToPaid({
@@ -802,14 +958,14 @@ export async function getOrderSummery() {
     where: {
       order: {
         createdAt: { gte: currentMonthStart },
-        status: { not: "Cancelled" }
-      }
+        status: { not: "Cancelled" },
+      },
     },
     select: {
       price: true,
       qty: true,
       costPrice: true,
-    }
+    },
   });
 
   const totalProfit = totalProfitRaw.reduce((acc, item) => {
@@ -847,24 +1003,53 @@ export async function getOrderSummery() {
 
   // 1. Orders
   const currentMonthOrders = await getCount(prisma.order, currentMonthStart);
-  const prevMonthOrders = await getCount(prisma.order, previousMonthStart, previousMonthEnd);
-  const ordersChange = prevMonthOrders === 0 ? currentMonthOrders * 100 : ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100;
+  const prevMonthOrders = await getCount(
+    prisma.order,
+    previousMonthStart,
+    previousMonthEnd,
+  );
+  const ordersChange =
+    prevMonthOrders === 0
+      ? currentMonthOrders * 100
+      : ((currentMonthOrders - prevMonthOrders) / prevMonthOrders) * 100;
 
   // 2. Users
   const currentMonthUsers = await getCount(prisma.user, currentMonthStart);
-  const prevMonthUsers = await getCount(prisma.user, previousMonthStart, previousMonthEnd);
-  const usersChange = prevMonthUsers === 0 ? currentMonthUsers * 100 : ((currentMonthUsers - prevMonthUsers) / prevMonthUsers) * 100;
+  const prevMonthUsers = await getCount(
+    prisma.user,
+    previousMonthStart,
+    previousMonthEnd,
+  );
+  const usersChange =
+    prevMonthUsers === 0
+      ? currentMonthUsers * 100
+      : ((currentMonthUsers - prevMonthUsers) / prevMonthUsers) * 100;
 
   // 3. Products
-  const currentMonthProducts = await getCount(prisma.product, currentMonthStart);
-  const prevMonthProducts = await getCount(prisma.product, previousMonthStart, previousMonthEnd);
-  const productsChange = prevMonthProducts === 0 ? currentMonthProducts * 100 : ((currentMonthProducts - prevMonthProducts) / prevMonthProducts) * 100;
+  const currentMonthProducts = await getCount(
+    prisma.product,
+    currentMonthStart,
+  );
+  const prevMonthProducts = await getCount(
+    prisma.product,
+    previousMonthStart,
+    previousMonthEnd,
+  );
+  const productsChange =
+    prevMonthProducts === 0
+      ? currentMonthProducts * 100
+      : ((currentMonthProducts - prevMonthProducts) / prevMonthProducts) * 100;
 
   // 4. Revenue (Sales)
   const currentMonthRevenue = await getSalesSum(currentMonthStart);
-  const prevMonthRevenue = await getSalesSum(previousMonthStart, previousMonthEnd);
-  const revenueChange = prevMonthRevenue === 0 ? currentMonthRevenue * 100 : ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100;
-
+  const prevMonthRevenue = await getSalesSum(
+    previousMonthStart,
+    previousMonthEnd,
+  );
+  const revenueChange =
+    prevMonthRevenue === 0
+      ? currentMonthRevenue * 100
+      : ((currentMonthRevenue - prevMonthRevenue) / prevMonthRevenue) * 100;
 
   return {
     ordersCount: currentMonthOrders,
@@ -879,70 +1064,147 @@ export async function getOrderSummery() {
       users: Math.round(usersChange),
       products: Math.round(productsChange),
       revenue: Math.round(revenueChange),
-    }
+    },
   };
 }
 
-
 // Get Order Profit Stats
-export async function getOrderProfitStats({ from, to }: { from: Date; to: Date }) {
-  const startDate = new Date(from);
-  startDate.setHours(0, 0, 0, 0);
-  const endDate = new Date(to);
-  endDate.setHours(23, 59, 59, 999);
+export async function getOrderProfitStats({
+  from,
+  to,
+}: {
+  from: Date;
+  to: Date;
+}) {
+  // Iraq is UTC+3: midnight local = 21:00 prev day UTC, end of day = 20:59:59 UTC
+  const toIraqDay = (d: Date, endOfDay: boolean) => {
+    const iso = new Date(d).toISOString().split("T")[0];
+    const [y, m, day] = iso.split("-").map(Number);
+    if (endOfDay) return new Date(Date.UTC(y, m - 1, day, 20, 59, 59, 999));
+    return new Date(Date.UTC(y, m - 1, day - 1, 21, 0, 0, 0));
+  };
+  const startDate = toIraqDay(from, false);
+  const endDate = toIraqDay(to, true);
 
-  const orderItems = await prisma.orderItem.findMany({
+  const orders = await prisma.order.findMany({
     where: {
-      order: {
-        createdAt: {
-          gte: startDate,
-          lte: endDate,
-        },
-        status: { not: "Cancelled" }
-      },
+      createdAt: { gte: startDate, lte: endDate },
+      status: "completed",
     },
     select: {
-      productId: true,
-      name: true,
-      qty: true,
-      price: true,
-      costPrice: true,
+      totalPrice: true,
+      shippingPrice: true,
+      actualShippingCost: true,
+      governorate: true,
+      orderitems: {
+        select: {
+          productId: true,
+          name: true,
+          qty: true,
+          price: true,
+          costPrice: true,
+          shippingPrice: true,
+        },
+      },
     },
   });
 
-  const statsMap = new Map<string, {
-    productId: string;
-    name: string;
-    totalQty: number;
-    totalRevenue: number;
-    totalCost: number;
-    totalProfit: number;
-  }>();
+  const statsMap = new Map<
+    string,
+    {
+      productId: string;
+      name: string;
+      totalQty: number;
+      totalRevenue: number;
+      totalCost: number;
+      totalProfit: number;
+      orderCount: number;
+    }
+  >();
 
-  for (const item of orderItems) {
-    const revenue = Number(item.price) * item.qty;
-    const cost = Number(item.costPrice) * item.qty;
-    const profit = revenue - cost;
+  let totalGrossRevenue = 0;       // sum(Order.totalPrice)
+  let totalActualShippingCost = 0; // sum(Order.actualShippingCost)
+  let baghdadOrderCount = 0;
+  let othersOrderCount = 0;
+  let baghdadActualShippingCost = 0;
+  let othersActualShippingCost = 0;
 
-    if (statsMap.has(item.productId)) {
-      const stats = statsMap.get(item.productId)!;
-      stats.totalQty += item.qty;
-      stats.totalRevenue += revenue;
-      stats.totalCost += cost;
-      stats.totalProfit += profit;
+  for (const order of orders) {
+    const orderItems = order.orderitems;
+    const isBaghdad = order.governorate === "Baghdad";
+    const actualShipping = Number(order.actualShippingCost);
+
+    if (isBaghdad) {
+      baghdadOrderCount++;
+      baghdadActualShippingCost += actualShipping;
     } else {
-      statsMap.set(item.productId, {
-        productId: item.productId,
-        name: item.name,
-        totalQty: item.qty,
-        totalRevenue: revenue,
-        totalCost: cost,
-        totalProfit: profit,
-      });
+      othersOrderCount++;
+      othersActualShippingCost += actualShipping;
+    }
+
+    totalGrossRevenue += Number(order.totalPrice);
+    totalActualShippingCost += actualShipping;
+
+    // Net product revenue = what was collected - actual delivery cost paid to courier
+    // This is the "true" revenue: product price + shipping margin (positive or negative)
+    const orderNetRevenue = Number(order.totalPrice) - actualShipping;
+
+    // Distribute proportionally among items (handles multi-product + bundle discounts)
+    const rawItemsTotal = orderItems.reduce(
+      (sum, i) => sum + Number(i.price) * i.qty,
+      0,
+    );
+
+    for (const item of orderItems) {
+      const rawRevenue = Number(item.price) * item.qty;
+      const revenue =
+        rawItemsTotal > 0
+          ? (rawRevenue / rawItemsTotal) * orderNetRevenue
+          : rawRevenue;
+      const cost = Number(item.costPrice) * item.qty;
+      const profit = revenue - cost;
+
+      if (statsMap.has(item.productId)) {
+        const stats = statsMap.get(item.productId)!;
+        stats.totalQty += item.qty;
+        stats.totalRevenue += revenue;
+        stats.totalCost += cost;
+        stats.totalProfit += profit;
+        stats.orderCount += 1;
+      } else {
+        statsMap.set(item.productId, {
+          productId: item.productId,
+          name: item.name,
+          totalQty: item.qty,
+          totalRevenue: revenue,
+          totalCost: cost,
+          totalProfit: profit,
+          orderCount: 1,
+        });
+      }
     }
   }
 
-  return Array.from(statsMap.values()).sort((a, b) => b.totalProfit - a.totalProfit);
+  const productStats = Array.from(statsMap.values()).sort(
+    (a, b) => b.totalProfit - a.totalProfit,
+  );
+
+  const totalOrderCount = baghdadOrderCount + othersOrderCount;
+  const avgOrderValue = totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
+
+  return {
+    productStats,
+    orderSummary: {
+      totalOrderCount,
+      baghdadOrderCount,
+      othersOrderCount,
+      avgOrderValue,
+      totalGrossRevenue,
+      totalActualShippingCost,
+      baghdadActualShippingCost,
+      othersActualShippingCost,
+    },
+  };
 }
 
 // Import Orders from Excel
@@ -957,33 +1219,33 @@ export async function importOrders(data: any[]) {
 
     // Governorate Mapping (Arabic -> English Keys)
     const governorateMap: { [key: string]: string } = {
-      "بغداد": "Baghdad",
-      "البصرة": "Basra",
-      "نينوى": "Nineveh",
-      "الموصل": "Nineveh",
-      "أربيل": "Erbil",
-      "اربيل": "Erbil",
-      "كركوك": "Kirkuk",
-      "السليمانية": "Sulaymaniyah",
-      "ديالى": "Diyala",
-      "بابل": "Babylon",
-      "الحلة": "Babylon",
-      "الأنبار": "Anbar",
-      "الانبار": "Anbar",
+      بغداد: "Baghdad",
+      البصرة: "Basra",
+      نينوى: "Nineveh",
+      الموصل: "Nineveh",
+      أربيل: "Erbil",
+      اربيل: "Erbil",
+      كركوك: "Kirkuk",
+      السليمانية: "Sulaymaniyah",
+      ديالى: "Diyala",
+      بابل: "Babylon",
+      الحلة: "Babylon",
+      الأنبار: "Anbar",
+      الانبار: "Anbar",
       "ذي قار": "Dhi Qar",
-      "الناصرية": "Dhi Qar",
-      "كربلاء": "Karbala",
-      "النجف": "Najaf",
-      "واسط": "Wasit",
-      "الكوت": "Wasit",
-      "القادسية": "Qadisiyah",
-      "الديوانية": "Qadisiyah",
-      "ميسان": "Maysan",
-      "العمارة": "Maysan",
-      "المثنى": "Muthanna",
-      "السماوة": "Muthanna",
+      الناصرية: "Dhi Qar",
+      كربلاء: "Karbala",
+      النجف: "Najaf",
+      واسط: "Wasit",
+      الكوت: "Wasit",
+      القادسية: "Qadisiyah",
+      الديوانية: "Qadisiyah",
+      ميسان: "Maysan",
+      العمارة: "Maysan",
+      المثنى: "Muthanna",
+      السماوة: "Muthanna",
       "صلاح الدين": "Saladin",
-      "دهوك": "Dohuk",
+      دهوك: "Dohuk",
     };
 
     let successCount = 0;
@@ -997,7 +1259,7 @@ export async function importOrders(data: any[]) {
       const governorate = governorateMap[govArabic] || govArabic || "Baghdad"; // Fallback
       const address = row["اقرب نقطة دالة"] || "";
       const notes = row["الملاحظات"] || "";
-      const totalPrice = (Number(row["السعر مع التوصيل"]) / 1000) || 0;
+      const totalPrice = Number(row["السعر مع التوصيل"]) / 1000 || 0;
       const qty = Number(row["عدد القطع"]) || 1;
       const productName = row["اسم المنتج"] || "";
 
@@ -1006,7 +1268,7 @@ export async function importOrders(data: any[]) {
       if (productName) {
         // Try exact match first
         product = await prisma.product.findFirst({
-          where: { name: { equals: productName, mode: "insensitive" } }
+          where: { name: { equals: productName, mode: "insensitive" } },
         });
 
         // Try contains if not found (take the first one)
@@ -1014,7 +1276,7 @@ export async function importOrders(data: any[]) {
           const firstPart = productName.split(",")[0].trim();
           if (firstPart) {
             product = await prisma.product.findFirst({
-              where: { name: { contains: firstPart, mode: "insensitive" } }
+              where: { name: { contains: firstPart, mode: "insensitive" } },
             });
           }
         }
@@ -1027,12 +1289,13 @@ export async function importOrders(data: any[]) {
 
         const itemPrice = Number(product.price);
         const shipping = Number(product.shippingPrice);
-        // If totalPrice from Excel is 0, use calculated. 
+        // If totalPrice from Excel is 0, use calculated.
         // Or just overwrite? The user said "fetch the price ... and add it".
         // I'll prefer the calculated price to ensure it matches the product in DB.
-        const calculatedTotalPrice = (itemPrice * qty) + shipping;
+        const calculatedTotalPrice = itemPrice * qty + shipping;
 
-        const finalTotalPrice = totalPrice > 0 ? totalPrice : calculatedTotalPrice;
+        const finalTotalPrice =
+          totalPrice > 0 ? totalPrice : calculatedTotalPrice;
 
         await prisma.$transaction(async (tx) => {
           // Create Order
@@ -1045,9 +1308,11 @@ export async function importOrders(data: any[]) {
               address,
               notes,
               totalPrice: finalTotalPrice,
-              status: 'home',
+              shippingPrice: shipping,
+              status: "home",
               quantity: qty,
-            }
+              actualShippingCost: await getActualShippingCost(governorate),
+            },
           });
 
           // Create Order Item
@@ -1058,10 +1323,11 @@ export async function importOrders(data: any[]) {
               slug: product.slug,
               name: product.name,
               price: product.price,
+              costPrice: product.costPrice,
               qty: qty,
               image: product.images[0] || "",
-              shippingPrice: product.shippingPrice
-            }
+              shippingPrice: product.shippingPrice,
+            },
           });
         });
         successCount++;
@@ -1070,11 +1336,8 @@ export async function importOrders(data: any[]) {
 
     revalidatePath("/admin/orders");
     return { success: true, count: successCount, message: "Done" };
-
   } catch (error) {
     console.error("Import Error:", error);
     return { success: false, message: "Failed to process file" };
   }
 }
-
-

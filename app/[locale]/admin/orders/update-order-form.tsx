@@ -51,7 +51,9 @@ export default function UpdateOrderForm({
             address: order.address,
             quantity: order.quantity,
             totalPrice: order.totalPrice,
+            shippingPrice: order.shippingPrice ?? "0",
             status: order.status,
+            actualShippingCost: order.actualShippingCost ?? "0",
         },
     });
 
@@ -203,6 +205,23 @@ export default function UpdateOrderForm({
                                     placeholder={t("enterNotes")}
                                     {...field}
                                     value={field.value || ''}
+                                />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="actualShippingCost"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>{t("actualShippingCost")}</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder={t("actualShippingCost")}
+                                    {...field}
                                 />
                             </FormControl>
                             <FormMessage />
