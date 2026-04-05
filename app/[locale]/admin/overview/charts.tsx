@@ -90,8 +90,8 @@ const Charts = ({
               fontSize: "13px",
             }}
             itemStyle={{ color: "var(--foreground)" }}
-            formatter={(value: number) => [
-              `${(value * 1000).toLocaleString("en-US")} د.ع`,
+            formatter={(value: number | undefined) => [
+              `${((value ?? 0) * 1000).toLocaleString("en-US")} د.ع`,
               "المبيعات",
             ]}
           />
