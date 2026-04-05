@@ -21,7 +21,9 @@
       "Bash(node -e ':*)",
       "Bash(npx shadcn@latest add tabs --yes)",
       "Bash(npx shadcn@latest add command popover --yes)",
-      "Bash(npx shadcn@latest add command --yes)"
+      "Bash(npx shadcn@latest add command --yes)",
+      "Bash(npm run:*)",
+      "Bash(npx shadcn@latest add switch --yes)"
     ]
   }
 }

@@ -36,6 +36,7 @@
         "paidAt": "تاريخ الدفع"
     },
     "Theme": {
+        "appearance": "المظهر",
         "light": "فاتح",
         "dark": "داكن",
         "system": "النظام"
@@ -46,7 +47,15 @@
     },
     "Footer": {
         "copyright": "جميع الحقوق محفوظة.",
-        "and": "و"
+        "and": "و",
+        "description": "متجرك الإلكتروني الموثوق لأفضل المنتجات.",
+        "quickLinks": "روابط سريعة",
+        "allProducts": "جميع المنتجات",
+        "cart": "عربة التسوق",
+        "myOrders": "طلباتي",
+        "support": "الدعم",
+        "signIn": "تسجيل الدخول",
+        "signUp": "إنشاء حساب"
     },
     "Menu": {
         "cart": "عربة التسوق",
@@ -71,6 +80,7 @@
         "free": "مجاني",
         "status": "حالة التوفر",
         "inStock": "متوفر",
+        "outOfStock": "نفذت الكمية",
         "reviews": "مراجعات",
         "customerReviews": "مراجعات العملاء",
         "noReviews": "لا توجد مراجعات بعد",
@@ -284,6 +294,8 @@
         "shippingCostCol": "تكلفة التوصيل",
         "shippingProfitCol": "ربح/خسارة",
         "shippingSettings": "إعدادات التوصيل",
+        "dealSettings": "صفقة الشهر",
+        "siteSettings": "إعدادات الموقع",
         "bulkUpdateByDate": "تحويل بالتاريخ",
         "dateFrom": "من تاريخ",
         "dateTo": "إلى تاريخ",

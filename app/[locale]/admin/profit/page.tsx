@@ -15,11 +15,9 @@ import { formatCurrency } from "@/lib/utils";
 import { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import {
   TrendingUp,
   TrendingDown,
-  ShoppingCart,
   Package,
   Truck,
   DollarSign,
@@ -31,7 +29,7 @@ import {
 import ProfitExportButton from "@/components/admin/profit-export-button";
 
 export const metadata: Metadata = {
-  title: "Profit Analysis",
+  title: "تحليل الأرباح",
 };
 
 function MarginBadge({ margin }: { margin: number }) {
@@ -303,6 +301,9 @@ const ProfitPage = async (props: {
                   الكمية
                 </TableHead>
                 <TableHead className="text-right font-semibold">
+                  الراجع
+                </TableHead>
+                <TableHead className="text-right font-semibold">
                   الإيراد الصافي
                 </TableHead>
                 <TableHead className="text-right font-semibold">
@@ -312,13 +313,16 @@ const ProfitPage = async (props: {
                   صافي الربح
                 </TableHead>
                 <TableHead className="text-right font-semibold">
-                  هامش الربح
-                </TableHead>
-                <TableHead className="text-right font-semibold">
                   مصاريف الإعلان
                 </TableHead>
                 <TableHead className="text-right font-semibold">
+                  إعلان / طلب
+                </TableHead>
+                <TableHead className="text-right font-semibold">
                   الربح بعد الإعلان
+                </TableHead>
+                <TableHead className="text-right font-semibold">
+                  هامش بعد الإعلان
                 </TableHead>
                 <TableHead className="text-right font-semibold">
                   % من الإيراد
@@ -329,7 +333,7 @@ const ProfitPage = async (props: {
               {productStats.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={10}
+                    colSpan={12}
                     className="text-center py-12 text-muted-foreground"
                   >
                     {t("noData")}
@@ -338,12 +342,16 @@ const ProfitPage = async (props: {
               ) : (
                 <>
                   {productStats.map((item, index) => {
-                    const margin =
-                      item.totalRevenue > 0
-                        ? (item.totalProfit / item.totalRevenue) * 100
-                        : 0;
                     const adCost = adByProductMap.get(item.productId) ?? 0;
                     const profitAfterAd = item.totalProfit - adCost;
+                    const marginAfterAd =
+                      item.totalRevenue > 0
+                        ? (profitAfterAd / item.totalRevenue) * 100
+                        : 0;
+                    const adPerOrder =
+                      adCost > 0 && item.orderCount > 0
+                        ? adCost / item.orderCount
+                        : 0;
                     const revenueShare =
                       productTotals.totalRevenue > 0
                         ? (item.totalRevenue / productTotals.totalRevenue) * 100
@@ -363,36 +371,52 @@ const ProfitPage = async (props: {
                           {item.totalQty}
                         </TableCell>
                         <TableCell className="text-right">
+                          {item.returnedQty > 0 ? (
+                            <div className="flex flex-col items-end gap-0.5">
+                              <span className="text-red-600 font-semibold">
+                                {item.returnedQty}
+                              </span>
+                              <span className="text-xs text-red-400">
+                                {(
+                                  (item.returnedQty /
+                                    (item.totalQty + item.returnedQty)) *
+                                  100
+                                ).toFixed(1)}
+                                %
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
                           {formatCurrency(item.totalRevenue)}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {formatCurrency(item.totalCost)}
                         </TableCell>
                         <TableCell
-                          className={`text-right font-semibold ${
-                            item.totalProfit >= 0
-                              ? "text-green-600"
-                              : "text-red-600"
-                          }`}
+                          className={`text-right font-semibold ${item.totalProfit >= 0 ? "text-green-600" : "text-red-600"}`}
                         >
                           {formatCurrency(item.totalProfit)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <MarginBadge margin={margin} />
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {adCost > 0 ? formatCurrency(adCost) : "—"}
                         </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {adPerOrder > 0 ? formatCurrency(adPerOrder) : "—"}
+                        </TableCell>
                         <TableCell
-                          className={`text-right font-semibold ${
-                            adCost > 0
-                              ? profitAfterAd >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                              : "text-muted-foreground"
-                          }`}
+                          className={`text-right font-semibold ${adCost > 0 ? (profitAfterAd >= 0 ? "text-green-600" : "text-red-600") : "text-muted-foreground"}`}
                         >
                           {adCost > 0 ? formatCurrency(profitAfterAd) : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {adCost > 0 ? (
+                            <MarginBadge margin={marginAfterAd} />
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -419,38 +443,56 @@ const ProfitPage = async (props: {
                       {productTotals.totalQty}
                     </TableCell>
                     <TableCell className="text-right">
+                      {(() => {
+                        const totalReturned = productStats.reduce((sum, p) => sum + p.returnedQty, 0);
+                        return totalReturned > 0 ? (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-red-600">{totalReturned}</span>
+                            <span className="text-xs text-red-400">
+                              {((totalReturned / (productTotals.totalQty + totalReturned)) * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>;
+                      })()}
+                    </TableCell>
+                    <TableCell className="text-right">
                       {formatCurrency(productTotals.totalRevenue)}
                     </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(productTotals.totalCost)}
                     </TableCell>
                     <TableCell
-                      className={`text-right ${
-                        netProfit >= 0 ? "text-green-600" : "text-red-600"
-                      }`}
+                      className={`text-right ${netProfit >= 0 ? "text-green-600" : "text-red-600"}`}
                     >
                       {formatCurrency(netProfit)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <MarginBadge margin={overallMargin} />
                     </TableCell>
                     <TableCell className="text-right text-red-600">
                       {expenseStats.totalAdCost > 0
                         ? formatCurrency(expenseStats.totalAdCost)
                         : "—"}
                     </TableCell>
+                    <TableCell className="text-right text-muted-foreground">
+                      —
+                    </TableCell>
                     <TableCell
-                      className={`text-right font-bold ${
-                        expenseStats.totalAdCost > 0
-                          ? netProfit - expenseStats.totalAdCost >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                          : "text-muted-foreground"
-                      }`}
+                      className={`text-right font-bold ${expenseStats.totalAdCost > 0 ? (netProfit - expenseStats.totalAdCost >= 0 ? "text-green-600" : "text-red-600") : "text-muted-foreground"}`}
                     >
                       {expenseStats.totalAdCost > 0
                         ? formatCurrency(netProfit - expenseStats.totalAdCost)
                         : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {expenseStats.totalAdCost > 0 ? (
+                        <MarginBadge
+                          margin={
+                            ((netProfit - expenseStats.totalAdCost) /
+                              productTotals.totalRevenue) *
+                            100
+                          }
+                        />
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       100%
@@ -500,7 +542,7 @@ const ProfitPage = async (props: {
         </p>
       </div>
 
-      {/* Expenses Breakdown */}
+      {/* Expenses Breakdown
       {(expenseStats.expenseByCategory.length > 0 ||
         expenseStats.adByProduct.length > 0) && (
         <div className="rounded-xl border bg-muted/30 p-5 space-y-4">
@@ -567,7 +609,7 @@ const ProfitPage = async (props: {
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Bottom Summary */}
       <div className="rounded-xl border bg-card p-6">

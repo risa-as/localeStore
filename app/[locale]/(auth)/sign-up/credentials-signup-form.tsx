@@ -9,111 +9,102 @@ import { useFormStatus } from "react-dom";
 import { signUpUser } from "@/lib/actions/user.actions";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Loader2, User, Mail, Lock } from "lucide-react";
 
 interface FormState {
   success: boolean;
   fieldErrors?: Record<string, string[]>;
   formError: string;
 }
+
 const CredentialsSignUpForm = () => {
-  const t = useTranslations('Auth');
-  const initialState: FormState = {
+  const t = useTranslations("Auth");
+  const [state, action] = useActionState(signUpUser, {
     success: false,
     fieldErrors: {},
     formError: "",
-  };
-  const [state, action] = useActionState(signUpUser, initialState);
-  // This Code For CallbackUrl
+  } as FormState);
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
-  // End Code
+
   const SignUpButton = () => {
     const { pending } = useFormStatus();
     return (
-      <Button disabled={pending} className="w-full" variant="default">
-        {pending ? t('submittingButton') : t('signUpButton')}
+      <Button
+        disabled={pending}
+        className="w-full h-14 text-base font-bold rounded-2xl gap-2 shadow-lg shadow-primary/20"
+      >
+        {pending && <Loader2 className="w-5 h-5 animate-spin" />}
+        {pending ? t("submittingButton") : t("signUpButton")}
       </Button>
     );
   };
+
+  const fieldClass = "h-13 ps-11 text-base rounded-xl border-2 focus:border-primary";
+  const style = { height: "52px" };
+
   return (
-    <form action={action}>
+    <form action={action} className="space-y-4">
       <input type="hidden" name="callbackUrl" value={callbackUrl} />
-      <div className="space-y-6">
-        <div>
-          <Label htmlFor="name">{t('name')}</Label>
-          <Input
-            id="name"
-            name="name"
-            type="text"
-            autoComplete="name"
-            defaultValue={signUpDefaultValues.name}
-          />
-          {state.fieldErrors?.name && (
-            <p className="text-sm text-destructive">
-              {state.fieldErrors.name[0]}
-            </p>
-          )}
+
+      {/* Name */}
+      <div className="space-y-2">
+        <Label htmlFor="name" className="text-base font-semibold">{t("name")}</Label>
+        <div className="relative">
+          <User className="absolute start-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input id="name" name="name" type="text" autoComplete="name"
+            defaultValue={signUpDefaultValues.name} className={fieldClass} style={style} />
         </div>
-        <div>
-          <Label htmlFor="email">{t('email')}</Label>
-          <Input
-            id="email"
-            name="email"
-            type="text"
-            autoComplete="email"
-            defaultValue={signUpDefaultValues.email}
-          />
-          {state.fieldErrors?.email && (
-            <p className="text-sm text-destructive">
-              {state.fieldErrors.email[0]}
-            </p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor="password">{t('password')}</Label>
-          <Input
-            id="password"
-            name="password"
-            type="password"
-            autoComplete="password"
-            defaultValue={signUpDefaultValues.password}
-          />
-          {state.fieldErrors?.password && (
-            <p className="text-sm text-destructive">
-              {state.fieldErrors.password[0]}
-            </p>
-          )}
-        </div>
-        <div>
-          <Label htmlFor="confirmPassword">{t('confirmPassword')}</Label>
-          <Input
-            id="confirmPassword"
-            name="confirmPassword"
-            type="password"
-            autoComplete="password"
-            defaultValue={signUpDefaultValues.confirmPassword}
-          />
-          {state.fieldErrors?.confirmPassword && (
-            <p className="text-sm text-destructive">
-              {state.fieldErrors.confirmPassword[0]}
-            </p>
-          )}
-        </div>
-        <div>
-          <SignUpButton />
-        </div>
-        {state.formError && (
-          <div className="text-center text-destructive mt-2">
-            {state.formError}
-          </div>
-        )}
-        <div className="text-sm text-center text-muted-foreground">
-          {t('hasAccount')}{" "}
-          <Link href="/sign-in" target="_self" className="link">
-            {t('signInButton')}
-          </Link>
-        </div>
+        {state.fieldErrors?.name && <p className="text-sm text-destructive">{state.fieldErrors.name[0]}</p>}
       </div>
+
+      {/* Email */}
+      <div className="space-y-2">
+        <Label htmlFor="email" className="text-base font-semibold">{t("email")}</Label>
+        <div className="relative">
+          <Mail className="absolute start-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input id="email" name="email" type="email" autoComplete="email"
+            defaultValue={signUpDefaultValues.email} className={fieldClass} style={style} />
+        </div>
+        {state.fieldErrors?.email && <p className="text-sm text-destructive">{state.fieldErrors.email[0]}</p>}
+      </div>
+
+      {/* Password */}
+      <div className="space-y-2">
+        <Label htmlFor="password" className="text-base font-semibold">{t("password")}</Label>
+        <div className="relative">
+          <Lock className="absolute start-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input id="password" name="password" type="password" autoComplete="new-password"
+            defaultValue={signUpDefaultValues.password} className={fieldClass} style={style} />
+        </div>
+        {state.fieldErrors?.password && <p className="text-sm text-destructive">{state.fieldErrors.password[0]}</p>}
+      </div>
+
+      {/* Confirm password */}
+      <div className="space-y-2">
+        <Label htmlFor="confirmPassword" className="text-base font-semibold">{t("confirmPassword")}</Label>
+        <div className="relative">
+          <Lock className="absolute start-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+          <Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password"
+            defaultValue={signUpDefaultValues.confirmPassword} className={fieldClass} style={style} />
+        </div>
+        {state.fieldErrors?.confirmPassword && <p className="text-sm text-destructive">{state.fieldErrors.confirmPassword[0]}</p>}
+      </div>
+
+      {state.formError && (
+        <div className="bg-destructive/10 text-destructive text-sm font-medium px-4 py-3 rounded-xl border border-destructive/20">
+          {state.formError}
+        </div>
+      )}
+
+      <SignUpButton />
+
+      <p className="text-center text-base text-muted-foreground">
+        {t("hasAccount")}{" "}
+        <Link href="/sign-in" className="text-primary font-bold hover:underline">
+          {t("signInButton")}
+        </Link>
+      </p>
     </form>
   );
 };

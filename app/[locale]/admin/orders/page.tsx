@@ -16,7 +16,7 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { NextIntlClientProvider } from "next-intl";
 
 export const metadata: Metadata = {
-  title: "Admin Orders",
+  title: "الطلبات",
 };
 
 const AdminOrdersPage = async (props: {

@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         hostname: "utfs.io",
         port: "",
       },
+      {
+        protocol: "https",
+        hostname: "*.ufs.sh",
+        port: "",
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },

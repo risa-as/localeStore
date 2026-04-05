@@ -727,24 +727,45 @@ export async function deleteOrder(id: string) {
 export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
   try {
     const order = updateOrderSchema.parse(data);
-    await prisma.order.update({
-      where: { id: order.id },
-      data: {
-        fullName: order.fullName,
-        phoneNumber: order.phoneNumber,
-        governorate: order.governorate,
-        address: order.address,
-        quantity: order.quantity,
-        totalPrice: order.totalPrice,
-        shippingPrice: order.shippingPrice,
-        status: order.status,
-        notes: order.notes,
-        actualShippingCost: order.actualShippingCost,
-      },
-    });
 
-    revalidatePath("/admin/orders");
-    revalidatePath(`/order/${order.id}`);
+    await prisma.$transaction(async (tx) => {
+      // Update each OrderItem qty if provided
+      if (order.orderItems && order.orderItems.length > 0) {
+        for (const item of order.orderItems) {
+          await tx.orderItem.update({
+            where: {
+              orderId_productId: {
+                orderId: order.id,
+                productId: item.productId,
+              },
+            },
+            data: { qty: item.qty },
+          });
+        }
+      }
+
+      // Recalculate total quantity from updated items
+      const updatedItems = await tx.orderItem.findMany({
+        where: { orderId: order.id },
+      });
+      const newQuantity = updatedItems.reduce((sum, i) => sum + i.qty, 0);
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          fullName: order.fullName,
+          phoneNumber: order.phoneNumber,
+          governorate: order.governorate,
+          address: order.address,
+          quantity: newQuantity,
+          totalPrice: order.totalPrice,
+          shippingPrice: order.shippingPrice,
+          status: order.status,
+          notes: order.notes,
+          actualShippingCost: order.actualShippingCost,
+        },
+      });
+    });
 
     return {
       success: true,
@@ -948,6 +969,18 @@ export async function getOrderSummery() {
     totalSales: Number(item.totalSales),
   }));
 
+  // Get daily sales (last 30 days)
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(now.getDate() - 29);
+  const dailySalesDataRaw = await prisma.$queryRaw<
+    Array<{ day: string; totalSales: Prisma.Decimal }>
+  >`SELECT to_char("createdAt", 'DD/MM') as "day", sum("totalPrice") as "totalSales" FROM "Order" WHERE "createdAt" >= ${thirtyDaysAgo} GROUP BY to_char("createdAt", 'DD/MM'), date_trunc('day', "createdAt") ORDER BY min("createdAt")`;
+
+  const dailySalesData = dailySalesDataRaw.map((item) => ({
+    month: item.day,
+    totalSales: Number(item.totalSales),
+  }));
+
   const latestOrders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     take: 6,
@@ -1058,6 +1091,7 @@ export async function getOrderSummery() {
     totalSales: currentMonthRevenue,
     totalProfit,
     salesData,
+    dailySalesData,
     latestOrders,
     statsChange: {
       orders: Math.round(ordersChange),
@@ -1086,28 +1120,52 @@ export async function getOrderProfitStats({
   const startDate = toIraqDay(from, false);
   const endDate = toIraqDay(to, true);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      createdAt: { gte: startDate, lte: endDate },
-      status: "completed",
-    },
-    select: {
-      totalPrice: true,
-      shippingPrice: true,
-      actualShippingCost: true,
-      governorate: true,
-      orderitems: {
-        select: {
-          productId: true,
-          name: true,
-          qty: true,
-          price: true,
-          costPrice: true,
-          shippingPrice: true,
+  const [orders, returnedOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: "completed",
+      },
+      select: {
+        totalPrice: true,
+        shippingPrice: true,
+        actualShippingCost: true,
+        governorate: true,
+        orderitems: {
+          select: {
+            productId: true,
+            name: true,
+            qty: true,
+            price: true,
+            costPrice: true,
+            shippingPrice: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: "returned",
+      },
+      select: {
+        orderitems: {
+          select: { productId: true, qty: true },
+        },
+      },
+    }),
+  ]);
+
+  // Build returned qty map per product
+  const returnedQtyMap = new Map<string, number>();
+  for (const order of returnedOrders) {
+    for (const item of order.orderitems) {
+      returnedQtyMap.set(
+        item.productId,
+        (returnedQtyMap.get(item.productId) ?? 0) + item.qty,
+      );
+    }
+  }
 
   const statsMap = new Map<
     string,
@@ -1119,6 +1177,7 @@ export async function getOrderProfitStats({
       totalCost: number;
       totalProfit: number;
       orderCount: number;
+      returnedQty: number;
     }
   >();
 
@@ -1180,8 +1239,29 @@ export async function getOrderProfitStats({
           totalCost: cost,
           totalProfit: profit,
           orderCount: 1,
+          returnedQty: 0,
         });
       }
+    }
+  }
+
+  // Attach returned qty to each product stat
+  for (const [productId, returnedQty] of returnedQtyMap) {
+    const stat = statsMap.get(productId);
+    if (stat) {
+      stat.returnedQty = returnedQty;
+    } else {
+      // Product had returns but no completed sales in range — include it
+      statsMap.set(productId, {
+        productId,
+        name: "",
+        totalQty: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+        totalProfit: 0,
+        orderCount: 0,
+        returnedQty,
+      });
     }
   }
 

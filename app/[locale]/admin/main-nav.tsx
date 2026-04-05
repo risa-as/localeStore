@@ -3,48 +3,58 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import React from "react";
-import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
+import {
+  LayoutDashboard, Package, Tag, ShoppingCart,
+  Users, TrendingUp, Receipt, Truck, Flame, Settings,
+} from "lucide-react";
 
 const MainNav = ({
   className,
-  role: roleProp,
+  role,
   ...props
 }: React.HTMLAttributes<HTMLElement> & { role?: string }) => {
-  const t = useTranslations('Admin');
-  const { data: session } = useSession();
-  const role = session?.user?.role || roleProp;
+  const t = useTranslations("Admin");
 
   const links = [
-    { title: t('overview'), href: "/admin/overview", hide: role !== "admin" },
-    { title: t('products'), href: "/admin/products" },
-    { title: t('categories'), href: "/admin/categories" },
-    { title: t('orders'), href: "/admin/orders" },
-    { title: t('users'), href: "/admin/users", hide: role !== "admin" },
-    { title: t('profitAnalysis'), href: "/admin/profit", hide: role !== "admin" },
-    { title: t('expenses'), href: "/admin/expenses", hide: role !== "admin" },
-    { title: t('shippingSettings'), href: "/admin/shipping-settings", hide: role !== "admin" },
+    { title: t("overview"),        href: "/admin/overview",          icon: LayoutDashboard, hide: role !== "admin" },
+    { title: t("products"),        href: "/admin/products",          icon: Package },
+    { title: t("categories"),      href: "/admin/categories",        icon: Tag },
+    { title: t("orders"),          href: "/admin/orders",            icon: ShoppingCart },
+    { title: t("users"),           href: "/admin/users",             icon: Users,     hide: role !== "admin" },
+    { title: t("profitAnalysis"),  href: "/admin/profit",            icon: TrendingUp, hide: role !== "admin" },
+    { title: t("expenses"),        href: "/admin/expenses",          icon: Receipt,   hide: role !== "admin" },
+    { title: t("shippingSettings"),href: "/admin/shipping-settings", icon: Truck,     hide: role !== "admin" },
+    { title: t("dealSettings"),    href: "/admin/deal-settings",     icon: Flame,     hide: role !== "admin" },
+    { title: t("siteSettings"),    href: "/admin/site-settings",     icon: Settings,  hide: role !== "admin" },
   ];
+
   const pathname = usePathname();
+
   return (
     <nav
-      className={cn("flex items-center gap-4 lg:gap-6 overflow-x-auto whitespace-nowrap pb-2", className)}
+      className={cn("flex items-center gap-1 overflow-x-auto scrollbar-none", className)}
       {...props}
     >
-      {links.filter(link => !link.hide).map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            "text-sm font-medium transition-colors hover:text-primary",
-            pathname.includes(item.href)
-              ? "text-primary"
-              : "text-muted-foreground"
-          )}
-        >
-          {item.title}
-        </Link>
-      ))}
+      {links.filter((l) => !l.hide).map((item) => {
+        const active = pathname.includes(item.href);
+        const Icon = item.icon;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap",
+              active
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+          >
+            <Icon className="w-3.5 h-3.5 shrink-0" />
+            {item.title}
+          </Link>
+        );
+      })}
     </nav>
   );
 };

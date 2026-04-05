@@ -131,6 +131,9 @@ export const updateOrderSchema = insertOrderSchema.extend({
   shippingPrice: currency,
   notes: z.string().optional().nullable(),
   actualShippingCost: currency,
+  orderItems: z
+    .array(z.object({ productId: z.string(), qty: z.number().int().positive() }))
+    .optional(),
 });
 
 // Schema for inserting an order item

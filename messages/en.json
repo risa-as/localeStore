@@ -36,6 +36,7 @@
         "paidAt": "Paid At"
     },
     "Theme": {
+        "appearance": "Appearance",
         "light": "Light",
         "dark": "Dark",
         "system": "System"
@@ -46,7 +47,15 @@
     },
     "Footer": {
         "copyright": "All rights reserved.",
-        "and": "and"
+        "and": "and",
+        "description": "Your trusted online store for the best products.",
+        "quickLinks": "Quick Links",
+        "allProducts": "All Products",
+        "cart": "Shopping Cart",
+        "myOrders": "My Orders",
+        "support": "Support",
+        "signIn": "Sign In",
+        "signUp": "Sign Up"
     },
     "Menu": {
         "cart": "Cart",
@@ -71,6 +80,7 @@
         "free": "Free",
         "status": "Status",
         "inStock": "In Stock",
+        "outOfStock": "Out of Stock",
         "reviews": "reviews",
         "customerReviews": "Customer Reviews",
         "noReviews": "No reviews yet",
@@ -284,6 +294,8 @@
         "shippingCostCol": "Shipping Cost",
         "shippingProfitCol": "Profit/Loss",
         "shippingSettings": "Shipping Settings",
+        "dealSettings": "Deal of Month",
+        "siteSettings": "Site Settings",
         "bulkUpdateByDate": "Update by Date",
         "dateFrom": "From Date",
         "dateTo": "To Date",

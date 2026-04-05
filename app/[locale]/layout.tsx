@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
+import { getLogoUrl } from "@/lib/get-logo";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "@/assets/styles/globals.css";
@@ -22,14 +23,22 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: {
-    template: `%s | Prostore`,
-    default: APP_NAME,
-  },
-  description: APP_DESCRIPTION,
-  metadataBase: new URL(SERVER_URL)
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const logoUrl = await getLogoUrl();
+  return {
+    title: {
+      template: `%s | متجر`,
+      default: APP_NAME,
+    },
+    description: APP_DESCRIPTION,
+    metadataBase: new URL(SERVER_URL),
+    icons: {
+      icon: logoUrl,
+      shortcut: logoUrl,
+      apple: logoUrl,
+    },
+  };
+}
 
 export default async function RootLayout({
   children,

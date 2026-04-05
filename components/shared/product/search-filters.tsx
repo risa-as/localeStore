@@ -1,166 +1,177 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SearchFiltersProps {
-    categories: { category: string; _count: number }[];
-    prices: { name: string; value: string }[];
-    ratings: number[];
-    translations: {
-        category: string;
-        price: string;
-        customerRatings: string;
-        any: string;
-        starsAndUp: string;
-    };
+  categories: { category: string; _count: number }[];
+  prices: { name: string; value: string }[];
+  ratings: number[];
+  translations: {
+    category: string;
+    price: string;
+    customerRatings: string;
+    any: string;
+    starsAndUp: string;
+  };
 }
 
 const SearchFilters = ({
-    categories,
-    prices,
-    ratings,
-    translations,
+  categories,
+  prices,
+  ratings,
+  translations,
 }: SearchFiltersProps) => {
-    const router = useRouter();
-    const searchParams = useSearchParams();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-    const currentCategory = searchParams.get("category") || "all";
-    const currentPrice = searchParams.get("price") || "all";
-    const currentRating = searchParams.get("rating") || "all";
+  const currentCategory = searchParams.get("category") || "all";
+  const currentPrice = searchParams.get("price") || "all";
+  const currentRating = searchParams.get("rating") || "all";
 
-    const formUrlQuery = (params: Record<string, string | null>) => {
-        const newParams = new URLSearchParams(searchParams.toString());
+  const buildUrl = (params: Record<string, string | null>) => {
+    const p = new URLSearchParams(searchParams.toString());
+    Object.entries(params).forEach(([k, v]) => {
+      if (!v || v === "all") p.delete(k);
+      else p.set(k, v);
+    });
+    return `/search?${p.toString()}`;
+  };
 
-        Object.entries(params).forEach(([key, value]) => {
-            if (value === null || value === "all") {
-                newParams.delete(key);
-            } else {
-                newParams.set(key, value);
-            }
-        });
+  const toggle = (key: string, value: string, current: string) => {
+    const next = current === value ? "all" : value;
+    router.push(buildUrl({ [key]: next, page: "1" }));
+  };
 
-        return `/search?${newParams.toString()}`;
-    };
-
-    const handleCategoryChange = (value: string) => {
-        const newValue = currentCategory === value ? "all" : value;
-        router.push(formUrlQuery({ category: newValue, page: "1" }));
-    };
-
-    const handlePriceChange = (value: string) => {
-        const newValue = currentPrice === value ? "all" : value;
-        router.push(formUrlQuery({ price: newValue, page: "1" }));
-    };
-
-    const handleRatingChange = (value: string) => {
-        const newValue = currentRating === value ? "all" : value;
-        router.push(formUrlQuery({ rating: newValue, page: "1" }));
-    };
-
-    return (
-        <div className="filter-links space-y-6">
-            {/* Category Links */}
-            <div>
-                <div className="text-xl mb-2 font-semibold">{translations.category}</div>
-                <ul className="space-y-2">
-                    <li>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="category-all"
-                                checked={currentCategory === "all"}
-                                onCheckedChange={() => handleCategoryChange("all")}
-                            />
-                            <Label htmlFor="category-all" className="cursor-pointer">
-                                {translations.any}
-                            </Label>
-                        </div>
-                    </li>
-                    {categories.map((x) => (
-                        <li key={x.category}>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id={`category-${x.category}`}
-                                    checked={currentCategory === x.category}
-                                    onCheckedChange={() => handleCategoryChange(x.category)}
-                                />
-                                <Label htmlFor={`category-${x.category}`} className="cursor-pointer">
-                                    {x.category}
-                                </Label>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            {/* Price Links */}
-            <div>
-                <div className="text-xl mb-2 font-semibold">{translations.price}</div>
-                <ul className="space-y-2">
-                    <li>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="price-all"
-                                checked={currentPrice === "all"}
-                                onCheckedChange={() => handlePriceChange("all")}
-                            />
-                            <Label htmlFor="price-all" className="cursor-pointer">
-                                {translations.any}
-                            </Label>
-                        </div>
-                    </li>
-                    {prices.map((p) => (
-                        <li key={p.value}>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id={`price-${p.value}`}
-                                    checked={currentPrice === p.value}
-                                    onCheckedChange={() => handlePriceChange(p.value)}
-                                />
-                                <Label htmlFor={`price-${p.value}`} className="cursor-pointer">
-                                    {p.name}
-                                </Label>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
-
-            {/* Rating Links */}
-            <div>
-                <div className="text-xl mb-2 font-semibold">{translations.customerRatings}</div>
-                <ul className="space-y-2">
-                    <li>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="rating-all"
-                                checked={currentRating === "all"}
-                                onCheckedChange={() => handleRatingChange("all")}
-                            />
-                            <Label htmlFor="rating-all" className="cursor-pointer">
-                                {translations.any}
-                            </Label>
-                        </div>
-                    </li>
-                    {ratings.map((r) => (
-                        <li key={r}>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id={`rating-${r}`}
-                                    checked={currentRating === r.toString()}
-                                    onCheckedChange={() => handleRatingChange(r.toString())}
-                                />
-                                <Label htmlFor={`rating-${r}`} className="cursor-pointer">
-                                    {r} {translations.starsAndUp}
-                                </Label>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+  return (
+    <div className="space-y-6">
+      {/* Categories */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          {translations.category}
+        </p>
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => toggle("category", "all", currentCategory)}
+            className={cn(
+              "flex items-center justify-between w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all",
+              currentCategory === "all"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-foreground"
+            )}
+          >
+            <span>{translations.any}</span>
+          </button>
+          {categories.map((x) => (
+            <button
+              key={x.category}
+              onClick={() => toggle("category", x.category, currentCategory)}
+              className={cn(
+                "flex items-center justify-between w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                currentCategory === x.category
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-foreground"
+              )}
+            >
+              <span>{x.category}</span>
+              <span
+                className={cn(
+                  "text-xs px-1.5 py-0.5 rounded-full font-medium",
+                  currentCategory === x.category
+                    ? "bg-white/20 text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {x._count}
+              </span>
+            </button>
+          ))}
         </div>
-    );
+      </div>
+
+      <div className="h-px bg-border" />
+
+      {/* Price */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          {translations.price}
+        </p>
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => toggle("price", "all", currentPrice)}
+            className={cn(
+              "w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all",
+              currentPrice === "all"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-foreground"
+            )}
+          >
+            {translations.any}
+          </button>
+          {prices.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => toggle("price", p.value, currentPrice)}
+              className={cn(
+                "w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all leading-snug",
+                currentPrice === p.value
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-foreground"
+              )}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="h-px bg-border" />
+
+      {/* Rating */}
+      <div>
+        <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          {translations.customerRatings}
+        </p>
+        <div className="flex flex-col gap-1">
+          <button
+            onClick={() => toggle("rating", "all", currentRating)}
+            className={cn(
+              "w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all",
+              currentRating === "all"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted text-foreground"
+            )}
+          >
+            {translations.any}
+          </button>
+          {ratings.map((r) => (
+            <button
+              key={r}
+              onClick={() => toggle("rating", r.toString(), currentRating)}
+              className={cn(
+                "flex items-center gap-1.5 w-full text-start px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                currentRating === r.toString()
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-foreground"
+              )}
+            >
+              {Array.from({ length: r }).map((_, i) => (
+                <Star
+                  key={i}
+                  className={cn(
+                    "w-3.5 h-3.5 fill-current",
+                    currentRating === r.toString() ? "text-yellow-300" : "text-yellow-400"
+                  )}
+                />
+              ))}
+              <span className="ml-0.5">{translations.starsAndUp}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default SearchFilters;

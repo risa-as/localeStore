@@ -13,30 +13,146 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { formatDateTime, formatId, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback, memo } from "react";
 import {
   bulkUpdateOrderStatus,
   deleteOrder,
 } from "@/lib/actions/order.actions";
 import DeleteDialog from "@/components/shared/delete-dialog";
-import { PAGE_SIZE } from "@/lib/constants";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import UpdateOrderForm from "./update-order-form";
+import dynamic from "next/dynamic";
+const UpdateOrderForm = dynamic(() => import("./update-order-form"), {
+  loading: () => (
+    <div className="space-y-3 py-2 animate-pulse">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-10 rounded-md bg-muted" />
+      ))}
+    </div>
+  ),
+  ssr: false,
+});
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Loader2, Pencil, Eye, MessageCircle, ChevronUp, Package } from "lucide-react";
+import {
+  ChevronDown,
+  Loader2,
+  Pencil,
+  Eye,
+  MessageCircle,
+  ChevronUp,
+  Package,
+} from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+
+// Memoized row — only re-renders when its own data changes, not when dialog state changes
+const OrderRow = memo(function OrderRow({
+  order,
+  index,
+  isSelected,
+  onToggle,
+  onEdit,
+  t,
+  tGov,
+}: {
+  order: any;
+  index: number;
+  isSelected: boolean;
+  onToggle: (id: string, checked: boolean) => void;
+  onEdit: (order: any) => void;
+  t: any;
+  tGov: any;
+}) {
+  return (
+    <TableRow key={order.id} data-state={isSelected ? "selected" : undefined}>
+      <TableCell>
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={(checked) => onToggle(order.id, checked as boolean)}
+          aria-label={`Select order ${order.id}`}
+          className="mx-2"
+        />
+      </TableCell>
+      <TableCell>{index + 1}</TableCell>
+      <TableCell>{formatDateTime(order.createdAt).dateTime}</TableCell>
+      <TableCell>{order.fullName}</TableCell>
+      <TableCell>
+        {order.orderitems && order.orderitems.length > 0
+          ? order.orderitems
+              .map((item: any) => `${item.name} ×${item.qty ?? 1}`)
+              .join("، ")
+          : t("noItems")}
+      </TableCell>
+      <TableCell>
+        <a
+          href={`https://wa.me/964${order.phoneNumber?.replace(/\D/g, "")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
+          title={t("whatsapp")}
+        >
+          <MessageCircle className="w-5 h-5 fill-current" />
+        </a>
+      </TableCell>
+      <TableCell>{order.phoneNumber}</TableCell>
+      <TableCell>
+        {tGov.has(order.governorate as any)
+          ? tGov(order.governorate as any)
+          : order.governorate}
+      </TableCell>
+      <TableCell>{order.address}</TableCell>
+      <TableCell>{order.quantity}</TableCell>
+      <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
+      <TableCell>{formatCurrency(order.actualShippingCost ?? 0)}</TableCell>
+      <TableCell className="max-w-[200px] truncate" title={order.notes || ""}>
+        {order.notes || "-"}
+      </TableCell>
+      <TableCell>
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            order.status === "completed"
+              ? "bg-green-100 text-green-800"
+              : order.status === "pending"
+                ? "bg-yellow-100 text-yellow-800"
+                : order.status === "returned" || order.status === "banned"
+                  ? "bg-red-100 text-red-800"
+                  : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {t(`Orders.Status.${order.status}`) || order.status}
+        </span>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            title={t("edit")}
+            onClick={() => onEdit(order)}
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button asChild variant="ghost" size="icon" title={t("details")}>
+            <Link href={`/order/${order.id}`}>
+              <span className="sr-only">{t("details")}</span>
+              <Eye className="w-4 h-4" />
+            </Link>
+          </Button>
+          <DeleteDialog id={order.id} action={deleteOrder} />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+});
 
 export default function OrdersTable({
   orders,
@@ -73,9 +189,17 @@ export default function OrdersTable({
   const [openEdit, setOpenEdit] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
 
+  // Preload the edit form chunk immediately so it's ready before user clicks
+  useEffect(() => {
+    import("./update-order-form");
+  }, []);
+
   // Aggregate per-product breakdown: { name -> { total, orderCount, breakdown: { qty -> orderCount } } }
   const productSummary = orders.reduce<
-    Record<string, { total: number; orderCount: number; breakdown: Record<number, number> }>
+    Record<
+      string,
+      { total: number; orderCount: number; breakdown: Record<number, number> }
+    >
   >((acc, order) => {
     if (order.orderitems) {
       for (const item of order.orderitems) {
@@ -85,32 +209,42 @@ export default function OrdersTable({
         }
         acc[item.name].total += qty;
         acc[item.name].orderCount += 1;
-        acc[item.name].breakdown[qty] = (acc[item.name].breakdown[qty] ?? 0) + 1;
+        acc[item.name].breakdown[qty] =
+          (acc[item.name].breakdown[qty] ?? 0) + 1;
       }
     }
     return acc;
   }, {});
   const summaryEntries = Object.entries(productSummary).sort(
-    (a, b) => b[1].total - a[1].total
+    (a, b) => b[1].total - a[1].total,
   );
 
   // Toggle all
-  const toggleAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedOrders(orders.map((o) => o.id));
-    } else {
-      setSelectedOrders([]);
-    }
-  };
+  const toggleAll = useCallback(
+    (checked: boolean) => {
+      if (checked) {
+        setSelectedOrders(orders.map((o) => o.id));
+      } else {
+        setSelectedOrders([]);
+      }
+    },
+    [orders],
+  );
 
   // Toggle single
-  const toggleOrder = (id: string, checked: boolean) => {
+  const toggleOrder = useCallback((id: string, checked: boolean) => {
     if (checked) {
       setSelectedOrders((prev) => [...prev, id]);
     } else {
       setSelectedOrders((prev) => prev.filter((o) => o !== id));
     }
-  };
+  }, []);
+
+  // Open edit dialog
+  const handleEdit = useCallback((order: any) => {
+    setEditingOrder(order);
+    setOpenEdit(true);
+  }, []);
 
   const isAllSelected =
     orders.length > 0 && selectedOrders.length === orders.length;
@@ -148,6 +282,24 @@ export default function OrdersTable({
 
   return (
     <div className="space-y-4">
+      {/* Single Edit Dialog — rendered once, not per-row */}
+      <Dialog
+        open={openEdit}
+        onOpenChange={(open) => {
+          setOpenEdit(open);
+          if (!open) setEditingOrder(null);
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("edit")}</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <UpdateOrderForm order={editingOrder} setOpen={setOpenEdit} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Bulk Action Bar - kept same */}
       {selectedOrders.length > 0 && (
         <div className="flex items-center gap-2 bg-muted/50 p-2 rounded-md">
@@ -190,7 +342,9 @@ export default function OrdersTable({
               <Package className="w-4 h-4 text-primary" />
               <span>ملخص المنتجات</span>
               <span className="text-muted-foreground font-normal">
-                ({summaryEntries.length} منتج، {summaryEntries.reduce((s, [, { total }]) => s + total, 0)} قطعة)
+                ({summaryEntries.length} منتج،{" "}
+                {summaryEntries.reduce((s, [, { total }]) => s + total, 0)}{" "}
+                قطعة)
               </span>
             </div>
             {summaryExpanded ? (
@@ -202,42 +356,46 @@ export default function OrdersTable({
 
           {summaryExpanded && (
             <div className="px-4 pb-4 pt-2 border-t bg-background/50 flex flex-wrap gap-3">
-              {summaryEntries.map(([name, { total, orderCount, breakdown }]) => {
-                const tiers = Object.entries(breakdown)
-                  .map(([q, c]) => ({ qty: Number(q), count: c }))
-                  .sort((a, b) => a.qty - b.qty);
-                const tierColors = [
-                  "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-                  "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-                  "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
-                  "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-                ];
-                return (
-                  <div
-                    key={name}
-                    className="flex flex-col gap-1.5 rounded-xl border bg-background px-4 py-3 shadow-sm min-w-[180px]"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold leading-tight">{name}</span>
-                      <span className="flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold min-w-[24px] h-6 px-2">
-                        {total}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-1 pt-0.5">
-                      {tiers.map(({ qty, count }, i) => (
-                        <span
-                          key={qty}
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${tierColors[Math.min(i, tierColors.length - 1)]}`}
-                        >
-                          <span>×{qty}</span>
-                          <span className="opacity-60">—</span>
-                          <span>{count} طلب</span>
+              {summaryEntries.map(
+                ([name, { total, orderCount, breakdown }]) => {
+                  const tiers = Object.entries(breakdown)
+                    .map(([q, c]) => ({ qty: Number(q), count: c }))
+                    .sort((a, b) => a.qty - b.qty);
+                  const tierColors = [
+                    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+                    "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+                    "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
+                    "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+                  ];
+                  return (
+                    <div
+                      key={name}
+                      className="flex flex-col gap-1.5 rounded-xl border bg-background px-4 py-3 shadow-sm min-w-[180px]"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold leading-tight">
+                          {name}
                         </span>
-                      ))}
+                        <span className="flex items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold min-w-[24px] h-6 px-2">
+                          {total}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 pt-0.5">
+                        {tiers.map(({ qty, count }, i) => (
+                          <span
+                            key={qty}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${tierColors[Math.min(i, tierColors.length - 1)]}`}
+                          >
+                            <span>×{qty}</span>
+                            <span className="opacity-60">—</span>
+                            <span>{count} طلب</span>
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
           )}
         </div>
@@ -274,119 +432,28 @@ export default function OrdersTable({
               <TableHead>{t("address")}</TableHead>
               <TableHead>{t("quantity")}</TableHead>
               <TableHead>{t("price")}</TableHead>
-              <TableHead>{t("actualShippingCost")}</TableHead>
+              <TableHead className="text-center">
+                {t("actualShippingCost")}
+              </TableHead>
               <TableHead>{t("notes")}</TableHead>
               <TableHead>{t("status")}</TableHead>
-              <TableHead className="w-[100px]">{t("actions")}</TableHead>
+              <TableHead className="w-[100px] text-center">
+                {t("actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {orders.map((order, index) => (
-              <TableRow
+              <OrderRow
                 key={order.id}
-                data-state={
-                  selectedOrders.includes(order.id) ? "selected" : undefined
-                }
-              >
-                <TableCell>
-                  <Checkbox
-                    checked={selectedOrders.includes(order.id)}
-                    onCheckedChange={(checked) =>
-                      toggleOrder(order.id, checked as boolean)
-                    }
-                    aria-label={`Select order ${order.id}`}
-                    className="mx-2"
-                  />
-                </TableCell>
-                <TableCell>{index + 1}</TableCell>
-                <TableCell>
-                  {formatDateTime(order.createdAt).dateTime}
-                </TableCell>
-                <TableCell>{order.fullName}</TableCell>
-                <TableCell>
-                  {order.orderitems && order.orderitems.length > 0
-                    ? order.orderitems.map((item: any) => item.name).join(", ")
-                    : t("noItems")}
-                </TableCell>
-                <TableCell>
-                  <a
-                    href={`https://wa.me/964${order.phoneNumber?.replace(/\D/g, "")}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center p-2 rounded-full bg-green-100 text-green-600 hover:bg-green-200 transition-colors"
-                    title={t("whatsapp")}
-                  >
-                    <MessageCircle className="w-5 h-5 fill-current" />
-                  </a>
-                </TableCell>
-                <TableCell>{order.phoneNumber}</TableCell>
-                <TableCell>{tGov(order.governorate as any)}</TableCell>
-                <TableCell>{order.address}</TableCell>
-                <TableCell>{order.quantity}</TableCell>
-                <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
-                <TableCell>
-                  {formatCurrency(order.actualShippingCost ?? 0)}
-                </TableCell>
-                <TableCell
-                  className="max-w-[200px] truncate"
-                  title={order.notes || ""}
-                >
-                  {order.notes || "-"}
-                </TableCell>
-                <TableCell>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      order.status === "completed"
-                        ? "bg-green-100 text-green-800"
-                        : order.status === "pending"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : order.status === "returned" ||
-                              order.status === "banned"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                    }`}
-                  >
-                    {t(`Orders.Status.${order.status}`) || order.status}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1">
-                    <Dialog
-                      open={openEdit && editingOrder?.id === order.id}
-                      onOpenChange={(open) => {
-                        setOpenEdit(open);
-                        if (open) setEditingOrder(order);
-                        else setEditingOrder(null);
-                      }}
-                    >
-                      <DialogTrigger asChild>
-                        <Button variant="ghost" size="icon" title={t("edit")}>
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>{t("edit")}</DialogTitle>
-                        </DialogHeader>
-                        <UpdateOrderForm order={order} setOpen={setOpenEdit} />
-                      </DialogContent>
-                    </Dialog>
-
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="icon"
-                      title={t("details")}
-                    >
-                      <Link href={`/order/${order.id}`}>
-                        <span className="sr-only">{t("details")}</span>
-                        <Eye className="w-4 h-4" />
-                      </Link>
-                    </Button>
-                    <DeleteDialog id={order.id} action={deleteOrder} />
-                  </div>
-                </TableCell>
-              </TableRow>
+                order={order}
+                index={index}
+                isSelected={selectedOrders.includes(order.id)}
+                onToggle={toggleOrder}
+                onEdit={handleEdit}
+                t={t}
+                tGov={tGov}
+              />
             ))}
           </TableBody>
         </Table>

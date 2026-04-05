@@ -10,11 +10,10 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Globe } from 'lucide-react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { usePathname, useRouter } from '@/i18n/navigation';
 
 export default function LanguageSwitcher() {
-    const t = useTranslations('Header');
     const locale = useLocale();
     const router = useRouter();
     const pathname = usePathname();

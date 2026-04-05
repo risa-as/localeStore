@@ -186,3 +186,18 @@ model Expense {
   notes       String?
   createdAt   DateTime @default(now()) @db.Timestamp(6)
 }
+
+model DealSettings {
+  id        String   @id @default("default")
+  isActive  Boolean  @default(false)
+  endDate   DateTime @db.Timestamp(6)
+  productId String?  @db.Uuid
+  title     String   @default("صفقة الشهر")
+  updatedAt DateTime @updatedAt
+}
+
+model SiteSettings {
+  id        String   @id @default("default")
+  logoUrl   String   @default("/images/logo.svg")
+  updatedAt DateTime @updatedAt
+}

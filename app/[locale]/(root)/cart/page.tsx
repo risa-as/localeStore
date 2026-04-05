@@ -3,7 +3,7 @@ import CartTable from "./cart-table";
 import { getTranslations } from "next-intl/server";
 
 export const metadata = {
-  title: "Shopping Cart",
+  title: "سلة التسوق",
 };
 const CartPage = async () => {
   const cart = await getMyCart();
