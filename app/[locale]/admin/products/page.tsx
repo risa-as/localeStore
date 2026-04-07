@@ -118,7 +118,9 @@ const AdminProductsPage = async (props: {
             <Warehouse className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="flex-1">
-            <p className="text-sm text-muted-foreground font-medium">قيمة المخزون بسعر الشراء</p>
+            <p className="text-sm text-muted-foreground font-medium">
+              قيمة المخزون بسعر الشراء
+            </p>
             <p className="text-2xl font-bold text-blue-700 dark:text-blue-300 mt-0.5">
               {formatCurrency(totalInventoryValue)}
             </p>
@@ -137,15 +139,31 @@ const AdminProductsPage = async (props: {
               <TableHead className="font-semibold w-12">#</TableHead>
               <TableHead className="font-semibold">{t("image")}</TableHead>
               <TableHead className="font-semibold">{t("name")}</TableHead>
-              <TableHead className="text-right font-semibold">{t("price")}</TableHead>
-              <TableHead className="text-right font-semibold">{t("costPrice")}</TableHead>
-              <TableHead className="text-right font-semibold">{t("shippingPrice")}</TableHead>
-              <TableHead className="text-right font-semibold">{t("profit")}</TableHead>
-              <TableHead className="font-semibold">{t("category")}</TableHead>
-              <TableHead className="text-center font-semibold">{t("stock")}</TableHead>
-              <TableHead className="text-center font-semibold">المتبقي</TableHead>
-              <TableHead className="text-center font-semibold">{t("rating")}</TableHead>
-              <TableHead className="text-center font-semibold w-[100px]">{t("actions")}</TableHead>
+              <TableHead className="text-right font-semibold">
+                {t("price")}
+              </TableHead>
+              <TableHead className="text-right font-semibold">
+                {t("costPrice")}
+              </TableHead>
+              <TableHead className="text-right font-semibold">
+                {t("shippingPrice")}
+              </TableHead>
+              <TableHead className="text-right font-semibold">
+                {t("profit")}
+              </TableHead>
+              <TableHead className="font-semibold">{t("offers")}</TableHead>
+              <TableHead className="text-center font-semibold">
+                {t("stock")}
+              </TableHead>
+              <TableHead className="text-center font-semibold">
+                المتبقي
+              </TableHead>
+              <TableHead className="text-center font-semibold">
+                {t("rating")}
+              </TableHead>
+              <TableHead className="text-center font-semibold w-[100px]">
+                {t("actions")}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -199,14 +217,16 @@ const AdminProductsPage = async (props: {
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <span className={`font-bold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                    <span
+                      className={`font-bold ${profit >= 0 ? "text-green-600" : "text-red-600"}`}
+                    >
                       {formatCurrency(profit)}
                     </span>
                   </TableCell>
 
                   <TableCell>
-                    <Badge variant="outline" className="text-xs">
-                      {product.category}
+                    <Badge variant="outline" className="text-xs text-wrap">
+                      {product.offers}
                     </Badge>
                   </TableCell>
 
@@ -215,32 +235,49 @@ const AdminProductsPage = async (props: {
                   </TableCell>
 
                   <TableCell className="text-center">
-                    <span className={`inline-flex items-center justify-center min-w-[2rem] h-7 rounded-full text-sm font-bold px-2
-                      ${remaining <= 0
-                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                        : remaining <= 5
-                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                        : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                      }`}>
+                    <span
+                      className={`inline-flex items-center justify-center min-w-[2rem] h-7 rounded-full text-sm font-bold px-2
+                      ${
+                        remaining <= 0
+                          ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                          : remaining <= 5
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                            : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
+                      }`}
+                    >
                       {remaining}
                     </span>
                   </TableCell>
 
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
-                      <span className="text-amber-500 text-sm font-medium">★</span>
-                      <span className="text-sm">{Number(product.rating).toFixed(1)}</span>
+                      <span className="text-amber-500 text-sm font-medium">
+                        ★
+                      </span>
+                      <span className="text-sm">
+                        {Number(product.rating).toFixed(1)}
+                      </span>
                     </div>
                   </TableCell>
 
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
-                      <Button asChild variant="ghost" size="icon" title={t("edit")}>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="icon"
+                        title={t("edit")}
+                      >
                         <Link href={`/admin/products/${product.id}`}>
                           <Pencil className="w-4 h-4" />
                         </Link>
                       </Button>
-                      <Button asChild variant="ghost" size="icon" title={t("details")}>
+                      <Button
+                        asChild
+                        variant="ghost"
+                        size="icon"
+                        title={t("details")}
+                      >
                         <Link href={`/landing/${product.slug}`}>
                           <Eye className="w-4 h-4" />
                         </Link>
