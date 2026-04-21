@@ -17,6 +17,7 @@ import { useState, useTransition, useEffect, useCallback, memo } from "react";
 import {
   bulkUpdateOrderStatus,
   deleteOrder,
+  resendOrderToModon,
 } from "@/lib/actions/order.actions";
 import DeleteDialog from "@/components/shared/delete-dialog";
 import {
@@ -24,6 +25,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import dynamic from "next/dynamic";
 const UpdateOrderForm = dynamic(() => import("./update-order-form"), {
@@ -50,27 +53,42 @@ import {
   MessageCircle,
   ChevronUp,
   Package,
+  Send,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 
 // Memoized row — only re-renders when its own data changes, not when dialog state changes
+const MODON_STATUSES = new Set([
+  "pending",
+  "completed",
+  "returned",
+  "returnReceived",
+  "rescheduled",
+]);
+
 const OrderRow = memo(function OrderRow({
   order,
   index,
   isSelected,
   onToggle,
   onEdit,
+  onResend,
   t,
   tGov,
+  showBarcode,
+  showCollectedPrice,
 }: {
   order: any;
   index: number;
   isSelected: boolean;
   onToggle: (id: string, checked: boolean) => void;
   onEdit: (order: any) => void;
+  onResend: (id: string) => void;
   t: any;
   tGov: any;
+  showBarcode: boolean;
+  showCollectedPrice: boolean;
 }) {
   return (
     <TableRow key={order.id} data-state={isSelected ? "selected" : undefined}>
@@ -118,21 +136,85 @@ const OrderRow = memo(function OrderRow({
       </TableCell>
       <TableCell>
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
             order.status === "completed"
               ? "bg-green-100 text-green-800"
               : order.status === "pending"
                 ? "bg-yellow-100 text-yellow-800"
                 : order.status === "returned" || order.status === "banned"
                   ? "bg-red-100 text-red-800"
-                  : "bg-gray-100 text-gray-800"
+                  : order.status === "rescheduled"
+                    ? "bg-indigo-100 text-indigo-800"
+                    : order.status === "failed"
+                      ? "bg-red-200 text-red-900"
+                      : order.status === "returnReceived"
+                        ? "bg-teal-100 text-teal-800"
+                        : "bg-gray-100 text-gray-800"
           }`}
         >
+          {(order.status === "rescheduled" || order.status === "failed") && (
+            <span className="text-[10px] font-bold opacity-70">🚚</span>
+          )}
+          {order.status === "returnReceived" && (
+            <span className="text-[10px]">📦</span>
+          )}
           {t(`Orders.Status.${order.status}`) || order.status}
         </span>
       </TableCell>
+      {showBarcode && (
+        <TableCell className="font-mono text-xs text-muted-foreground">
+          {order.modonQrId ?? "-"}
+        </TableCell>
+      )}
+      {showCollectedPrice &&
+        (() => {
+          const collected =
+            order.modonCollectedPrice != null
+              ? Number(order.modonCollectedPrice)
+              : null;
+          const total = Number(order.totalPrice);
+          const hasDiff = collected != null && collected !== total;
+          return (
+            <TableCell
+              className={hasDiff ? "bg-red-50 dark:bg-red-950/30" : ""}
+            >
+              {collected != null ? (
+                <div className="flex flex-col gap-0.5">
+                  <span
+                    className={
+                      hasDiff
+                        ? "text-red-600 font-semibold"
+                        : "text-green-700 font-medium"
+                    }
+                  >
+                    {formatCurrency(collected)}
+                  </span>
+                  {hasDiff && (
+                    <span className="text-xs text-red-500">
+                      ({collected > total ? "+" : ""}
+                      {formatCurrency(collected - total)})
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <span className="text-muted-foreground">-</span>
+              )}
+            </TableCell>
+          );
+        })()}
       <TableCell>
         <div className="flex items-center gap-1">
+          {order.status === "pending" && !order.modonQrId && (
+            <Button
+              variant="outline"
+              size="icon"
+              title="إعادة إرسال لمدن (فشل مسبقاً)"
+              className="text-orange-500 border-orange-500 hover:bg-orange-50 hover:text-orange-600"
+              onClick={() => onResend(order.id)}
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -159,13 +241,18 @@ export default function OrdersTable({
   page,
   count,
   sort,
+  status,
 }: {
   orders: any[];
   page: number;
   count: number;
   sort?: string;
+  status?: string;
 }) {
   const t = useTranslations("Admin");
+  const showBarcode = MODON_STATUSES.has(status ?? "");
+  const showCollectedPrice =
+    status === "completed" || status === "completedAccountant";
 
   // ... existing hooks ...
   const tGov = useTranslations("Governorates");
@@ -246,17 +333,34 @@ export default function OrdersTable({
     setOpenEdit(true);
   }, []);
 
+  const handleResend = useCallback(
+    (id: string) => {
+      startTransition(async () => {
+        const res = await resendOrderToModon(id);
+        if (res.success) {
+          toast({ title: "نجاح", description: res.message });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "خطأ",
+            description: res.message,
+          });
+        }
+      });
+    },
+    [toast],
+  );
+
   const isAllSelected =
     orders.length > 0 && selectedOrders.length === orders.length;
 
-  const handleBulkUpdate = (status: string) => {
+  const [confirmPendingOpen, setConfirmPendingOpen] = useState(false);
+
+  const executeBulkUpdate = (status: string) => {
     startTransition(async () => {
       const res = await bulkUpdateOrderStatus(selectedOrders, status);
       if (res.success) {
-        toast({
-          title: "Success",
-          description: res.message,
-        });
+        toast({ title: "Success", description: res.message });
         setSelectedOrders([]);
       } else {
         toast({
@@ -268,15 +372,26 @@ export default function OrdersTable({
     });
   };
 
+  const handleBulkUpdate = (status: string) => {
+    if (status === "pending") {
+      setConfirmPendingOpen(true);
+      return;
+    }
+    executeBulkUpdate(status);
+  };
+
   const statuses = [
     "home",
-    "account",
     "pending",
     "completed",
     "completedAccountant",
     "returned",
+    "returnReceived",
+    "rescheduled",
+    "failed",
     "waiting",
     "unavailable",
+    "delete",
     "banned",
   ];
 
@@ -297,6 +412,41 @@ export default function OrdersTable({
           {editingOrder && (
             <UpdateOrderForm order={editingOrder} setOpen={setOpenEdit} />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Pending Dialog */}
+      <Dialog open={confirmPendingOpen} onOpenChange={setConfirmPendingOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>تأكيد التحويل إلى معلق</DialogTitle>
+            <DialogDescription>
+              {selectedOrders.length === 1
+                ? "سيتم إرسال هذا الطلب إلى شركة مدن. هل أنت متأكد؟"
+                : `سيتم إرسال ${selectedOrders.length} طلبات إلى شركة مدن. هل أنت متأكد؟`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmPendingOpen(false)}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={() => {
+                setConfirmPendingOpen(false);
+                executeBulkUpdate("pending");
+              }}
+              disabled={isPending}
+            >
+              {isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "تأكيد"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -401,6 +551,81 @@ export default function OrdersTable({
         </div>
       )}
 
+      {/* Modon Collected Price Statistics */}
+      {showCollectedPrice &&
+        (() => {
+          const withCollected = orders.filter(
+            (o) => o.modonCollectedPrice != null,
+          );
+          if (withCollected.length === 0) {
+            return (
+              <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                لا توجد بيانات سعر مدن في هذه الصفحة — ستظهر الإحصائيات بعد
+                المزامنة التالية
+              </div>
+            );
+          }
+          const diffOrders = withCollected.filter(
+            (o) => Number(o.modonCollectedPrice) !== Number(o.totalPrice),
+          );
+          const totalExpected = withCollected.reduce(
+            (s, o) => s + Number(o.totalPrice),
+            0,
+          );
+          const totalCollected = withCollected.reduce(
+            (s, o) => s + Number(o.modonCollectedPrice),
+            0,
+          );
+          const totalDiff = totalCollected - totalExpected;
+          return (
+            <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap gap-4 text-sm">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  طلبات مع سعر مدن
+                </span>
+                <span className="font-semibold">{withCollected.length}</span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  طلبات مختلفة السعر
+                </span>
+                <span
+                  className={`font-semibold ${diffOrders.length > 0 ? "text-red-600" : "text-green-700"}`}
+                >
+                  {diffOrders.length}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  إجمالي المتوقع
+                </span>
+                <span className="font-semibold">
+                  {formatCurrency(totalExpected)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  إجمالي المستلم
+                </span>
+                <span className="font-semibold">
+                  {formatCurrency(totalCollected)}
+                </span>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="text-muted-foreground text-xs">
+                  الفرق الكلي
+                </span>
+                <span
+                  className={`font-semibold ${totalDiff < 0 ? "text-red-600" : totalDiff > 0 ? "text-amber-600" : "text-green-700"}`}
+                >
+                  {totalDiff >= 0 ? "+" : ""}
+                  {formatCurrency(totalDiff)}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
       <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
@@ -436,7 +661,11 @@ export default function OrdersTable({
                 {t("actualShippingCost")}
               </TableHead>
               <TableHead>{t("notes")}</TableHead>
-              <TableHead>{t("status")}</TableHead>
+              <TableHead className="min-w-[140px] whitespace-nowrap">
+                {t("status")}
+              </TableHead>
+              {showBarcode && <TableHead>باركود</TableHead>}
+              {showCollectedPrice && <TableHead>سعر مدن</TableHead>}
               <TableHead className="w-[100px] text-center">
                 {t("actions")}
               </TableHead>
@@ -451,8 +680,11 @@ export default function OrdersTable({
                 isSelected={selectedOrders.includes(order.id)}
                 onToggle={toggleOrder}
                 onEdit={handleEdit}
+                onResend={handleResend}
                 t={t}
                 tGov={tGov}
+                showBarcode={showBarcode}
+                showCollectedPrice={showCollectedPrice}
               />
             ))}
           </TableBody>

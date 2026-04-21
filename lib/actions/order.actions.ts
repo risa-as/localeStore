@@ -16,6 +16,12 @@ import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  sendOrderToModon,
+  fetchModonOrders,
+  MODON_CITY_MAP,
+  MODON_STATUS_MAP,
+} from "@/lib/modon/api";
 
 // Helper to check for fraud
 async function checkForFraud(
@@ -174,8 +180,8 @@ export async function createQuickOrder(
         const shippingPrice =
           updatedItems.length > 0
             ? Math.max(
-                ...updatedItems.map((item) => Number(item.shippingPrice)),
-              )
+              ...updatedItems.map((item) => Number(item.shippingPrice)),
+            )
             : 0;
 
         const newTotalPrice = itemsPrice + shippingPrice;
@@ -221,10 +227,10 @@ export async function createQuickOrder(
     const isFraud = isAdminOrEmployee
       ? false
       : await checkForFraud(
-          ip as string,
-          orderData.phoneNumber,
-          orderData.governorate,
-        );
+        ip as string,
+        orderData.phoneNumber,
+        orderData.governorate,
+      );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -384,8 +390,8 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
         const newShippingPrice =
           updatedItems.length > 0
             ? Math.max(
-                ...updatedItems.map((item) => Number(item.shippingPrice)),
-              )
+              ...updatedItems.map((item) => Number(item.shippingPrice)),
+            )
             : 0;
 
         const newTotalPrice = newItemsPrice + newShippingPrice;
@@ -439,10 +445,10 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const isFraud = isAdminOrEmployee
       ? false
       : await checkForFraud(
-          ip as string,
-          orderData.phoneNumber,
-          orderData.governorate,
-        );
+        ip as string,
+        orderData.phoneNumber,
+        orderData.governorate,
+      );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -545,13 +551,13 @@ export async function getAllOrders({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { phoneNumber: { contains: query, mode: "insensitive" } },
-            { address: { contains: query, mode: "insensitive" } },
-            { governorate: { contains: query, mode: "insensitive" } },
-          ],
-        }
+        OR: [
+          { fullName: { contains: query, mode: "insensitive" } },
+          { phoneNumber: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { governorate: { contains: query, mode: "insensitive" } },
+        ],
+      }
       : {};
 
   if (status && status !== "all") {
@@ -638,13 +644,13 @@ export async function getAllOrdersForExport({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { phoneNumber: { contains: query, mode: "insensitive" } },
-            { address: { contains: query, mode: "insensitive" } },
-            { governorate: { contains: query, mode: "insensitive" } },
-          ],
-        }
+        OR: [
+          { fullName: { contains: query, mode: "insensitive" } },
+          { phoneNumber: { contains: query, mode: "insensitive" } },
+          { address: { contains: query, mode: "insensitive" } },
+          { governorate: { contains: query, mode: "insensitive" } },
+        ],
+      }
       : {};
 
   if (status && status !== "all") {
@@ -728,6 +734,25 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
   try {
     const order = updateOrderSchema.parse(data);
 
+    // جلب بيانات الطلب الحالية (للتحقق من modonQrId والحالة)
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      select: {
+        status: true,
+        modonQrId: true,
+        fullName: true,
+        phoneNumber: true,
+        governorate: true,
+        quantity: true,
+        totalPrice: true,
+        notes: true,
+        address: true,
+        orderitems: {
+          select: { name: true }
+        }
+      },
+    });
+
     await prisma.$transaction(async (tx) => {
       // Update each OrderItem qty if provided
       if (order.orderItems && order.orderItems.length > 0) {
@@ -750,6 +775,9 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
       });
       const newQuantity = updatedItems.reduce((sum, i) => sum + i.qty, 0);
 
+      const enteringPending =
+        order.status === "pending" && existingOrder?.status !== "pending";
+
       await tx.order.update({
         where: { id: order.id },
         data: {
@@ -763,10 +791,58 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           status: order.status,
           notes: order.notes,
           actualShippingCost: order.actualShippingCost,
+          ...(enteringPending && { modonQrId: null, modonSentAt: null }),
         },
       });
     });
 
+    // ── إرسال تلقائي لموذن عند الانتقال إلى "pending" ──
+    if (
+      order.status === "pending" &&
+      existingOrder?.status !== "pending"
+    ) {
+      const govRaw = order.governorate ?? existingOrder?.governorate ?? "";
+      const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+      let phoneRaw = order.phoneNumber ?? existingOrder?.phoneNumber ?? "";
+      if (phoneRaw.startsWith("0")) {
+        phoneRaw = "+964" + phoneRaw.slice(1);
+      } else if (!phoneRaw.startsWith("+")) {
+        phoneRaw = "+" + phoneRaw;
+      }
+
+      let rawPrice = Number(order.totalPrice ?? existingOrder?.totalPrice ?? 0);
+      let finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+      let productNames = "طلب إلكتروني";
+      if (existingOrder?.orderitems && existingOrder.orderitems.length > 0) {
+        productNames = existingOrder.orderitems.map((i: any) => i.name).join(" + ");
+      }
+
+      const modonRes = await sendOrderToModon({
+        client_name: order.fullName ?? existingOrder?.fullName ?? "",
+        client_mobile: phoneRaw,
+        city_id: cityId,
+        location: order.address ?? existingOrder?.address ?? undefined,
+        items_number: existingOrder?.quantity ?? 1,
+        price: finalModonPrice,
+        type_name: productNames,
+        merchant_notes: order.notes ?? existingOrder?.notes ?? undefined,
+      });
+
+      const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+      if (qrIdStr) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            modonQrId: String(qrIdStr),
+            modonSentAt: new Date(),
+          },
+        });
+      }
+    }
+
+    revalidatePath("/admin/orders");
     return {
       success: true,
       message: "Order Updated Successfully",
@@ -780,21 +856,191 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
 // Bulk Update Order Status
 export async function bulkUpdateOrderStatus(ids: string[], status: string) {
   try {
+    // ── أولاً: حدّث الحالة في قاعدة البيانات لجميع الطلبات ──
     await prisma.order.updateMany({
-      where: {
-        id: {
-          in: ids,
+      where: { id: { in: ids } },
+      data: { status },
+    });
+
+    // ── ثانياً: إن كانت الحالة الجديدة "pending" → أرسل لمدن ──
+    let modonSent = 0;
+    let modonFailed = 0;
+
+    if (status === "pending") {
+      // مسح بيانات مدن القديمة لإعادة الإرسال دائماً
+      await prisma.order.updateMany({
+        where: { id: { in: ids } },
+        data: { modonQrId: null, modonSentAt: null },
+      });
+
+      const ordersToSend = await prisma.order.findMany({
+        where: {
+          id: { in: ids },
         },
-      },
-      data: {
-        status: status,
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          governorate: true,
+          address: true,
+          quantity: true,
+          totalPrice: true,
+          notes: true,
+          orderitems: {
+            select: { name: true, qty: true },
+          },
+        },
+      });
+
+      // ترتيب الطلبات حسب اسم المنتج الأول قبل الإرسال
+      ordersToSend.sort((a, b) => {
+        const nameA = a.orderitems?.[0]?.name ?? "";
+        const nameB = b.orderitems?.[0]?.name ?? "";
+        return nameA.localeCompare(nameB, "ar");
+      });
+
+      // إرسال بالتسلسل للحفاظ على الترتيب في نظام مدن
+      const results: { success: boolean }[] = [];
+      for (const o of ordersToSend) {
+        let phoneRaw = o.phoneNumber ?? "";
+        if (phoneRaw.startsWith("0")) {
+          phoneRaw = "+964" + phoneRaw.slice(1);
+        } else if (!phoneRaw.startsWith("+")) {
+          phoneRaw = "+" + phoneRaw;
+        }
+
+        const govRaw = o.governorate ?? "";
+        const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+        const rawPrice = Number(o.totalPrice ?? 0);
+        const finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+        const productNames = o.orderitems && o.orderitems.length > 0
+          ? o.orderitems.map((i: any) => i.name).join(" + ")
+          : "طلب إلكتروني";
+
+        const modonRes = await sendOrderToModon({
+          client_name: o.fullName ?? "",
+          client_mobile: phoneRaw,
+          city_id: cityId,
+          location: o.address ?? undefined,
+          items_number: o.quantity ?? 1,
+          price: finalModonPrice,
+          type_name: productNames,
+          merchant_notes: o.notes ?? undefined,
+        });
+
+        const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+        if (qrIdStr) {
+          await prisma.order.update({
+            where: { id: o.id },
+            data: {
+              modonQrId: String(qrIdStr),
+              modonSentAt: new Date(),
+            },
+          });
+          results.push({ success: true });
+        } else {
+          results.push({ success: false });
+        }
+      }
+
+      modonSent = results.filter((r) => r.success).length;
+      modonFailed = results.length - modonSent;
+    }
+
+    revalidatePath("/admin/orders");
+
+    const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
+    const modonMsg =
+      status === "pending" && (modonSent + modonFailed) > 0
+        ? ` مدن: ✅ ${modonSent} أُرسل، ❌ ${modonFailed} فشل.`
+        : "";
+
+    return {
+      success: true,
+      message: baseMsg + modonMsg,
+      modonSent,
+      modonFailed,
+    };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError };
+  }
+}
+
+// إعادة إرسال طلب واحد لمدن يدوياً (للطلبات التي فشل إرسالها)
+export async function resendOrderToModon(orderId: string) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        governorate: true,
+        address: true,
+        quantity: true,
+        totalPrice: true,
+        notes: true,
+        modonQrId: true,
+        status: true,
+        orderitems: {
+          select: { name: true, qty: true },
+        },
       },
     });
 
-    revalidatePath("/admin/orders");
+    if (!order) return { success: false, message: "الطلب غير موجود" };
+    if (order.modonQrId)
+      return { success: false, message: "الطلب مُرسل لمدن مسبقاً" };
+
+    let phoneRaw = order.phoneNumber ?? "";
+    if (phoneRaw.startsWith("0")) {
+      phoneRaw = "+964" + phoneRaw.slice(1);
+    } else if (!phoneRaw.startsWith("+")) {
+      phoneRaw = "+" + phoneRaw;
+    }
+
+    const govRaw = order.governorate ?? "";
+    const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+    let rawPrice = Number(order.totalPrice ?? 0);
+    // التصحيح التلقائي للسعر: معالجة (25) لتصبح (25000)
+    let finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+    const productNames = order.orderitems && order.orderitems.length > 0
+      ? order.orderitems.map((i: any) => i.name).join(" + ")
+      : "طلب إلكتروني";
+
+    const modonRes = await sendOrderToModon({
+      client_name: order.fullName ?? "",
+      client_mobile: phoneRaw,
+      city_id: cityId,
+      location: order.address ?? undefined,
+      items_number: order.quantity ?? 1,
+      price: finalModonPrice,
+      type_name: productNames,
+      merchant_notes: order.notes ?? undefined,
+    });
+
+    const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+    if (qrIdStr) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          modonQrId: String(qrIdStr),
+          modonSentAt: new Date(),
+        },
+      });
+      revalidatePath("/admin/orders");
+      return { success: true, message: "✅ تم الإرسال لمدن بنجاح" };
+    }
+
+    const errorMsg = modonRes?.msg || "خطأ غير معروف في البيانات المدخلة";
     return {
-      success: true,
-      message: "Orders Updated Successfully",
+      success: false,
+      message: `❌ التوصيل: ${errorMsg}`,
     };
   } catch (error) {
     const { success, formError } = formatError(error);
@@ -1285,6 +1531,58 @@ export async function getOrderProfitStats({
       othersActualShippingCost,
     },
   };
+}
+
+// ── مزامنة حالات طلبات مدن ──
+export async function syncModonOrders() {
+  try {
+    const modonOrders = await fetchModonOrders();
+    if (!modonOrders || modonOrders.length === 0) {
+      return { success: false, message: "لا توجد طلبات في مدن للمزامنة", updatedOrders: 0 };
+    }
+
+    // جلب جميع الطلبات المحلية التي لديها qr_id وليست مكتملة/راجعة نهائياً
+    const localOrders = await prisma.order.findMany({
+      where: {
+        modonQrId: { not: null },
+        status: { notIn: ["completed", "returnReceived"] },
+      },
+      select: { id: true, modonQrId: true, status: true },
+    });
+
+    let updatedCount = 0;
+
+    for (const localOrder of localOrders) {
+      const remoteOrder = modonOrders.find(
+        (o: any) => String(o.id ?? o.qr_id) === localOrder.modonQrId
+      );
+
+      if (remoteOrder && remoteOrder.status_id != null) {
+        const newLocalStatus = MODON_STATUS_MAP[String(remoteOrder.status_id)];
+        if (newLocalStatus && newLocalStatus !== localOrder.status) {
+          const updateData: Prisma.OrderUpdateInput = { status: newLocalStatus };
+          if (newLocalStatus === "completed" && remoteOrder.price != null) {
+            updateData.modonCollectedPrice = Number(remoteOrder.price);
+          }
+          await prisma.order.update({
+            where: { id: localOrder.id },
+            data: updateData,
+          });
+          updatedCount++;
+        }
+      }
+    }
+
+    revalidatePath("/admin/orders");
+    return {
+      success: true,
+      message: `تم التزامن وتحديث حالة ${updatedCount} طلب بنجاح.`,
+      updatedOrders: updatedCount,
+    };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError, updatedOrders: 0 };
+  }
 }
 
 // Import Orders from Excel

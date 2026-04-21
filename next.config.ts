@@ -54,7 +54,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com",
               "img-src 'self' data: blob: https://utfs.io",
-              "connect-src 'self' https://graph.facebook.com https://vitals.vercel-insights.com",
+              "connect-src 'self' https://graph.facebook.com https://vitals.vercel-insights.com https://*.ingest.uploadthing.com https://uploadthing.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },

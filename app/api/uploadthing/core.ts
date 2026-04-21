@@ -1,6 +1,6 @@
 import { createUploadthing, type FileRouter } from "uploadthing/next";
 import { UploadThingError } from "uploadthing/server";
-import { auth } from "@/auth";
+import { getToken } from "next-auth/jwt";
 const f = createUploadthing();
 
 export const ourFileRouter = {
@@ -11,10 +11,12 @@ export const ourFileRouter = {
     },
   })
     .middleware(async ({ req }) => {
-      const session = await auth();
-      if (!session) throw new UploadThingError("Unauthorized");
-
-      return { userId: session?.user?.id };
+      const token = await getToken({
+        req,
+        secret: process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET,
+      });
+      if (!token) throw new UploadThingError("Unauthorized");
+      return { userId: token.sub ?? "" };
     })
     .onUploadComplete(async ({ metadata }) => {
       return { uploadedBy: metadata.userId };

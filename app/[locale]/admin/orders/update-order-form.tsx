@@ -103,7 +103,7 @@ export default function UpdateOrderForm({
         });
     };
 
-    const statuses = ['home', 'account', 'pending', 'completed', 'completedAccountant', 'returned', 'waiting', 'unavailable', 'banned'];
+    const statuses = ['home', 'account', 'pending', 'completed', 'completedAccountant', 'returned', 'returnReceived', 'waiting', 'unavailable', 'banned', 'rescheduled', 'failed'];
 
     return (
         <Form {...form}>
