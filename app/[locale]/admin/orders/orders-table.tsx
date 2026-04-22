@@ -170,7 +170,7 @@ const OrderRow = memo(function OrderRow({
         (() => {
           const collected =
             order.modonCollectedPrice != null
-              ? Number(order.modonCollectedPrice)
+              ? Number(order.modonCollectedPrice) / 1000
               : null;
           const total = Number(order.totalPrice);
           const hasDiff = collected != null && collected !== total;
@@ -566,16 +566,18 @@ export default function OrdersTable({
             );
           }
           const diffOrders = withCollected.filter(
-            (o) => Number(o.modonCollectedPrice) !== Number(o.totalPrice),
+            (o) =>
+              Number(o.modonCollectedPrice) / 1000 !== Number(o.totalPrice),
           );
           const totalExpected = withCollected.reduce(
             (s, o) => s + Number(o.totalPrice),
             0,
           );
-          const totalCollected = withCollected.reduce(
-            (s, o) => s + Number(o.modonCollectedPrice),
-            0,
-          );
+          const totalCollected =
+            withCollected.reduce(
+              (s, o) => s + Number(o.modonCollectedPrice),
+              0,
+            ) / 1000;
           const totalDiff = totalCollected - totalExpected;
           return (
             <div className="rounded-lg border bg-muted/30 px-4 py-3 flex flex-wrap gap-4 text-sm">
