@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { syncModonOrders } from "@/lib/actions/order.actions";
+import { auth } from "@/auth";
 
-export const maxDuration = 60; // 60 seconds limit
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
     const authHeader = req.headers.get("authorization");
-    if (
-      process.env.CRON_SECRET &&
-      authHeader !== `Bearer ${process.env.CRON_SECRET}`
-    ) {
+    const isCron = process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`;
+    const session = isCron ? null : await auth();
+    const isAdmin = session?.user?.role === "admin";
+
+    if (!isCron && !isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

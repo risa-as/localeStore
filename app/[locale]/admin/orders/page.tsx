@@ -15,7 +15,7 @@ import BulkUpdateByDateDialog from "@/components/admin/bulk-update-by-date-dialo
 import ModonSyncButton from "@/components/admin/modon-sync-button";
 import { PAGE_SIZE } from "@/lib/constants";
 import { NextIntlClientProvider } from "next-intl";
-import { X } from "lucide-react";
+import { X, BarChart2 } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "الطلبات",
@@ -104,9 +104,15 @@ const AdminOrdersPage = async (props: {
             </div>
           )}
         </div>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <ModonSyncButton />
-        </NextIntlClientProvider>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/modon-stats" className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors">
+            <BarChart2 className="w-4 h-4" />
+            <span className="hidden sm:inline">إحصائيات</span>
+          </Link>
+          <NextIntlClientProvider locale={locale} messages={messages}>
+            <ModonSyncButton />
+          </NextIntlClientProvider>
+        </div>
       </div>
 
       {/* ── Row 2: Search + Secondary Actions ── */}

@@ -72,6 +72,7 @@ export default function UpdateOrderForm({
             status: order.status,
             actualShippingCost: order.actualShippingCost ?? "0",
             notes: order.notes ?? "",
+            modonQrId: order.modonQrId ?? "",
         },
     });
 
@@ -265,6 +266,25 @@ export default function UpdateOrderForm({
                             <FormLabel>{t("actualShippingCost")}</FormLabel>
                             <FormControl>
                                 <Input placeholder={t("actualShippingCost")} {...field} />
+                            </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <FormField
+                    control={form.control}
+                    name="modonQrId"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>باركود مدن</FormLabel>
+                            <FormControl>
+                                <Input
+                                    placeholder="رقم الباركود (اختياري)"
+                                    {...field}
+                                    value={field.value ?? ""}
+                                    className="font-mono"
+                                />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

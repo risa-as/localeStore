@@ -86,7 +86,7 @@ const AdminSearch = () => {
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={t("searchPlaceholder")}
+          placeholder={pathname.includes("/admin/orders") ? t("ordersSearchPlaceholder") : t("searchPlaceholder")}
           className="h-9 w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
         />
         {hasValue ? (

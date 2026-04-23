@@ -556,6 +556,7 @@ export async function getAllOrders({
           { phoneNumber: { contains: query, mode: "insensitive" } },
           { address: { contains: query, mode: "insensitive" } },
           { governorate: { contains: query, mode: "insensitive" } },
+          { modonQrId: { contains: query, mode: "insensitive" } },
         ],
       }
       : {};
@@ -649,6 +650,7 @@ export async function getAllOrdersForExport({
           { phoneNumber: { contains: query, mode: "insensitive" } },
           { address: { contains: query, mode: "insensitive" } },
           { governorate: { contains: query, mode: "insensitive" } },
+          { modonQrId: { contains: query, mode: "insensitive" } },
         ],
       }
       : {};
@@ -791,6 +793,7 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           status: order.status,
           notes: order.notes,
           actualShippingCost: order.actualShippingCost,
+          ...(order.modonQrId !== undefined && { modonQrId: order.modonQrId || null }),
           ...(enteringPending && { modonQrId: null, modonSentAt: null }),
         },
       });
@@ -1562,7 +1565,7 @@ export async function syncModonOrders() {
         if (newLocalStatus && newLocalStatus !== localOrder.status) {
           const updateData: Prisma.OrderUpdateInput = { status: newLocalStatus };
           if (newLocalStatus === "completed" && remoteOrder.price != null) {
-            updateData.modonCollectedPrice = Number(remoteOrder.price);
+            updateData.modonCollectedPrice = Number(remoteOrder.price) / 1000;
           }
           await prisma.order.update({
             where: { id: localOrder.id },
@@ -1718,4 +1721,96 @@ export async function importOrders(data: any[]) {
     console.error("Import Error:", error);
     return { success: false, message: "Failed to process file" };
   }
+}
+
+// ── إحصائيات مدن ──
+export async function getModonStats() {
+  const MODON_STATUSES = ["pending", "completed", "returned", "returnReceived", "rescheduled", "failed"];
+
+  // جلب طلباتنا التي أُرسلت لمدن (لديها باركود)
+  const [localOrders, priceDiffs, dailySent, modonOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: { modonQrId: { not: null } },
+      select: { id: true, modonQrId: true, status: true, fullName: true, phoneNumber: true, createdAt: true },
+    }),
+
+    prisma.order.findMany({
+      where: { status: "completed", modonCollectedPrice: { not: null } },
+      select: { totalPrice: true, modonCollectedPrice: true },
+    }),
+
+    prisma.order.findMany({
+      where: { modonSentAt: { not: null, gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      select: { modonSentAt: true },
+    }),
+
+    fetchModonOrders(),
+  ]);
+
+  // إحصائيات الحالات (فقط طلبات أُرسلت لمدن)
+  const counts: Record<string, number> = {};
+  for (const s of MODON_STATUSES) counts[s] = 0;
+  for (const o of localOrders) {
+    if (counts[o.status] !== undefined) counts[o.status]++;
+  }
+  const totalSentToModon = localOrders.length;
+
+  // مقارنة: طلباتنا ذات الباركود vs طلبات مدن
+  const localQrIds = new Set(localOrders.map((o) => String(o.modonQrId)));
+  const modonIds = new Set((modonOrders as any[]).map((o: any) => String(o.id ?? o.qr_id)));
+
+  // موجودة عندنا لكن مفقودة من مدن
+  const missingInModon = localOrders.filter((o) => !modonIds.has(String(o.modonQrId)));
+
+  // موجودة في مدن لكن مفقودة من نظامنا
+  const missingInLocal = (modonOrders as any[]).filter(
+    (o: any) => !localQrIds.has(String(o.id ?? o.qr_id))
+  );
+
+  // مقارنة الأسعار
+  const priceStats = priceDiffs.reduce(
+    (acc, o) => {
+      const expected = Number(o.totalPrice);
+      const collected = Number(o.modonCollectedPrice);
+      acc.total++;
+      if (collected < expected) { acc.less++; acc.lossAmount += expected - collected; }
+      else if (collected > expected) { acc.more++; acc.gainAmount += collected - expected; }
+      else acc.exact++;
+      return acc;
+    },
+    { total: 0, exact: 0, less: 0, more: 0, lossAmount: 0, gainAmount: 0 },
+  );
+
+  // تجميع يومي
+  const dailyMap: Record<string, number> = {};
+  for (const o of dailySent) {
+    const localDate = new Date(o.modonSentAt!.getTime() + 3 * 60 * 60 * 1000);
+    const day = localDate.toISOString().slice(0, 10);
+    dailyMap[day] = (dailyMap[day] ?? 0) + 1;
+  }
+  const daily = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }));
+
+  return convertToPlainObject({
+    counts,
+    totalSentToModon,
+    totalInModon: modonIds.size,
+    missingInModon: missingInModon.map((o) => ({
+      id: o.id,
+      modonQrId: o.modonQrId,
+      fullName: o.fullName,
+      phoneNumber: o.phoneNumber,
+      status: o.status,
+      createdAt: o.createdAt,
+    })),
+    missingInLocal: missingInLocal.map((o: any) => ({
+      modonId: String(o.id ?? o.qr_id),
+      clientName: o.client_name ?? "-",
+      phone: o.client_mobile ?? "-",
+      statusId: o.status_id,
+    })),
+    priceStats,
+    daily,
+  });
 }
