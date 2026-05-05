@@ -560,14 +560,17 @@ export async function getOrderById(orderId: string) {
   const data = await prisma.order.findFirst({
     where: { id: orderId },
     include: {
-      orderitems: true,
+      orderitems: {
+        include: {
+          product: { select: { categories: true } },
+        },
+      },
       user: true,
     },
   });
   return convertToPlainObject(data);
 }
 
-// Get All Orders
 // Get All Orders
 export async function getAllOrders({
   limit = PAGE_SIZE,
@@ -748,9 +751,22 @@ export async function getMyOrders({
 // Delete an Order
 export async function deleteOrder(id: string) {
   try {
-    await prisma.order.delete({
+    const res = await prisma.order.findFirst({
       where: { id },
     });
+    if (res?.status === "delete") {
+      await prisma.order.delete({
+        where: { id },
+      });
+    } else {
+      await prisma.order.update({
+        where: { id },
+        data: {
+          status: "delete",
+        },
+      });
+    }
+
     revalidatePath("/admin/orders");
     return {
       success: true,
@@ -1413,7 +1429,7 @@ export async function getOrderProfitStats({
     prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
-        status: "completed",
+        status: { in: ["completed", "completedAccountant"] },
       },
       select: {
         totalPrice: true,
@@ -1435,7 +1451,7 @@ export async function getOrderProfitStats({
     prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
-        status: "returned",
+        status: { in: ["returned", "returnReceived"] },
       },
       select: {
         orderitems: {

@@ -33,6 +33,8 @@ function ThankYouContent() {
   // --- إعدادات التتبع ---
   const [eventId] = useState(() => uuidv4());
   const [orderData, setOrderData] = useState<any>(null);
+  const [redirectCategory, setRedirectCategory] = useState("");
+  const redirectCategoryRef = useRef("");
 
   // جلب البيانات (يحدث مرة واحد)
   useEffect(() => {
@@ -42,6 +44,18 @@ function ThankYouContent() {
           .then((order) => {
             if (order) {
               setOrderData(order);
+
+              // قراءة فئة المنتج الذي اشتراه الزبون مباشرةً من بيانات الطلب
+              console.log("[DEBUG] orderitems[0]:", order.orderitems?.[0]);
+              console.log("[DEBUG] product:", order.orderitems?.[0]?.product);
+              console.log(
+                "[DEBUG] categories:",
+                order.orderitems?.[0]?.product?.categories,
+              );
+              const cat = order.orderitems?.[0]?.product?.categories?.[0] ?? "";
+              console.log("[DEBUG] cat:", cat);
+              redirectCategoryRef.current = cat;
+              setRedirectCategory(cat);
 
               // Send CAPI Event with Real Data
               sendCAPIEvent("Purchase", eventId, {
@@ -106,7 +120,11 @@ function ThankYouContent() {
 
   useEffect(() => {
     if (timeLeft === 0) {
-      routerRef.current.push("/ar");
+      const cat = redirectCategoryRef.current;
+      const url = cat
+        ? `/ar/search?category=${encodeURIComponent(cat)}`
+        : "/ar";
+      routerRef.current.push(url);
     }
   }, [timeLeft]);
 
@@ -172,7 +190,14 @@ function ThankYouContent() {
               asChild
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
             >
-              <Link href="/en" className="flex items-center gap-2">
+              <Link
+                href={
+                  redirectCategory
+                    ? `/ar/search?category=${encodeURIComponent(redirectCategory)}`
+                    : "/ar"
+                }
+                className="flex items-center gap-2"
+              >
                 <ShoppingBag className="w-4 h-4" />
                 {t("continueShopping")}
               </Link>

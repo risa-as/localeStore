@@ -251,20 +251,6 @@ const ProfitPage = async (props: {
 
       {/* KPI Cards — Row 2 */}
       <div className="grid grid-cols-2 lg:grid-cols-2 gap-4">
-        {/* <StatCard
-          label="صافي الإيراد (بعد التوصيل)"
-          value={formatCurrency(productTotals.totalRevenue)}
-          sub={`= ${formatCurrency(orderSummary.totalGrossRevenue)} - ${formatCurrency(orderSummary.totalActualShippingCost)}`}
-          icon={DollarSign}
-          neutral
-        />
-        <StatCard
-          label="متوسط قيمة الطلب"
-          value={formatCurrency(orderSummary.avgOrderValue)}
-          sub="إجمالي ما دفعه الزبون"
-          icon={ShoppingCart}
-          neutral
-        /> */}
         <StatCard
           label="طلبات بغداد"
           value={`${orderSummary.baghdadOrderCount} طلب`}
@@ -386,7 +372,9 @@ const ProfitPage = async (props: {
                               </span>
                             </div>
                           ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
+                            <span className="text-muted-foreground text-sm">
+                              —
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
@@ -444,15 +432,27 @@ const ProfitPage = async (props: {
                     </TableCell>
                     <TableCell className="text-right">
                       {(() => {
-                        const totalReturned = productStats.reduce((sum, p) => sum + p.returnedQty, 0);
+                        const totalReturned = productStats.reduce(
+                          (sum, p) => sum + p.returnedQty,
+                          0,
+                        );
                         return totalReturned > 0 ? (
                           <div className="flex flex-col items-end gap-0.5">
-                            <span className="text-red-600">{totalReturned}</span>
+                            <span className="text-red-600">
+                              {totalReturned}
+                            </span>
                             <span className="text-xs text-red-400">
-                              {((totalReturned / (productTotals.totalQty + totalReturned)) * 100).toFixed(1)}%
+                              {(
+                                (totalReturned /
+                                  (productTotals.totalQty + totalReturned)) *
+                                100
+                              ).toFixed(1)}
+                              %
                             </span>
                           </div>
-                        ) : <span className="text-muted-foreground">—</span>;
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        );
                       })()}
                     </TableCell>
                     <TableCell className="text-right">
