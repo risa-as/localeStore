@@ -33,9 +33,9 @@ const ProductCard = ({ product, priority = false }: { product: Product; priority
 
       {/* Info */}
       <div className="flex flex-col flex-1 p-3 sm:p-4 gap-2">
-        {product.category && (
+        {product.categories?.length > 0 && (
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            {product.category}
+            {product.categories[0]}
           </span>
         )}
 

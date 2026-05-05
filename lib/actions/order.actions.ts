@@ -180,12 +180,15 @@ export async function createQuickOrder(
         const shippingPrice =
           updatedItems.length > 0
             ? Math.max(
-              ...updatedItems.map((item) => Number(item.shippingPrice)),
-            )
+                ...updatedItems.map((item) => Number(item.shippingPrice)),
+              )
             : 0;
 
         const newTotalPrice = itemsPrice + shippingPrice;
-        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
+        const newQuantity = updatedItems.reduce(
+          (acc, item) => acc + item.qty,
+          0,
+        );
 
         await tx.order.update({
           where: { id: recentOrder.id },
@@ -227,10 +230,10 @@ export async function createQuickOrder(
     const isFraud = isAdminOrEmployee
       ? false
       : await checkForFraud(
-        ip as string,
-        orderData.phoneNumber,
-        orderData.governorate,
-      );
+          ip as string,
+          orderData.phoneNumber,
+          orderData.governorate,
+        );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -274,6 +277,34 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
+    console.log("🚀 Sending request to n8n...");
+    // n8n
+    try {
+      const res = await fetch(
+        "https://ri-sa03.app.n8n.cloud/webhook-test/create-order",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: insertedOrderId,
+            fullName: orderData.fullName,
+            phone: "964" + orderData.phoneNumber.substring(1),
+            product: product.name,
+            quantity: orderData.quantity,
+            price: price,
+            address: orderData.address,
+            governorate: orderData.governorate,
+          }),
+        },
+      );
+
+      const text = await res.text();
+      console.log("✅ n8n response:", text);
+    } catch (err) {
+      console.error("❌ n8n error:", err);
+    }
 
     return {
       success: true,
@@ -390,12 +421,15 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
         const newShippingPrice =
           updatedItems.length > 0
             ? Math.max(
-              ...updatedItems.map((item) => Number(item.shippingPrice)),
-            )
+                ...updatedItems.map((item) => Number(item.shippingPrice)),
+              )
             : 0;
 
         const newTotalPrice = newItemsPrice + newShippingPrice;
-        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
+        const newQuantity = updatedItems.reduce(
+          (acc, item) => acc + item.qty,
+          0,
+        );
 
         await tx.order.update({
           where: { id: recentOrder.id },
@@ -445,10 +479,10 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const isFraud = isAdminOrEmployee
       ? false
       : await checkForFraud(
-        ip as string,
-        orderData.phoneNumber,
-        orderData.governorate,
-      );
+          ip as string,
+          orderData.phoneNumber,
+          orderData.governorate,
+        );
 
     // Create a transaction to create order and order items in database
     const insertedOrderId = await prisma.$transaction(async (tx) => {
@@ -551,14 +585,14 @@ export async function getAllOrders({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-        OR: [
-          { fullName: { contains: query, mode: "insensitive" } },
-          { phoneNumber: { contains: query, mode: "insensitive" } },
-          { address: { contains: query, mode: "insensitive" } },
-          { governorate: { contains: query, mode: "insensitive" } },
-          { modonQrId: { contains: query, mode: "insensitive" } },
-        ],
-      }
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+            { modonQrId: { contains: query, mode: "insensitive" } },
+          ],
+        }
       : {};
 
   if (status && status !== "all") {
@@ -645,14 +679,14 @@ export async function getAllOrdersForExport({
   const queryFilter: Prisma.OrderWhereInput =
     query && query !== "all"
       ? {
-        OR: [
-          { fullName: { contains: query, mode: "insensitive" } },
-          { phoneNumber: { contains: query, mode: "insensitive" } },
-          { address: { contains: query, mode: "insensitive" } },
-          { governorate: { contains: query, mode: "insensitive" } },
-          { modonQrId: { contains: query, mode: "insensitive" } },
-        ],
-      }
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+            { modonQrId: { contains: query, mode: "insensitive" } },
+          ],
+        }
       : {};
 
   if (status && status !== "all") {
@@ -750,8 +784,8 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
         notes: true,
         address: true,
         orderitems: {
-          select: { name: true }
-        }
+          select: { name: true },
+        },
       },
     });
 
@@ -793,17 +827,16 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           status: order.status,
           notes: order.notes,
           actualShippingCost: order.actualShippingCost,
-          ...(order.modonQrId !== undefined && { modonQrId: order.modonQrId || null }),
+          ...(order.modonQrId !== undefined && {
+            modonQrId: order.modonQrId || null,
+          }),
           ...(enteringPending && { modonQrId: null, modonSentAt: null }),
         },
       });
     });
 
     // ── إرسال تلقائي لموذن عند الانتقال إلى "pending" ──
-    if (
-      order.status === "pending" &&
-      existingOrder?.status !== "pending"
-    ) {
+    if (order.status === "pending" && existingOrder?.status !== "pending") {
       const govRaw = order.governorate ?? existingOrder?.governorate ?? "";
       const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
 
@@ -815,11 +848,14 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
       }
 
       let rawPrice = Number(order.totalPrice ?? existingOrder?.totalPrice ?? 0);
-      let finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+      let finalModonPrice =
+        rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
 
       let productNames = "طلب إلكتروني";
       if (existingOrder?.orderitems && existingOrder.orderitems.length > 0) {
-        productNames = existingOrder.orderitems.map((i: any) => i.name).join(" + ");
+        productNames = existingOrder.orderitems
+          .map((i: any) => i.name)
+          .join(" + ");
       }
 
       const modonRes = await sendOrderToModon({
@@ -916,11 +952,13 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
         const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
 
         const rawPrice = Number(o.totalPrice ?? 0);
-        const finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+        const finalModonPrice =
+          rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
 
-        const productNames = o.orderitems && o.orderitems.length > 0
-          ? o.orderitems.map((i: any) => i.name).join(" + ")
-          : "طلب إلكتروني";
+        const productNames =
+          o.orderitems && o.orderitems.length > 0
+            ? o.orderitems.map((i: any) => i.name).join(" + ")
+            : "طلب إلكتروني";
 
         const modonRes = await sendOrderToModon({
           client_name: o.fullName ?? "",
@@ -956,7 +994,7 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
     const modonMsg =
-      status === "pending" && (modonSent + modonFailed) > 0
+      status === "pending" && modonSent + modonFailed > 0
         ? ` مدن: ✅ ${modonSent} أُرسل، ❌ ${modonFailed} فشل.`
         : "";
 
@@ -1010,11 +1048,13 @@ export async function resendOrderToModon(orderId: string) {
 
     let rawPrice = Number(order.totalPrice ?? 0);
     // التصحيح التلقائي للسعر: معالجة (25) لتصبح (25000)
-    let finalModonPrice = rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+    let finalModonPrice =
+      rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
 
-    const productNames = order.orderitems && order.orderitems.length > 0
-      ? order.orderitems.map((i: any) => i.name).join(" + ")
-      : "طلب إلكتروني";
+    const productNames =
+      order.orderitems && order.orderitems.length > 0
+        ? order.orderitems.map((i: any) => i.name).join(" + ")
+        : "طلب إلكتروني";
 
     const modonRes = await sendOrderToModon({
       client_name: order.fullName ?? "",
@@ -1430,7 +1470,7 @@ export async function getOrderProfitStats({
     }
   >();
 
-  let totalGrossRevenue = 0;       // sum(Order.totalPrice)
+  let totalGrossRevenue = 0; // sum(Order.totalPrice)
   let totalActualShippingCost = 0; // sum(Order.actualShippingCost)
   let baghdadOrderCount = 0;
   let othersOrderCount = 0;
@@ -1519,7 +1559,8 @@ export async function getOrderProfitStats({
   );
 
   const totalOrderCount = baghdadOrderCount + othersOrderCount;
-  const avgOrderValue = totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
+  const avgOrderValue =
+    totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
 
   return {
     productStats,
@@ -1541,7 +1582,11 @@ export async function syncModonOrders() {
   try {
     const modonOrders = await fetchModonOrders();
     if (!modonOrders || modonOrders.length === 0) {
-      return { success: false, message: "لا توجد طلبات في مدن للمزامنة", updatedOrders: 0 };
+      return {
+        success: false,
+        message: "لا توجد طلبات في مدن للمزامنة",
+        updatedOrders: 0,
+      };
     }
 
     // جلب جميع الطلبات المحلية التي لديها qr_id وليست مكتملة/راجعة نهائياً
@@ -1557,13 +1602,15 @@ export async function syncModonOrders() {
 
     for (const localOrder of localOrders) {
       const remoteOrder = modonOrders.find(
-        (o: any) => String(o.id ?? o.qr_id) === localOrder.modonQrId
+        (o: any) => String(o.id ?? o.qr_id) === localOrder.modonQrId,
       );
 
       if (remoteOrder && remoteOrder.status_id != null) {
         const newLocalStatus = MODON_STATUS_MAP[String(remoteOrder.status_id)];
         if (newLocalStatus && newLocalStatus !== localOrder.status) {
-          const updateData: Prisma.OrderUpdateInput = { status: newLocalStatus };
+          const updateData: Prisma.OrderUpdateInput = {
+            status: newLocalStatus,
+          };
           if (newLocalStatus === "completed" && remoteOrder.price != null) {
             updateData.modonCollectedPrice = Number(remoteOrder.price) / 1000;
           }
@@ -1725,13 +1772,27 @@ export async function importOrders(data: any[]) {
 
 // ── إحصائيات مدن ──
 export async function getModonStats() {
-  const MODON_STATUSES = ["pending", "completed", "returned", "returnReceived", "rescheduled", "failed"];
+  const MODON_STATUSES = [
+    "pending",
+    "completed",
+    "returned",
+    "returnReceived",
+    "rescheduled",
+    "failed",
+  ];
 
   // جلب طلباتنا التي أُرسلت لمدن (لديها باركود)
   const [localOrders, priceDiffs, dailySent, modonOrders] = await Promise.all([
     prisma.order.findMany({
       where: { modonQrId: { not: null } },
-      select: { id: true, modonQrId: true, status: true, fullName: true, phoneNumber: true, createdAt: true },
+      select: {
+        id: true,
+        modonQrId: true,
+        status: true,
+        fullName: true,
+        phoneNumber: true,
+        createdAt: true,
+      },
     }),
 
     prisma.order.findMany({
@@ -1740,7 +1801,12 @@ export async function getModonStats() {
     }),
 
     prisma.order.findMany({
-      where: { modonSentAt: { not: null, gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      where: {
+        modonSentAt: {
+          not: null,
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        },
+      },
       select: { modonSentAt: true },
     }),
 
@@ -1757,14 +1823,18 @@ export async function getModonStats() {
 
   // مقارنة: طلباتنا ذات الباركود vs طلبات مدن
   const localQrIds = new Set(localOrders.map((o) => String(o.modonQrId)));
-  const modonIds = new Set((modonOrders as any[]).map((o: any) => String(o.id ?? o.qr_id)));
+  const modonIds = new Set(
+    (modonOrders as any[]).map((o: any) => String(o.id ?? o.qr_id)),
+  );
 
   // موجودة عندنا لكن مفقودة من مدن
-  const missingInModon = localOrders.filter((o) => !modonIds.has(String(o.modonQrId)));
+  const missingInModon = localOrders.filter(
+    (o) => !modonIds.has(String(o.modonQrId)),
+  );
 
   // موجودة في مدن لكن مفقودة من نظامنا
   const missingInLocal = (modonOrders as any[]).filter(
-    (o: any) => !localQrIds.has(String(o.id ?? o.qr_id))
+    (o: any) => !localQrIds.has(String(o.id ?? o.qr_id)),
   );
 
   // مقارنة الأسعار
@@ -1773,9 +1843,13 @@ export async function getModonStats() {
       const expected = Number(o.totalPrice);
       const collected = Number(o.modonCollectedPrice);
       acc.total++;
-      if (collected < expected) { acc.less++; acc.lossAmount += expected - collected; }
-      else if (collected > expected) { acc.more++; acc.gainAmount += collected - expected; }
-      else acc.exact++;
+      if (collected < expected) {
+        acc.less++;
+        acc.lossAmount += expected - collected;
+      } else if (collected > expected) {
+        acc.more++;
+        acc.gainAmount += collected - expected;
+      } else acc.exact++;
       return acc;
     },
     { total: 0, exact: 0, less: 0, more: 0, lossAmount: 0, gainAmount: 0 },

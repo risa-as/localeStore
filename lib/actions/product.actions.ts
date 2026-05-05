@@ -71,7 +71,10 @@ export async function getAllProducts({
       : {};
 
   // Category filter
-  const categoryFilter = category && category !== "all" ? { category } : {};
+  const categoryFilter =
+    category && category !== "all"
+      ? { categories: { has: category } }
+      : {};
 
   // Price filter
   const priceFilter: Prisma.ProductWhereInput =
@@ -193,14 +196,15 @@ export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
   }
 }
 
-// Get all categories
+// Get all categories with counts (from product categories arrays)
 export async function getAllCategories() {
-  const data = await prisma.product.groupBy({
-    by: ["category"],
-    _count: true,
-  });
-
-  return convertToPlainObject(data);
+  const data = await prisma.$queryRaw<{ category: string; _count: number }[]>`
+    SELECT category_name AS category, COUNT(*)::int AS "_count"
+    FROM "Product", unnest(categories) AS category_name
+    GROUP BY category_name
+    ORDER BY COUNT(*) DESC
+  `;
+  return data;
 }
 
 // Get featured products

@@ -197,9 +197,9 @@ const AdminProductsPage = async (props: {
 
                   <TableCell className="font-medium max-w-[200px]">
                     <span className="line-clamp-2">{product.name}</span>
-                    {product.category && (
+                    {product.categories?.length > 0 && (
                       <span className="text-xs text-muted-foreground block mt-0.5">
-                        {product.category}
+                        {product.categories.join(', ')}
                       </span>
                     )}
                   </TableCell>

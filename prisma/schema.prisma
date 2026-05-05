@@ -10,7 +10,7 @@ model Product {
   id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name          String
   slug          String      @unique(map: "product_slug_idx")
-  category      String
+  categories    String[]    @default([])
   images        String[]
   description   String
   stock         Int

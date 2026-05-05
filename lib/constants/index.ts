@@ -36,7 +36,7 @@ export const PAGE_SIZE = Number(process.env.PAGE_SIZE) || 10;
 export const productDefaultValues = {
   name: "",
   slug: "",
-  category: "",
+  categories: [],
   images: [],
   colors: [],
   description: "",

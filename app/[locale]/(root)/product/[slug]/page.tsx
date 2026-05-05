@@ -54,14 +54,14 @@ const ProductDetailsPage = async (props: {
         >
           المنتجات
         </Link>
-        {product.category && (
+        {product.categories?.[0] && (
           <>
             <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
             <Link
-              href={`/search?category=${encodeURIComponent(product.category)}`}
+              href={`/search?category=${encodeURIComponent(product.categories[0])}`}
               className="hover:text-foreground transition-colors"
             >
-              {product.category}
+              {product.categories[0]}
             </Link>
           </>
         )}
@@ -83,12 +83,16 @@ const ProductDetailsPage = async (props: {
 
           {/* Info — center */}
           <div className="lg:col-span-2 space-y-5">
-            {/* Category badge */}
-            {product.category && (
-              <span className="inline-flex items-center gap-1.5 text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full">
-                <Tag className="w-3.5 h-3.5" />
-                {product.category}
-              </span>
+            {/* Category badges */}
+            {product.categories?.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {product.categories.map((cat: string) => (
+                  <span key={cat} className="inline-flex items-center gap-1.5 text-sm font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full">
+                    <Tag className="w-3.5 h-3.5" />
+                    {cat}
+                  </span>
+                ))}
+              </div>
             )}
 
             {/* Name */}

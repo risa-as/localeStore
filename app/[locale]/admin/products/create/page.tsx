@@ -2,6 +2,8 @@ import ProductForm from "@/components/admin/product-form";
 import { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { getAllCategories } from "@/lib/actions/category.actions";
+
+export const dynamic = 'force-dynamic';
 import Link from "next/link";
 import { ArrowRight, PackagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
