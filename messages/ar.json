@@ -55,7 +55,12 @@
     "myOrders": "طلباتي",
     "support": "الدعم",
     "signIn": "تسجيل الدخول",
-    "signUp": "إنشاء حساب"
+    "signUp": "إنشاء حساب",
+    "legal": "الصفحات القانونية",
+    "privacyPolicy": "سياسة الخصوصية",
+    "termsOfService": "الشروط والأحكام",
+    "country": "العراق",
+    "poweredBy": "تطوير Risa_03"
   },
   "Menu": {
     "cart": "عربة التسوق",

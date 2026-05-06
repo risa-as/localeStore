@@ -55,7 +55,12 @@
     "myOrders": "My Orders",
     "support": "Support",
     "signIn": "Sign In",
-    "signUp": "Sign Up"
+    "signUp": "Sign Up",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "country": "Iraq",
+    "poweredBy": "Powered by Risa_03"
   },
   "Menu": {
     "cart": "Cart",
