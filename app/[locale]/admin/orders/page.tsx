@@ -1,11 +1,8 @@
-import { auth } from "@/auth";
 import Pagination from "@/components/shared/pagination";
-import { deleteOrder, getAllOrders } from "@/lib/actions/order.actions";
+import { getAllOrders } from "@/lib/actions/order.actions";
 import { requireAdmin } from "@/lib/auth-guard";
 import { Metadata } from "next";
-import { formatCurrency, formatDateTime, formatId } from "@/lib/utils";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { getTranslations, getMessages, getLocale } from "next-intl/server";
 import OrdersTable from "./orders-table";
 import AdminSearch from "@/components/admin/admin-search";
@@ -17,6 +14,9 @@ import { PAGE_SIZE } from "@/lib/constants";
 import { NextIntlClientProvider } from "next-intl";
 import { X, BarChart2 } from "lucide-react";
 
+// n8n
+import { prisma } from "@/db/prisma";
+import { fail } from "node:assert";
 export const metadata: Metadata = {
   title: "الطلبات",
 };
@@ -55,7 +55,11 @@ const AdminOrdersPage = async (props: {
     status = "home",
     sort = "date",
   } = await props.searchParams;
-
+  // n8n
+  const failedWhatsapp = await prisma.whatsAppFailedDelivery.findMany({
+    select: { phone: true },
+  });
+  const failedPhone = new Set(failedWhatsapp.map((t) => t.phone));
   const orders = await getAllOrders({
     page: Number(page),
     limit: PAGE_SIZE,
@@ -105,7 +109,10 @@ const AdminOrdersPage = async (props: {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/admin/modon-stats" className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors">
+          <Link
+            href="/admin/modon-stats"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm text-muted-foreground hover:bg-muted transition-colors"
+          >
             <BarChart2 className="w-4 h-4" />
             <span className="hidden sm:inline">إحصائيات</span>
           </Link>
@@ -173,6 +180,7 @@ const AdminOrdersPage = async (props: {
           count={orders.totalPages}
           sort={sort}
           status={status}
+          failedPhone={Array.from(failedPhone)}
         />
       </NextIntlClientProvider>
 

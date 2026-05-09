@@ -78,6 +78,8 @@ const OrderRow = memo(function OrderRow({
   tGov,
   showBarcode,
   showCollectedPrice,
+  // n8n
+  isWhatsappFailed,
 }: {
   order: any;
   index: number;
@@ -89,6 +91,7 @@ const OrderRow = memo(function OrderRow({
   tGov: any;
   showBarcode: boolean;
   showCollectedPrice: boolean;
+  isWhatsappFailed: boolean;
 }) {
   return (
     <TableRow key={order.id} data-state={isSelected ? "selected" : undefined}>
@@ -110,7 +113,7 @@ const OrderRow = memo(function OrderRow({
               .join("، ")
           : t("noItems")}
       </TableCell>
-      <TableCell>
+      {/* <TableCell>
         <a
           href={`https://wa.me/964${order.phoneNumber?.replace(/\D/g, "")}`}
           target="_blank"
@@ -120,6 +123,30 @@ const OrderRow = memo(function OrderRow({
         >
           <MessageCircle className="w-5 h-5 fill-current" />
         </a>
+      </TableCell> */}
+      <TableCell>
+        <div className="relative inline-flex">
+          <a
+            href={`https://wa.me/964${order.phoneNumber?.replace(/\D/g, "")}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`inline-flex items-center justify-center p-2 rounded-full transition-colors ${
+              isWhatsappFailed
+                ? "bg-red-100 text-red-500 hover:bg-red-200"
+                : "bg-green-100 text-green-600 hover:bg-green-200"
+            }`}
+            title={
+              isWhatsappFailed ? "لا يوجد واتساب - اتصل به!" : t("whatsapp")
+            }
+          >
+            <MessageCircle className="w-5 h-5 fill-current" />
+          </a>
+          {isWhatsappFailed && (
+            <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-bold">
+              !
+            </span>
+          )}
+        </div>
       </TableCell>
       <TableCell>{order.phoneNumber}</TableCell>
       <TableCell>
@@ -242,18 +269,22 @@ export default function OrdersTable({
   count,
   sort,
   status,
+  failedPhone,
 }: {
   orders: any[];
   page: number;
   count: number;
   sort?: string;
   status?: string;
+  // n8n
+  failedPhone: string[];
 }) {
   const t = useTranslations("Admin");
   const showBarcode = true;
   const showCollectedPrice =
     status === "completed" || status === "completedAccountant";
-
+  // n8n
+  const failedPhonesSet = new Set(failedPhone);
   // ... existing hooks ...
   const tGov = useTranslations("Governorates");
   const { toast } = useToast();
@@ -685,6 +716,7 @@ export default function OrdersTable({
                 tGov={tGov}
                 showBarcode={showBarcode}
                 showCollectedPrice={showCollectedPrice}
+                isWhatsappFailed={failedPhonesSet.has(order.phoneNumber)} // ← أضف هذا
               />
             ))}
           </TableBody>

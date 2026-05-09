@@ -1,15 +1,10 @@
 "use server";
 import { cookies, headers } from "next/headers";
-
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import { convertToPlainObject, formatError } from "../utils";
 import { getMyCart } from "./cart.actions";
-import {
-  insertOrderSchema,
-  shippingAddressSchema,
-  updateOrderSchema,
-} from "../validators";
+import { insertOrderSchema, updateOrderSchema } from "../validators";
 import { prisma } from "@/db/prisma";
 import { CartItem } from "@/types";
 import { revalidatePath } from "next/cache";
