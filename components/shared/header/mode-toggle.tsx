@@ -12,11 +12,13 @@ import {
 import { SunIcon, MoonIcon, SunMoon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 
 const ModeToggle = () => {
     const [mounted, setMounted] = useState(false);
     const { theme, setTheme } = useTheme();
+    const t = useTranslations("Theme");
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -42,25 +44,25 @@ const ModeToggle = () => {
                 />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Appearance</DropdownMenuLabel>
+                <DropdownMenuLabel>{t("appearance")}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
                     checked={theme === "system"}
                     onCheckedChange={() => setTheme("system")}
                 >
-                    System
+                    {t("system")}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                     checked={theme === "dark"}
                     onCheckedChange={() => setTheme("dark")}
                 >
-                    Dark
+                    {t("dark")}
                 </DropdownMenuCheckboxItem>
                 <DropdownMenuCheckboxItem
                     checked={theme === "light"}
                     onCheckedChange={() => setTheme("light")}
                 >
-                    Light
+                    {t("light")}
                 </DropdownMenuCheckboxItem>
             </DropdownMenuContent>
         </DropdownMenu>

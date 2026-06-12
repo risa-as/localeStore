@@ -15,8 +15,6 @@ import {
 import { Button } from "../ui/button";
 import { Trash } from "lucide-react";
 
-import { useTranslations } from "next-intl";
-
 const DeleteDialog = ({
   id,
   action,
@@ -27,51 +25,42 @@ const DeleteDialog = ({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
-  const t = useTranslations('Admin');
 
   const handleDeleteClick = () => {
     startTransition(async () => {
       const res = await action(id);
       if (!res.success) {
-        toast({
-          variant: "destructive",
-          description: res.message,
-        });
+        toast({ variant: "destructive", description: res.message });
       } else {
         setOpen(false);
-        toast({
-          description: res.message,
-        });
+        toast({ description: res.message });
       }
     });
-    return;
   };
+
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button size="icon" variant="destructive" className="ml-2">
+        <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50">
           <Trash className="w-4 h-4" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{t('deleteConfirm')}</AlertDialogTitle>
+          <AlertDialogTitle>هل أنت متأكد؟</AlertDialogTitle>
           <AlertDialogDescription>
-            {t('deleteDescription')}
+            لا يمكن التراجع عن هذا الإجراء بعد تنفيذه.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{t('deleteCancel')}</AlertDialogCancel>
-          <Button
-            variant="destructive"
-            disabled={isPending}
-            onClick={handleDeleteClick}
-          >
-            {isPending ? t('deleting') : t('delete')}
+          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+          <Button variant="destructive" disabled={isPending} onClick={handleDeleteClick}>
+            {isPending ? "جاري الحذف..." : "حذف"}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   );
 };
+
 export default DeleteDialog;

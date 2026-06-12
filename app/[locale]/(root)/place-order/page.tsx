@@ -1,139 +1,120 @@
-import { auth } from "@/auth";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { getMyCart } from "@/lib/actions/cart.actions";
-import { getUserById } from "@/lib/actions/user.actions";
 import { formatCurrency } from "@/lib/utils";
-import { ShippingAddress } from "@/types";
 import { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import PlaceOrderForm from "./place-order-form";
 import { getTranslations } from "next-intl/server";
 import { cookies } from "next/headers";
+import { ShippingAddress } from "@/types";
+import { ShoppingBag, MapPin } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Place Order",
-};
+export const metadata: Metadata = { title: "إتمام الطلب" };
 
 const PlaceOrderPage = async () => {
   const cart = await getMyCart();
-
   const cookieStore = await cookies();
   const guestShippingInfo = cookieStore.get("guest-shipping-info")?.value;
 
-  let defaultValues: {
-    fullName: string;
-    phoneNumber: string;
-    governorate: string;
-    address: string;
-    quantity: number;
-  } = {
-    fullName: "",
-    phoneNumber: "",
-    governorate: "",
-    address: "",
-    quantity: 0
-  };
+  let defaultValues = { fullName: "", phoneNumber: "", governorate: "", address: "", quantity: 0 };
   let isEditable = true;
-
-  let userAddress: ShippingAddress | null = null; // Keep for display purposes
-  let paymentMethod = "Cash On Delivery"; // Default for guest
+  let userAddress: ShippingAddress | null = null;
 
   if (guestShippingInfo) {
-    const guestData = JSON.parse(guestShippingInfo);
-    // Assuming guestData matches insertOrderSchema structure from createQuickOrder
+    const g = JSON.parse(guestShippingInfo);
     defaultValues = {
-      fullName: guestData.fullName || "",
-      phoneNumber: guestData.phoneNumber || "",
-      governorate: guestData.city || guestData.governorate || "",
-      address: guestData.streetAddress || guestData.address || "",
-      quantity: 0
+      fullName: g.fullName || "",
+      phoneNumber: g.phoneNumber || "",
+      governorate: g.city || g.governorate || "",
+      address: g.streetAddress || g.address || "",
+      quantity: 0,
     };
     isEditable = false;
-
-    // Adapt guestData to ShippingAddress for display in existing JSX
-    userAddress = {
-      fullName: guestData.fullName,
-      streetAddress: guestData.address,
-      city: guestData.governorate,
-      postalCode: "",
-      country: "",
-    };
+    userAddress = { fullName: g.fullName, streetAddress: g.address, city: g.governorate, postalCode: "", country: "" };
   }
 
-
   if (!cart || cart.items.length === 0) redirect("/cart");
-  // We no longer redirect if userAddress is missing, as we will collect it in the form if needed.
 
-  const t = await getTranslations('Checkout');
+  const t = await getTranslations("Checkout");
 
   return (
-    <>
-      <h1 className="py-4 text-2xl">{t('placeOrder')}</h1>
-      <div className="grid md:grid-cols-3 gap-5">
-        <div className="md:col-span-2 overflow-x-auto space-y-4">
-          <Card>
-            <CardContent className="p-6 gap-4">
-              <h2 className="text-xl font-bold pb-4">{t('orderItems')}</h2>
+    <div className="py-5 sm:py-8 space-y-5 sm:space-y-8">
+      {/* Title */}
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 rounded-xl bg-primary/10">
+          <ShoppingBag className="w-6 h-6 text-primary" />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-extrabold">{t("placeOrder")}</h1>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+        {/* Items */}
+        <div className="lg:col-span-2">
+          <Card className="rounded-3xl border-2">
+            <CardContent className="p-5 sm:p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <ShoppingBag className="w-5 h-5 text-primary" />
+                <h2 className="text-xl font-extrabold">{t("orderItems")}</h2>
+              </div>
               <div className="space-y-4">
                 {cart.items.map((item) => (
-                  <div key={item.slug} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
-                    <div className="flex items-center gap-4">
-                      <div className="relative w-16 h-16 rounded-md overflow-hidden border">
-                        <Image
-                          src={item.image}
-                          alt={item.name}
-                          fill
-                          className="object-cover"
-                        />
-                      </div>
-                      <div>
-                        <p className="font-semibold">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">{t('items')}: {item.qty}</p>
-                      </div>
+                  <div key={item.slug} className="flex items-center gap-3 sm:gap-4 py-3 border-b last:border-0">
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border-2 shrink-0">
+                      <Image src={item.image} alt={item.name} fill className="object-cover" />
                     </div>
-                    <div className="font-bold">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm sm:text-base line-clamp-2">{item.name}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5">
+                        {item.qty} × {formatCurrency(item.price)}
+                      </p>
+                    </div>
+                    <p className="font-extrabold text-base sm:text-lg text-primary shrink-0">
                       {formatCurrency(Number(item.price) * item.qty)}
-                    </div>
+                    </p>
                   </div>
                 ))}
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Summary + Form */}
         <div>
-          <Card>
-            <CardContent className="p-4 gap-4 space-y-4">
-              <div className="flex justify-between">
-                <div>{t('items')}</div>
-                <div>{formatCurrency(cart.itemsPrice)}</div>
+          <Card className="rounded-3xl border-2 shadow-lg shadow-primary/5 lg:sticky lg:top-20">
+            <CardContent className="p-5 space-y-5">
+              {/* Price summary */}
+              <div>
+                <h2 className="text-xl font-extrabold mb-4">ملخص الطلب</h2>
+                <div className="space-y-2.5 text-base">
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>{t("items")}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(cart.itemsPrice)}</span>
+                  </div>
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>{t("shipping")}</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(cart.shippingPrice)}</span>
+                  </div>
+                  <div className="flex justify-between border-t-2 pt-3 font-extrabold text-lg">
+                    <span>{t("total")}</span>
+                    <span className="text-primary text-xl">{formatCurrency(cart.totalPrice)}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="flex justify-between">
-                <div>{t('shipping')}</div>
-                <div>{formatCurrency(cart.shippingPrice)}</div>
+              {/* Shipping form */}
+              <div className="border-t-2 pt-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <MapPin className="w-5 h-5 text-primary" />
+                  <h3 className="text-base font-bold">{t("shippingAddress")}</h3>
+                </div>
+                <PlaceOrderForm cart={cart} defaultValues={defaultValues} isEditable={isEditable} />
               </div>
-              <div className="flex justify-between font-bold text-lg border-t pt-4">
-                <div>{t('total')}</div>
-                <div>{formatCurrency(cart.totalPrice)}</div>
-              </div>
-              {/* Form handles inputs (if isEditable) or just hidden fields/submit (if !isEditable) */}
-              <PlaceOrderForm cart={cart} defaultValues={defaultValues} isEditable={isEditable} />
             </CardContent>
           </Card>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 

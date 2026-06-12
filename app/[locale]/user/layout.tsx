@@ -4,39 +4,37 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
+import { getLogoUrl } from "@/lib/get-logo";
 import MainNav from "./main-nav";
 
 export default async function UserLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   const session = await auth();
-  if (!session) {
-    redirect("/sign-in");
-  }
+  if (!session) redirect("/sign-in");
+  const logoUrl = await getLogoUrl();
 
   return (
-    <div className="flex flex-col">
-      <div className="border-b container mx-auto">
-        <div className="flex items-center h-16 px-4 gap-12">
-          <Link href="/" className="w-22">
-            <Image
-              src="/images/logo.svg"
-              alt={APP_NAME}
-              width={48}
-              height={48}
-            />
-          </Link>
-          <MainNav />
-          <div className="ml-auto items-center flex space-x-4">
-            <Menu />
+    <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b-2 bg-card/95 backdrop-blur">
+        <div className="h-1 bg-gradient-to-r from-primary to-orange-300" />
+        <div className="container mx-auto px-3 sm:px-6">
+          <div className="flex items-center h-14 sm:h-16 gap-3">
+            <Link href="/" className="shrink-0">
+              <Image src={logoUrl} alt={APP_NAME} width={38} height={38} className="rounded-xl" />
+            </Link>
+            <MainNav />
+            <div className="ml-auto">
+              <Menu />
+            </div>
           </div>
         </div>
-      </div>
-      <div className="flex-1 space-y-4 p-8 pt-6 container mx-auto">
+      </header>
+
+      <main className="flex-1 container mx-auto px-3 sm:px-6 py-5 sm:py-8">
         {children}
-      </div>
+      </main>
     </div>
   );
 }

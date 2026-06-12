@@ -9,15 +9,14 @@ import { getTranslations } from "next-intl/server";
 import SearchFilters from "@/components/shared/product/search-filters";
 import { Product } from "@/types";
 import dynamic from "next/dynamic";
+import { X } from "lucide-react";
 
-const MobileFilters = dynamic(() => import("@/components/shared/product/mobile-filters"), {
-  ssr: true, // Still want SSR for SEO? Or false for pure mobile perf? Drawer is interactive. Keep SSR true or leave dynamic defaults. User recommendation said "HeavyComponent = dynamic...". Drawer is somewhat heavy.
-});
-
-
+const MobileFilters = dynamic(
+  () => import("@/components/shared/product/mobile-filters"),
+  { ssr: true }
+);
 
 const ratings = [4, 3, 2, 1];
-
 const sortOrders = ["newest", "lowest", "highest", "rating"];
 
 export async function generateMetadata(props: {
@@ -35,27 +34,19 @@ export async function generateMetadata(props: {
     rating = "all",
   } = await props.searchParams;
 
-  const t = await getTranslations('SearchPage');
+  const t = await getTranslations("SearchPage");
 
   const isQuerySet = q && q !== "all" && q.trim() !== "";
-  const isCategorySet =
-    category && category !== "all" && category.trim() !== "";
+  const isCategorySet = category && category !== "all" && category.trim() !== "";
   const isPriceSet = price && price !== "all" && price.trim() !== "";
   const isRatingSet = rating && rating !== "all" && rating.trim() !== "";
 
   if (isQuerySet || isCategorySet || isPriceSet || isRatingSet) {
     return {
-      title: `
-      ${t('title')} ${isQuerySet ? q : ""} 
-      ${isCategorySet ? `: ${t('category')} ${category}` : ""}
-      ${isPriceSet ? `: ${t('price')} ${price}` : ""}
-      ${isRatingSet ? `: ${t('rating')} ${rating}` : ""}`,
-    };
-  } else {
-    return {
-      title: t('title'),
+      title: `${t("title")} ${isQuerySet ? q : ""} ${isCategorySet ? `- ${category}` : ""}`,
     };
   }
+  return { title: t("title") };
 }
 
 const SearchPage = async (props: {
@@ -77,9 +68,8 @@ const SearchPage = async (props: {
     page = "1",
   } = await props.searchParams;
 
-  const t = await getTranslations('SearchPage');
+  const t = await getTranslations("SearchPage");
 
-  // Construct filter url
   const getFilterUrl = ({
     c,
     p,
@@ -94,13 +84,11 @@ const SearchPage = async (props: {
     pg?: string;
   }) => {
     const params = { q, category, price, rating, sort, page };
-
     if (c) params.category = c;
     if (p) params.price = p;
     if (s) params.sort = s;
     if (r) params.rating = r;
     if (pg) params.page = pg;
-
     return `/search?${new URLSearchParams(params).toString()}`;
   };
 
@@ -115,113 +103,124 @@ const SearchPage = async (props: {
 
   const categories = await getAllCategories();
 
-  /* prices and ratings are already defined at module level (ratings only now), need to pass them */
   const prices = [
-    {
-      name: `1,000 د.ع ${t('priceTo')} 50,000 د.ع`,
-      value: "1-50",
-    },
-    {
-      name: `51,000 د.ع ${t('priceTo')} 100,000 د.ع`,
-      value: "51-100",
-    },
-    {
-      name: `101,000 د.ع ${t('priceTo')} 200,000 د.ع`,
-      value: "101-200",
-    },
-    {
-      name: `201,000 د.ع ${t('priceTo')} 500,000 د.ع`,
-      value: "201-500",
-    },
-    {
-      name: `501,000 د.ع ${t('priceTo')} 1,000,000 د.ع`,
-      value: "501-1000",
-    },
+    { name: `1,000 - 50,000 د.ع`, value: "1-50" },
+    { name: `51,000 - 100,000 د.ع`, value: "51-100" },
+    { name: `101,000 - 200,000 د.ع`, value: "101-200" },
+    { name: `201,000 - 500,000 د.ع`, value: "201-500" },
+    { name: `501,000 - 1,000,000 د.ع`, value: "501-1000" },
   ];
 
+  const activeFilters: { label: string; clearUrl: string }[] = [];
+  if (q !== "all" && q !== "")
+    activeFilters.push({ label: `"${q}"`, clearUrl: getFilterUrl({ c: undefined }) });
+  if (category !== "all" && category !== "")
+    activeFilters.push({ label: category, clearUrl: getFilterUrl({ c: "all" }) });
+  if (price !== "all")
+    activeFilters.push({ label: price.replace("-", " - ") + " د.ع", clearUrl: getFilterUrl({ p: "all" }) });
+  if (rating !== "all")
+    activeFilters.push({ label: `${rating}★+`, clearUrl: getFilterUrl({ r: "all" }) });
+
+  const hasFilters = activeFilters.length > 0;
+
   return (
-    <div className="grid md:grid-cols-5 md:gap-5">
-      <div className="hidden md:block">
-        <SearchFilters
-          categories={categories}
-          prices={prices}
-          ratings={ratings}
-          translations={{
-            category: t('category'),
-            price: t('price'),
-            customerRatings: t('customerRatings'),
-            any: t('any'),
-            starsAndUp: t('starsAndUp'),
-          }}
-        />
-      </div>
-      <div className="md:col-span-4 space-y-4">
-        <div className="flex-between flex-col md:flex-row my-4">
-          <div className="flex items-center gap-2">
-            <div className="md:hidden mb-2">
+    <div className="flex gap-6">
+      {/* Sidebar — desktop only */}
+      <aside className="hidden md:block w-56 shrink-0">
+        <div className="sticky top-24 rounded-2xl border bg-card p-5">
+          <SearchFilters
+            categories={categories}
+            prices={prices}
+            ratings={ratings}
+            translations={{
+              category: t("category"),
+              price: t("price"),
+              customerRatings: t("customerRatings"),
+              any: t("any"),
+              starsAndUp: t("starsAndUp"),
+            }}
+          />
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 min-w-0 space-y-4">
+        {/* Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-2xl border bg-card">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Mobile filter trigger */}
+            <div className="md:hidden">
               <MobileFilters
                 categories={categories}
                 prices={prices}
                 ratings={ratings}
                 translations={{
-                  category: t('category'),
-                  price: t('price'),
-                  customerRatings: t('customerRatings'),
-                  any: t('any'),
-                  starsAndUp: t('starsAndUp'),
-                  filter: t('filter'),
+                  category: t("category"),
+                  price: t("price"),
+                  customerRatings: t("customerRatings"),
+                  any: t("any"),
+                  starsAndUp: t("starsAndUp"),
+                  filter: t("filter"),
                 }}
               />
             </div>
-            {q !== "all" && q !== "" && (
-              <span className="bg-gray-100 p-1 px-2 rounded-md">
-                {t('query')}: {q}
-              </span>
-            )}
-            {category !== "all" && category !== "" && (
-              <span className="bg-gray-100 p-1 px-2 rounded-md">
-                {t('category')}: {category}
-              </span>
-            )}
-            {price !== "all" && (
-              <span className="bg-gray-100 p-1 px-2 rounded-md">
-                {t('price')}: {price}
-              </span>
-            )}
-            {rating !== "all" && (
-              <span className="bg-gray-100 p-1 px-2 rounded-md">
-                {t('customerRatings')}: {rating} {t('starsAndUp')}
-              </span>
-            )}
 
-            {(q !== "all" && q !== "") ||
-              (category !== "all" && category !== "") ||
-              rating !== "all" ||
-              price !== "all" ? (
-              <Button variant={"link"} asChild>
-                <Link href="/search">{t('clear')}</Link>
-              </Button>
-            ) : null}
-          </div>
-          <div>
-            {t('sortBy')}{" "}
-            {sortOrders.map((s) => (
+            {/* Active filter chips */}
+            {activeFilters.map((f, i) => (
               <Link
-                key={s}
-                className={`mx-2 ${sort == s && "font-bold"}`}
-                href={getFilterUrl({ s })}
+                key={i}
+                href={f.clearUrl}
+                className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-2.5 py-1 rounded-full hover:bg-primary/20 transition-colors"
               >
-                {t(s as any)}
+                {f.label}
+                <X className="w-3 h-3" />
               </Link>
             ))}
+            {hasFilters && (
+              <Button variant="ghost" size="sm" asChild className="text-xs h-7 text-muted-foreground">
+                <Link href="/search">{t("clear")}</Link>
+              </Button>
+            )}
+          </div>
+
+          {/* Sort */}
+          <div className="flex items-center gap-1.5 text-sm">
+            <span className="text-muted-foreground shrink-0 text-xs">{t("sortBy")}:</span>
+            <div className="flex gap-1">
+              {sortOrders.map((s) => (
+                <Link
+                  key={s}
+                  href={getFilterUrl({ s })}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                    sort === s
+                      ? "bg-primary text-primary-foreground"
+                      : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {t(s as any)}
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {products.data.length === 0 && <div>{t('noResults')}</div>}
-          {products.data.map((product: Product, index: number) => (
-            <ProductCard key={product.id} product={product} priority={index < 4} />
-          ))}
-        </div>
+
+
+        {/* Product Grid */}
+        {products.data.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24 text-center gap-4">
+            <div className="text-6xl">🔍</div>
+            <p className="text-lg font-semibold">{t("noResults")}</p>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link href="/search">{t("clear")}</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+            {products.data.map((product: Product, index: number) => (
+              <ProductCard key={product.id} product={product} priority={index < 4} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

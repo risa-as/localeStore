@@ -13,7 +13,7 @@ const currency = z
 export const insertProductSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   slug: z.string().min(3, "Slug must be at least 3 characters"),
-  category: z.string().min(3, "Category must be at least 3 characters"),
+  categories: z.array(z.string()).min(1, "يجب اختيار فئة واحدة على الأقل"),
   colors: z.array(z.string()).optional().default([]),
   description: z.string().min(3, "Description must be at least 3 characters"),
   stock: z.coerce.number(),
@@ -131,6 +131,10 @@ export const updateOrderSchema = insertOrderSchema.extend({
   shippingPrice: currency,
   notes: z.string().optional().nullable(),
   actualShippingCost: currency,
+  modonQrId: z.string().optional().nullable(),
+  orderItems: z
+    .array(z.object({ productId: z.string(), qty: z.number().int().positive() }))
+    .optional(),
 });
 
 // Schema for inserting an order item

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 
 export const metadata: Metadata = {
-  title: "Unauthorized Access",
+  title: "غير مصرح",
 };
 
 export default async function UnauthorizedPage() {

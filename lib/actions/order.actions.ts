@@ -1,21 +1,22 @@
 "use server";
 import { cookies, headers } from "next/headers";
-
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import { convertToPlainObject, formatError } from "../utils";
 import { getMyCart } from "./cart.actions";
-import {
-  insertOrderSchema,
-  shippingAddressSchema,
-  updateOrderSchema,
-} from "../validators";
+import { insertOrderSchema, updateOrderSchema } from "../validators";
 import { prisma } from "@/db/prisma";
 import { CartItem } from "@/types";
 import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
+import {
+  sendOrderToModon,
+  fetchModonOrders,
+  MODON_CITY_MAP,
+  MODON_STATUS_MAP,
+} from "@/lib/modon/api";
 
 // Helper to check for fraud
 async function checkForFraud(
@@ -179,7 +180,10 @@ export async function createQuickOrder(
             : 0;
 
         const newTotalPrice = itemsPrice + shippingPrice;
-        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
+        const newQuantity = updatedItems.reduce(
+          (acc, item) => acc + item.qty,
+          0,
+        );
 
         await tx.order.update({
           where: { id: recentOrder.id },
@@ -268,7 +272,34 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
+    //Start N8N
+    try {
+      const res = await fetch(
+        "https://n8n.srv1667498.hstgr.cloud/webhook/create-order",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            orderId: insertedOrderId,
+            fullName: orderData.fullName,
+            phone: "964" + orderData.phoneNumber.substring(1),
+            product: product.name,
+            quantity: orderData.quantity,
+            price: price,
+            address: orderData.address,
+            governorate: orderData.governorate,
+          }),
+        },
+      );
 
+      const text = await res.text();
+      console.log("✅ n8n response:", text);
+    } catch (err) {
+      console.error("❌ n8n error:", err);
+    }
+    // End N8N
     return {
       success: true,
       message: "Order created",
@@ -389,7 +420,10 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             : 0;
 
         const newTotalPrice = newItemsPrice + newShippingPrice;
-        const newQuantity = updatedItems.reduce((acc, item) => acc + item.qty, 0);
+        const newQuantity = updatedItems.reduce(
+          (acc, item) => acc + item.qty,
+          0,
+        );
 
         await tx.order.update({
           where: { id: recentOrder.id },
@@ -520,14 +554,17 @@ export async function getOrderById(orderId: string) {
   const data = await prisma.order.findFirst({
     where: { id: orderId },
     include: {
-      orderitems: true,
+      orderitems: {
+        include: {
+          product: { select: { categories: true } },
+        },
+      },
       user: true,
     },
   });
   return convertToPlainObject(data);
 }
 
-// Get All Orders
 // Get All Orders
 export async function getAllOrders({
   limit = PAGE_SIZE,
@@ -550,6 +587,7 @@ export async function getAllOrders({
             { phoneNumber: { contains: query, mode: "insensitive" } },
             { address: { contains: query, mode: "insensitive" } },
             { governorate: { contains: query, mode: "insensitive" } },
+            { modonQrId: { contains: query, mode: "insensitive" } },
           ],
         }
       : {};
@@ -643,6 +681,7 @@ export async function getAllOrdersForExport({
             { phoneNumber: { contains: query, mode: "insensitive" } },
             { address: { contains: query, mode: "insensitive" } },
             { governorate: { contains: query, mode: "insensitive" } },
+            { modonQrId: { contains: query, mode: "insensitive" } },
           ],
         }
       : {};
@@ -706,9 +745,22 @@ export async function getMyOrders({
 // Delete an Order
 export async function deleteOrder(id: string) {
   try {
-    await prisma.order.delete({
+    const res = await prisma.order.findFirst({
       where: { id },
     });
+    if (res?.status === "delete") {
+      await prisma.order.delete({
+        where: { id },
+      });
+    } else {
+      await prisma.order.update({
+        where: { id },
+        data: {
+          status: "delete",
+        },
+      });
+    }
+
     revalidatePath("/admin/orders");
     return {
       success: true,
@@ -727,24 +779,147 @@ export async function deleteOrder(id: string) {
 export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
   try {
     const order = updateOrderSchema.parse(data);
-    await prisma.order.update({
+
+    // جلب بيانات الطلب الحالية (للتحقق من modonQrId والحالة)
+    const existingOrder = await prisma.order.findUnique({
       where: { id: order.id },
-      data: {
-        fullName: order.fullName,
-        phoneNumber: order.phoneNumber,
-        governorate: order.governorate,
-        address: order.address,
-        quantity: order.quantity,
-        totalPrice: order.totalPrice,
-        shippingPrice: order.shippingPrice,
-        status: order.status,
-        notes: order.notes,
-        actualShippingCost: order.actualShippingCost,
+      select: {
+        status: true,
+        modonQrId: true,
+        fullName: true,
+        phoneNumber: true,
+        governorate: true,
+        quantity: true,
+        totalPrice: true,
+        notes: true,
+        address: true,
+        orderitems: {
+          select: { name: true },
+        },
       },
     });
 
+    await prisma.$transaction(async (tx) => {
+      // Update each OrderItem qty if provided
+      if (order.orderItems && order.orderItems.length > 0) {
+        for (const item of order.orderItems) {
+          await tx.orderItem.update({
+            where: {
+              orderId_productId: {
+                orderId: order.id,
+                productId: item.productId,
+              },
+            },
+            data: { qty: item.qty },
+          });
+        }
+      }
+
+      // Recalculate total quantity from updated items
+      const updatedItems = await tx.orderItem.findMany({
+        where: { orderId: order.id },
+      });
+      const newQuantity = updatedItems.reduce((sum, i) => sum + i.qty, 0);
+
+      const enteringPending =
+        order.status === "pending" && existingOrder?.status !== "pending";
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          fullName: order.fullName,
+          phoneNumber: order.phoneNumber,
+          governorate: order.governorate,
+          address: order.address,
+          quantity: newQuantity,
+          totalPrice: order.totalPrice,
+          shippingPrice: order.shippingPrice,
+          status: order.status,
+          notes: order.notes,
+          actualShippingCost: order.actualShippingCost,
+          ...(order.modonQrId !== undefined && {
+            modonQrId: order.modonQrId || null,
+          }),
+          ...(enteringPending && { modonQrId: null, modonSentAt: null }),
+        },
+      });
+    });
+
+    // ── إرسال تلقائي لموذن عند الانتقال إلى "pending" ──
+    if (order.status === "pending" && existingOrder?.status !== "pending") {
+      const govRaw = order.governorate ?? existingOrder?.governorate ?? "";
+      const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+      let phoneRaw = order.phoneNumber ?? existingOrder?.phoneNumber ?? "";
+      if (phoneRaw.startsWith("0")) {
+        phoneRaw = "+964" + phoneRaw.slice(1);
+      } else if (!phoneRaw.startsWith("+")) {
+        phoneRaw = "+" + phoneRaw;
+      }
+
+      let rawPrice = Number(order.totalPrice ?? existingOrder?.totalPrice ?? 0);
+      let finalModonPrice =
+        rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+      let productNames = "طلب إلكتروني";
+      if (existingOrder?.orderitems && existingOrder.orderitems.length > 0) {
+        productNames = existingOrder.orderitems
+          .map((i: any) => i.name)
+          .join(" + ");
+      }
+
+      const modonRes = await sendOrderToModon({
+        client_name: order.fullName ?? existingOrder?.fullName ?? "",
+        client_mobile: phoneRaw,
+        city_id: cityId,
+        location: order.address ?? existingOrder?.address ?? undefined,
+        items_number: existingOrder?.quantity ?? 1,
+        price: finalModonPrice,
+        type_name: productNames,
+        merchant_notes: order.notes ?? existingOrder?.notes ?? undefined,
+      });
+
+      const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+      if (qrIdStr) {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            modonQrId: String(qrIdStr),
+            modonSentAt: new Date(),
+          },
+        });
+      }
+    }
+
     revalidatePath("/admin/orders");
-    revalidatePath(`/order/${order.id}`);
+    // Start N8N
+    if (order.status === "returned" && existingOrder?.status !== "returned") {
+      try {
+        const phone =
+          "964" +
+          (order.phoneNumber ?? existingOrder?.phoneNumber ?? "").substring(1);
+        const productNames =
+          existingOrder?.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
+        const price = order.totalPrice ?? existingOrder?.totalPrice ?? 0;
+
+        await fetch(
+          "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone,
+              fullName: order.fullName ?? existingOrder?.fullName ?? "",
+              product: productNames,
+              price: price.toString(),
+            }),
+          },
+        );
+      } catch (err) {
+        console.error("❌ n8n returned order error:", err);
+      }
+    }
+    // End N8N
 
     return {
       success: true,
@@ -759,21 +934,233 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
 // Bulk Update Order Status
 export async function bulkUpdateOrderStatus(ids: string[], status: string) {
   try {
+    // ── أولاً: حدّث الحالة في قاعدة البيانات لجميع الطلبات ──
     await prisma.order.updateMany({
-      where: {
-        id: {
-          in: ids,
+      where: { id: { in: ids } },
+      data: { status },
+    });
+
+    // ── ثانياً: إن كانت الحالة الجديدة "pending" → أرسل لمدن ──
+    let modonSent = 0;
+    let modonFailed = 0;
+
+    if (status === "pending") {
+      // مسح بيانات مدن القديمة لإعادة الإرسال دائماً
+      await prisma.order.updateMany({
+        where: { id: { in: ids } },
+        data: { modonQrId: null, modonSentAt: null },
+      });
+
+      const ordersToSend = await prisma.order.findMany({
+        where: {
+          id: { in: ids },
         },
-      },
-      data: {
-        status: status,
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          governorate: true,
+          address: true,
+          quantity: true,
+          totalPrice: true,
+          notes: true,
+          orderitems: {
+            select: { name: true, qty: true },
+          },
+        },
+      });
+
+      // ترتيب الطلبات حسب اسم المنتج الأول قبل الإرسال
+      ordersToSend.sort((a, b) => {
+        const nameA = a.orderitems?.[0]?.name ?? "";
+        const nameB = b.orderitems?.[0]?.name ?? "";
+        return nameA.localeCompare(nameB, "ar");
+      });
+
+      // إرسال بالتسلسل للحفاظ على الترتيب في نظام مدن
+      const results: { success: boolean }[] = [];
+      for (const o of ordersToSend) {
+        let phoneRaw = o.phoneNumber ?? "";
+        if (phoneRaw.startsWith("0")) {
+          phoneRaw = "+964" + phoneRaw.slice(1);
+        } else if (!phoneRaw.startsWith("+")) {
+          phoneRaw = "+" + phoneRaw;
+        }
+
+        const govRaw = o.governorate ?? "";
+        const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+        const rawPrice = Number(o.totalPrice ?? 0);
+        const finalModonPrice =
+          rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+        const productNames =
+          o.orderitems && o.orderitems.length > 0
+            ? o.orderitems.map((i: any) => i.name).join(" + ")
+            : "طلب إلكتروني";
+
+        const modonRes = await sendOrderToModon({
+          client_name: o.fullName ?? "",
+          client_mobile: phoneRaw,
+          city_id: cityId,
+          location: o.address ?? undefined,
+          items_number: o.quantity ?? 1,
+          price: finalModonPrice,
+          type_name: productNames,
+          merchant_notes: o.notes ?? undefined,
+        });
+
+        const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+        if (qrIdStr) {
+          await prisma.order.update({
+            where: { id: o.id },
+            data: {
+              modonQrId: String(qrIdStr),
+              modonSentAt: new Date(),
+            },
+          });
+          results.push({ success: true });
+        } else {
+          results.push({ success: false });
+        }
+      }
+
+      modonSent = results.filter((r) => r.success).length;
+      modonFailed = results.length - modonSent;
+    }
+
+    revalidatePath("/admin/orders");
+
+    // start n8n
+
+    if (status === "returned") {
+      const returnedOrders = await prisma.order.findMany({
+        where: { id: { in: ids } },
+        select: {
+          fullName: true,
+          phoneNumber: true,
+          totalPrice: true,
+          orderitems: { select: { name: true } },
+        },
+      });
+
+      for (const o of returnedOrders) {
+        try {
+          const phone = "964" + (o.phoneNumber ?? "").substring(1);
+          const productNames =
+            o.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
+
+          await fetch(
+            "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone,
+                fullName: o.fullName ?? "",
+                product: productNames,
+                price: o.totalPrice?.toString() ?? "0",
+              }),
+            },
+          );
+        } catch (err) {
+          console.error("❌ n8n returned order error:", err);
+        }
+      }
+    }
+    // end n8n
+    const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
+    const modonMsg =
+      status === "pending" && modonSent + modonFailed > 0
+        ? ` مدن: ✅ ${modonSent} أُرسل، ❌ ${modonFailed} فشل.`
+        : "";
+
+    return {
+      success: true,
+      message: baseMsg + modonMsg,
+      modonSent,
+      modonFailed,
+    };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError };
+  }
+}
+
+// إعادة إرسال طلب واحد لمدن يدوياً (للطلبات التي فشل إرسالها)
+export async function resendOrderToModon(orderId: string) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        governorate: true,
+        address: true,
+        quantity: true,
+        totalPrice: true,
+        notes: true,
+        modonQrId: true,
+        status: true,
+        orderitems: {
+          select: { name: true, qty: true },
+        },
       },
     });
 
-    revalidatePath("/admin/orders");
+    if (!order) return { success: false, message: "الطلب غير موجود" };
+    if (order.modonQrId)
+      return { success: false, message: "الطلب مُرسل لمدن مسبقاً" };
+
+    let phoneRaw = order.phoneNumber ?? "";
+    if (phoneRaw.startsWith("0")) {
+      phoneRaw = "+964" + phoneRaw.slice(1);
+    } else if (!phoneRaw.startsWith("+")) {
+      phoneRaw = "+" + phoneRaw;
+    }
+
+    const govRaw = order.governorate ?? "";
+    const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
+
+    let rawPrice = Number(order.totalPrice ?? 0);
+    // التصحيح التلقائي للسعر: معالجة (25) لتصبح (25000)
+    let finalModonPrice =
+      rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
+
+    const productNames =
+      order.orderitems && order.orderitems.length > 0
+        ? order.orderitems.map((i: any) => i.name).join(" + ")
+        : "طلب إلكتروني";
+
+    const modonRes = await sendOrderToModon({
+      client_name: order.fullName ?? "",
+      client_mobile: phoneRaw,
+      city_id: cityId,
+      location: order.address ?? undefined,
+      items_number: order.quantity ?? 1,
+      price: finalModonPrice,
+      type_name: productNames,
+      merchant_notes: order.notes ?? undefined,
+    });
+
+    const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
+    if (qrIdStr) {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          modonQrId: String(qrIdStr),
+          modonSentAt: new Date(),
+        },
+      });
+      revalidatePath("/admin/orders");
+      return { success: true, message: "✅ تم الإرسال لمدن بنجاح" };
+    }
+
+    const errorMsg = modonRes?.msg || "خطأ غير معروف في البيانات المدخلة";
     return {
-      success: true,
-      message: "Orders Updated Successfully",
+      success: false,
+      message: `❌ التوصيل: ${errorMsg}`,
     };
   } catch (error) {
     const { success, formError } = formatError(error);
@@ -948,6 +1335,18 @@ export async function getOrderSummery() {
     totalSales: Number(item.totalSales),
   }));
 
+  // Get daily sales (last 30 days)
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(now.getDate() - 29);
+  const dailySalesDataRaw = await prisma.$queryRaw<
+    Array<{ day: string; totalSales: Prisma.Decimal }>
+  >`SELECT to_char("createdAt", 'DD/MM') as "day", sum("totalPrice") as "totalSales" FROM "Order" WHERE "createdAt" >= ${thirtyDaysAgo} GROUP BY to_char("createdAt", 'DD/MM'), date_trunc('day', "createdAt") ORDER BY min("createdAt")`;
+
+  const dailySalesData = dailySalesDataRaw.map((item) => ({
+    month: item.day,
+    totalSales: Number(item.totalSales),
+  }));
+
   const latestOrders = await prisma.order.findMany({
     orderBy: { createdAt: "desc" },
     take: 6,
@@ -1058,6 +1457,7 @@ export async function getOrderSummery() {
     totalSales: currentMonthRevenue,
     totalProfit,
     salesData,
+    dailySalesData,
     latestOrders,
     statsChange: {
       orders: Math.round(ordersChange),
@@ -1086,28 +1486,52 @@ export async function getOrderProfitStats({
   const startDate = toIraqDay(from, false);
   const endDate = toIraqDay(to, true);
 
-  const orders = await prisma.order.findMany({
-    where: {
-      createdAt: { gte: startDate, lte: endDate },
-      status: "completed",
-    },
-    select: {
-      totalPrice: true,
-      shippingPrice: true,
-      actualShippingCost: true,
-      governorate: true,
-      orderitems: {
-        select: {
-          productId: true,
-          name: true,
-          qty: true,
-          price: true,
-          costPrice: true,
-          shippingPrice: true,
+  const [orders, returnedOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: { in: ["completed", "completedAccountant"] },
+      },
+      select: {
+        totalPrice: true,
+        shippingPrice: true,
+        actualShippingCost: true,
+        governorate: true,
+        orderitems: {
+          select: {
+            productId: true,
+            name: true,
+            qty: true,
+            price: true,
+            costPrice: true,
+            shippingPrice: true,
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: { in: ["returned", "returnReceived"] },
+      },
+      select: {
+        orderitems: {
+          select: { productId: true, qty: true },
+        },
+      },
+    }),
+  ]);
+
+  // Build returned qty map per product
+  const returnedQtyMap = new Map<string, number>();
+  for (const order of returnedOrders) {
+    for (const item of order.orderitems) {
+      returnedQtyMap.set(
+        item.productId,
+        (returnedQtyMap.get(item.productId) ?? 0) + item.qty,
+      );
+    }
+  }
 
   const statsMap = new Map<
     string,
@@ -1119,10 +1543,11 @@ export async function getOrderProfitStats({
       totalCost: number;
       totalProfit: number;
       orderCount: number;
+      returnedQty: number;
     }
   >();
 
-  let totalGrossRevenue = 0;       // sum(Order.totalPrice)
+  let totalGrossRevenue = 0; // sum(Order.totalPrice)
   let totalActualShippingCost = 0; // sum(Order.actualShippingCost)
   let baghdadOrderCount = 0;
   let othersOrderCount = 0;
@@ -1180,8 +1605,29 @@ export async function getOrderProfitStats({
           totalCost: cost,
           totalProfit: profit,
           orderCount: 1,
+          returnedQty: 0,
         });
       }
+    }
+  }
+
+  // Attach returned qty to each product stat
+  for (const [productId, returnedQty] of returnedQtyMap) {
+    const stat = statsMap.get(productId);
+    if (stat) {
+      stat.returnedQty = returnedQty;
+    } else {
+      // Product had returns but no completed sales in range — include it
+      statsMap.set(productId, {
+        productId,
+        name: "",
+        totalQty: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+        totalProfit: 0,
+        orderCount: 0,
+        returnedQty,
+      });
     }
   }
 
@@ -1190,7 +1636,8 @@ export async function getOrderProfitStats({
   );
 
   const totalOrderCount = baghdadOrderCount + othersOrderCount;
-  const avgOrderValue = totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
+  const avgOrderValue =
+    totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
 
   return {
     productStats,
@@ -1205,6 +1652,64 @@ export async function getOrderProfitStats({
       othersActualShippingCost,
     },
   };
+}
+
+// ── مزامنة حالات طلبات مدن ──
+export async function syncModonOrders() {
+  try {
+    const modonOrders = await fetchModonOrders();
+    if (!modonOrders || modonOrders.length === 0) {
+      return {
+        success: false,
+        message: "لا توجد طلبات في مدن للمزامنة",
+        updatedOrders: 0,
+      };
+    }
+
+    // جلب جميع الطلبات المحلية التي لديها qr_id وليست مكتملة/راجعة نهائياً
+    const localOrders = await prisma.order.findMany({
+      where: {
+        modonQrId: { not: null },
+        status: { notIn: ["completed", "returnReceived"] },
+      },
+      select: { id: true, modonQrId: true, status: true },
+    });
+
+    let updatedCount = 0;
+
+    for (const localOrder of localOrders) {
+      const remoteOrder = modonOrders.find(
+        (o: any) => String(o.id ?? o.qr_id) === localOrder.modonQrId,
+      );
+
+      if (remoteOrder && remoteOrder.status_id != null) {
+        const newLocalStatus = MODON_STATUS_MAP[String(remoteOrder.status_id)];
+        if (newLocalStatus && newLocalStatus !== localOrder.status) {
+          const updateData: Prisma.OrderUpdateInput = {
+            status: newLocalStatus,
+          };
+          if (newLocalStatus === "completed" && remoteOrder.price != null) {
+            updateData.modonCollectedPrice = Number(remoteOrder.price) / 1000;
+          }
+          await prisma.order.update({
+            where: { id: localOrder.id },
+            data: updateData,
+          });
+          updatedCount++;
+        }
+      }
+    }
+
+    revalidatePath("/admin/orders");
+    return {
+      success: true,
+      message: `تم التزامن وتحديث حالة ${updatedCount} طلب بنجاح.`,
+      updatedOrders: updatedCount,
+    };
+  } catch (error) {
+    const { success, formError } = formatError(error);
+    return { success, message: formError, updatedOrders: 0 };
+  }
 }
 
 // Import Orders from Excel
@@ -1340,4 +1845,123 @@ export async function importOrders(data: any[]) {
     console.error("Import Error:", error);
     return { success: false, message: "Failed to process file" };
   }
+}
+
+// ── إحصائيات مدن ──
+export async function getModonStats() {
+  const MODON_STATUSES = [
+    "pending",
+    "completed",
+    "returned",
+    "returnReceived",
+    "rescheduled",
+    "failed",
+  ];
+
+  // جلب طلباتنا التي أُرسلت لمدن (لديها باركود)
+  const [localOrders, priceDiffs, dailySent, modonOrders] = await Promise.all([
+    prisma.order.findMany({
+      where: { modonQrId: { not: null } },
+      select: {
+        id: true,
+        modonQrId: true,
+        status: true,
+        fullName: true,
+        phoneNumber: true,
+        createdAt: true,
+      },
+    }),
+
+    prisma.order.findMany({
+      where: { status: "completed", modonCollectedPrice: { not: null } },
+      select: { totalPrice: true, modonCollectedPrice: true },
+    }),
+
+    prisma.order.findMany({
+      where: {
+        modonSentAt: {
+          not: null,
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+        },
+      },
+      select: { modonSentAt: true },
+    }),
+
+    fetchModonOrders(),
+  ]);
+
+  // إحصائيات الحالات (فقط طلبات أُرسلت لمدن)
+  const counts: Record<string, number> = {};
+  for (const s of MODON_STATUSES) counts[s] = 0;
+  for (const o of localOrders) {
+    if (counts[o.status] !== undefined) counts[o.status]++;
+  }
+  const totalSentToModon = localOrders.length;
+
+  // مقارنة: طلباتنا ذات الباركود vs طلبات مدن
+  const localQrIds = new Set(localOrders.map((o) => String(o.modonQrId)));
+  const modonIds = new Set(
+    (modonOrders as any[]).map((o: any) => String(o.id ?? o.qr_id)),
+  );
+
+  // موجودة عندنا لكن مفقودة من مدن
+  const missingInModon = localOrders.filter(
+    (o) => !modonIds.has(String(o.modonQrId)),
+  );
+
+  // موجودة في مدن لكن مفقودة من نظامنا
+  const missingInLocal = (modonOrders as any[]).filter(
+    (o: any) => !localQrIds.has(String(o.id ?? o.qr_id)),
+  );
+
+  // مقارنة الأسعار
+  const priceStats = priceDiffs.reduce(
+    (acc, o) => {
+      const expected = Number(o.totalPrice);
+      const collected = Number(o.modonCollectedPrice);
+      acc.total++;
+      if (collected < expected) {
+        acc.less++;
+        acc.lossAmount += expected - collected;
+      } else if (collected > expected) {
+        acc.more++;
+        acc.gainAmount += collected - expected;
+      } else acc.exact++;
+      return acc;
+    },
+    { total: 0, exact: 0, less: 0, more: 0, lossAmount: 0, gainAmount: 0 },
+  );
+
+  // تجميع يومي
+  const dailyMap: Record<string, number> = {};
+  for (const o of dailySent) {
+    const localDate = new Date(o.modonSentAt!.getTime() + 3 * 60 * 60 * 1000);
+    const day = localDate.toISOString().slice(0, 10);
+    dailyMap[day] = (dailyMap[day] ?? 0) + 1;
+  }
+  const daily = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, count]) => ({ date, count }));
+
+  return convertToPlainObject({
+    counts,
+    totalSentToModon,
+    totalInModon: modonIds.size,
+    missingInModon: missingInModon.map((o) => ({
+      id: o.id,
+      modonQrId: o.modonQrId,
+      fullName: o.fullName,
+      phoneNumber: o.phoneNumber,
+      status: o.status,
+      createdAt: o.createdAt,
+    })),
+    missingInLocal: missingInLocal.map((o: any) => ({
+      modonId: String(o.id ?? o.qr_id),
+      clientName: o.client_name ?? "-",
+      phone: o.client_mobile ?? "-",
+      statusId: o.status_id,
+    })),
+    priceStats,
+    daily,
+  });
 }

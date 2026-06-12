@@ -24,12 +24,11 @@ import {
   bulkUpdateOrderStatusByDateRange,
   countOrdersByDateAndStatus,
 } from "@/lib/actions/order.actions";
-import { CalendarRange, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
+import { CalendarRange, Loader2, ArrowLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 const STATUSES = [
   "home",
-  "account",
   "pending",
   "completed",
   "completedAccountant",

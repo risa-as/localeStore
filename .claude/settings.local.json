@@ -21,7 +21,11 @@
       "Bash(node -e ':*)",
       "Bash(npx shadcn@latest add tabs --yes)",
       "Bash(npx shadcn@latest add command popover --yes)",
-      "Bash(npx shadcn@latest add command --yes)"
+      "Bash(npx shadcn@latest add command --yes)",
+      "Bash(npm run:*)",
+      "Bash(npx shadcn@latest add switch --yes)",
+      "Bash(node -e ' *)",
+      "Bash(DATABASE_URL=\"postgresql://neondb_owner:npg_eXYUNqL6o1pH@ep-muddy-salad-agt5le3k-pooler.c-2.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require\" npx prisma db execute --stdin)"
     ]
   }
 }

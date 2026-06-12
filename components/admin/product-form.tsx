@@ -26,13 +26,6 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { createProduct, updateProduct } from "@/lib/actions/product.actions";
 import { Card, CardContent } from "../ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
 import Image from "next/image";
 import { Checkbox } from "../ui/checkbox";
 import { UploadButton } from "@/lib/uploadthing";
@@ -173,33 +166,47 @@ const ProductForm = ({
             />
           </div>
           <div className="flex flex-col md:flex-row gap-5">
-            {/* Cate */}
-            {/* Category */}
+            {/* Categories - multi-select checkboxes */}
             <FormField
               control={form.control}
-              name="category"
-              render={({ field }) => (
+              name="categories"
+              render={() => (
                 <FormItem className="w-full">
                   <FormLabel>{t('category')}</FormLabel>
-                  <FormControl>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t('placeholderCategory')} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories.map((category) => (
-                          <SelectItem key={category.id} value={category.name}>
-                            {category.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
+                  <div className="flex flex-wrap gap-3 p-3 border rounded-md min-h-[48px]">
+                    {categories.map((category) => (
+                      <FormField
+                        key={category.id}
+                        control={form.control}
+                        name="categories"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value?.includes(category.name)}
+                                onCheckedChange={(checked) => {
+                                  const current = field.value || [];
+                                  if (checked) {
+                                    field.onChange([...current, category.name]);
+                                  } else {
+                                    field.onChange(
+                                      current.filter((c: string) => c !== category.name)
+                                    );
+                                  }
+                                }}
+                              />
+                            </FormControl>
+                            <FormLabel className="font-normal cursor-pointer">
+                              {category.name}
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    ))}
+                    {categories.length === 0 && (
+                      <p className="text-sm text-muted-foreground">{t('placeholderCategory')}</p>
+                    )}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

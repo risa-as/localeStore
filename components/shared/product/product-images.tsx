@@ -1,36 +1,54 @@
 "use client";
-import { useState } from 'react';
-import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { useState } from "react";
+import Image from "next/image";
+import { cn } from "@/lib/utils";
 
 const ProductImages = ({ images }: { images: string[] }) => {
-    const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useState(0);
 
-    return (
-        <div className="space-y-4">
-            <Image
-                src={images[current]}
-                alt="Product Image"
-                width={1000}
-                height={1000}
-                className="min-h-[300px] object-contain object-center rounded-lg border aspect-square"
-            />
-            <div className="flex gap-2">
-                {images.map((image, index) => (
-                    <div
-                        key={image}
-                        onClick={() => setCurrent(index)}
-                        className={cn("border cursor-pointer hover:border-orange-600 rounded-md overflow-hidden p-1",
-                            current === index && "border-orange-500 border-2"
-                        )}
-                        style={{ height: '100px', width: '100px' }} // Optional: Enforce thumbnail size
-                    >
-                        <Image src={image} alt="image" width={100} height={100} className="object-cover object-center w-full h-full" />
-                    </div>
-                ))}
-            </div>
+  return (
+    <div className="space-y-3 p-3">
+      {/* Main image */}
+      <div className="rounded-2xl overflow-hidden bg-muted/20 border">
+        <Image
+          src={images[current]}
+          alt="Product Image"
+          width={800}
+          height={800}
+          className="w-full aspect-square object-contain"
+          priority
+        />
+      </div>
+
+      {/* Thumbnails */}
+      {images.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {images.map((image, index) => (
+            <button
+              key={image}
+              onClick={() => setCurrent(index)}
+              className={cn(
+                "rounded-xl overflow-hidden border-2 shrink-0 transition-all focus:outline-none",
+                current === index
+                  ? "border-primary scale-105 shadow-lg shadow-primary/20"
+                  : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
+              )}
+              style={{ width: 68, height: 68 }}
+              aria-label={`صورة ${index + 1}`}
+            >
+              <Image
+                src={image}
+                alt={`صورة ${index + 1}`}
+                width={68}
+                height={68}
+                className="object-cover w-full h-full"
+              />
+            </button>
+          ))}
         </div>
-    );
-}
+      )}
+    </div>
+  );
+};
 
 export default ProductImages;

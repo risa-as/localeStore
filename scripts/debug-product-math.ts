@@ -104,7 +104,6 @@ async function main() {
     const sortedGroups = Array.from(groups.values()).sort((a, b) => b.count - a.count);
 
     for (const g of sortedGroups) {
-      const isMulti = g.orderitems > 1; // not available here, but we can infer from rawSum
       const discountNote = Math.abs(g.share - g.catalogPrice * g.qty) > 0.01
         ? ` ← خصم! كتالوج=${g.catalogPrice * g.qty} فعلي=${g.share.toFixed(4)}`
         : "";

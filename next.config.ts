@@ -11,6 +11,11 @@ const nextConfig: NextConfig = {
         hostname: "utfs.io",
         port: "",
       },
+      {
+        protocol: "https",
+        hostname: "*.ufs.sh",
+        port: "",
+      },
     ],
     formats: ['image/avif', 'image/webp'],
   },
@@ -48,8 +53,8 @@ const nextConfig: NextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://connect.facebook.net https://www.googletagmanager.com",
-              "img-src 'self' data: blob: https://utfs.io",
-              "connect-src 'self' https://graph.facebook.com https://vitals.vercel-insights.com",
+              "img-src 'self' data: blob: https://utfs.io https://*.ufs.sh",
+              "connect-src 'self' https://graph.facebook.com https://vitals.vercel-insights.com https://*.ingest.uploadthing.com https://uploadthing.com",
               "frame-ancestors 'none'",
             ].join('; '),
           },
