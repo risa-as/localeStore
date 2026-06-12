@@ -23,3 +23,13 @@ export async function GET() {
 
   return NextResponse.json(failed);
 }
+
+export async function DELETE(req: Request) {
+  const { phone } = await req.json();
+
+  await prisma.whatsAppFailedDelivery.deleteMany({
+    where: { phone },
+  });
+
+  return NextResponse.json({ success: true });
+}

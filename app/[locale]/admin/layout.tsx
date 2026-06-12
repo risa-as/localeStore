@@ -3,16 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
-import { getMessages, getLocale } from "next-intl/server";
 import { getLogoUrl } from "@/lib/get-logo";
-import { NextIntlClientProvider } from "next-intl";
 import { auth } from "@/auth";
 
 export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const messages = await getMessages();
-  const locale = await getLocale();
   const session = await auth();
   const logoUrl = await getLogoUrl();
 
@@ -42,16 +38,12 @@ export default async function AdminLayout({
 
             {/* Nav */}
             <div className="flex-1 overflow-hidden">
-              <NextIntlClientProvider locale={locale} messages={messages}>
-                <MainNav role={session?.user?.role} />
-              </NextIntlClientProvider>
+              <MainNav role={session?.user?.role} />
             </div>
 
             {/* Right side */}
             <div className="flex items-center gap-2 shrink-0">
-              <NextIntlClientProvider locale={locale} messages={messages}>
-                <Menu />
-              </NextIntlClientProvider>
+              <Menu />
             </div>
 
           </div>
@@ -60,9 +52,7 @@ export default async function AdminLayout({
 
       {/* Page content */}
       <main className="flex-1 container mx-auto p-4 md:p-8 pt-6">
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          {children}
-        </NextIntlClientProvider>
+        {children}
       </main>
     </div>
   );

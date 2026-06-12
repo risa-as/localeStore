@@ -272,11 +272,10 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
-    console.log("🚀 Sending request to n8n...");
-    // n8n
+    //Start N8N
     try {
       const res = await fetch(
-        "https://ri-sa03.app.n8n.cloud/webhook-test/create-order",
+        "https://n8n.srv1667498.hstgr.cloud/webhook/create-order",
         {
           method: "POST",
           headers: {
@@ -300,7 +299,7 @@ export async function createQuickOrder(
     } catch (err) {
       console.error("❌ n8n error:", err);
     }
-
+    // End N8N
     return {
       success: true,
       message: "Order created",
@@ -893,6 +892,35 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
     }
 
     revalidatePath("/admin/orders");
+    // Start N8N
+    if (order.status === "returned" && existingOrder?.status !== "returned") {
+      try {
+        const phone =
+          "964" +
+          (order.phoneNumber ?? existingOrder?.phoneNumber ?? "").substring(1);
+        const productNames =
+          existingOrder?.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
+        const price = order.totalPrice ?? existingOrder?.totalPrice ?? 0;
+
+        await fetch(
+          "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              phone,
+              fullName: order.fullName ?? existingOrder?.fullName ?? "",
+              product: productNames,
+              price: price.toString(),
+            }),
+          },
+        );
+      } catch (err) {
+        console.error("❌ n8n returned order error:", err);
+      }
+    }
+    // End N8N
+
     return {
       success: true,
       message: "Order Updated Successfully",
@@ -1003,6 +1031,44 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     revalidatePath("/admin/orders");
 
+    // start n8n
+
+    if (status === "returned") {
+      const returnedOrders = await prisma.order.findMany({
+        where: { id: { in: ids } },
+        select: {
+          fullName: true,
+          phoneNumber: true,
+          totalPrice: true,
+          orderitems: { select: { name: true } },
+        },
+      });
+
+      for (const o of returnedOrders) {
+        try {
+          const phone = "964" + (o.phoneNumber ?? "").substring(1);
+          const productNames =
+            o.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
+
+          await fetch(
+            "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                phone,
+                fullName: o.fullName ?? "",
+                product: productNames,
+                price: o.totalPrice?.toString() ?? "0",
+              }),
+            },
+          );
+        } catch (err) {
+          console.error("❌ n8n returned order error:", err);
+        }
+      }
+    }
+    // end n8n
     const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
     const modonMsg =
       status === "pending" && modonSent + modonFailed > 0

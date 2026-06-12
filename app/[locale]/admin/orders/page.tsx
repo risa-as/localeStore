@@ -3,7 +3,7 @@ import { getAllOrders } from "@/lib/actions/order.actions";
 import { requireAdmin } from "@/lib/auth-guard";
 import { Metadata } from "next";
 import Link from "next/link";
-import { getTranslations, getMessages, getLocale } from "next-intl/server";
+import { getTranslations } from "next-intl/server";
 import OrdersTable from "./orders-table";
 import AdminSearch from "@/components/admin/admin-search";
 import OrdersExportButton from "@/components/admin/orders-export-button";
@@ -11,12 +11,11 @@ import OrdersImportButton from "@/components/admin/orders-import-button";
 import BulkUpdateByDateDialog from "@/components/admin/bulk-update-by-date-dialog";
 import ModonSyncButton from "@/components/admin/modon-sync-button";
 import { PAGE_SIZE } from "@/lib/constants";
-import { NextIntlClientProvider } from "next-intl";
 import { X, BarChart2 } from "lucide-react";
 
 // n8n
 import { prisma } from "@/db/prisma";
-import { fail } from "node:assert";
+//
 export const metadata: Metadata = {
   title: "الطلبات",
 };
@@ -60,6 +59,7 @@ const AdminOrdersPage = async (props: {
     select: { phone: true },
   });
   const failedPhone = new Set(failedWhatsapp.map((t) => t.phone));
+  //
   const orders = await getAllOrders({
     page: Number(page),
     limit: PAGE_SIZE,
@@ -69,8 +69,6 @@ const AdminOrdersPage = async (props: {
   });
 
   const t = await getTranslations("Admin");
-  const messages = await getMessages();
-  const locale = await getLocale();
 
   const statuses = [
     "home",
@@ -116,29 +114,25 @@ const AdminOrdersPage = async (props: {
             <BarChart2 className="w-4 h-4" />
             <span className="hidden sm:inline">إحصائيات</span>
           </Link>
-          <NextIntlClientProvider locale={locale} messages={messages}>
-            <ModonSyncButton />
-          </NextIntlClientProvider>
+          <ModonSyncButton />
         </div>
       </div>
 
       {/* ── Row 2: Search + Secondary Actions ── */}
-      <NextIntlClientProvider locale={locale} messages={messages}>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <div className="flex-1">
-            <AdminSearch />
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <BulkUpdateByDateDialog />
-            <OrdersImportButton />
-            <OrdersExportButton
-              query={searchText}
-              status={status}
-              sort={sort}
-            />
-          </div>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex-1">
+          <AdminSearch />
         </div>
-      </NextIntlClientProvider>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <BulkUpdateByDateDialog />
+          <OrdersImportButton />
+          <OrdersExportButton
+            query={searchText}
+            status={status}
+            sort={sort}
+          />
+        </div>
+      </div>
 
       {/* ── Row 3: Status Tabs ── */}
       <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide pb-0.5">
@@ -173,16 +167,14 @@ const AdminOrdersPage = async (props: {
       </div>
 
       {/* ── Orders Table ── */}
-      <NextIntlClientProvider locale={locale} messages={messages}>
-        <OrdersTable
-          orders={orders.data}
-          page={Number(page) || 1}
-          count={orders.totalPages}
-          sort={sort}
-          status={status}
-          failedPhone={Array.from(failedPhone)}
-        />
-      </NextIntlClientProvider>
+      <OrdersTable
+        orders={orders.data}
+        page={Number(page) || 1}
+        count={orders.totalPages}
+        sort={sort}
+        status={status}
+        failedPhone={Array.from(failedPhone)}
+      />
 
       {orders.totalPages > 1 && (
         <Pagination
