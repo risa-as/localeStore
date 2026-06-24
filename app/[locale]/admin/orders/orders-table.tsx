@@ -190,14 +190,14 @@ const OrderRow = memo(function OrderRow({
       </TableCell>
       {showBarcode && (
         <TableCell className="font-mono text-xs text-muted-foreground">
-          {order.modonQrId ?? "-"}
+          {order.deliveryTrackingId ?? "-"}
         </TableCell>
       )}
       {showCollectedPrice &&
         (() => {
           const collected =
-            order.modonCollectedPrice != null
-              ? Number(order.modonCollectedPrice)
+            order.deliveryCollectedPrice != null
+              ? Number(order.deliveryCollectedPrice)
               : null;
           const total = Number(order.totalPrice);
           const hasDiff = collected != null && collected !== total;
@@ -231,7 +231,7 @@ const OrderRow = memo(function OrderRow({
         })()}
       <TableCell>
         <div className="flex items-center gap-1">
-          {order.status === "pending" && !order.modonQrId && (
+          {order.status === "pending" && !order.deliveryTrackingId && (
             <Button
               variant="outline"
               size="icon"
@@ -586,7 +586,7 @@ export default function OrdersTable({
       {showCollectedPrice &&
         (() => {
           const withCollected = orders.filter(
-            (o) => o.modonCollectedPrice != null,
+            (o) => o.deliveryCollectedPrice != null,
           );
           if (withCollected.length === 0) {
             return (
@@ -597,14 +597,14 @@ export default function OrdersTable({
             );
           }
           const diffOrders = withCollected.filter(
-            (o) => Number(o.modonCollectedPrice) !== Number(o.totalPrice),
+            (o) => Number(o.deliveryCollectedPrice) !== Number(o.totalPrice),
           );
           const totalExpected = withCollected.reduce(
             (s, o) => s + Number(o.totalPrice),
             0,
           );
           const totalCollected = withCollected.reduce(
-            (s, o) => s + Number(o.modonCollectedPrice),
+            (s, o) => s + Number(o.deliveryCollectedPrice),
             0,
           );
           const totalDiff = totalCollected - totalExpected;

@@ -285,6 +285,7 @@
     "phoneNumber": "رقم الهاتف",
     "status": "الحالة",
     "categories": "الفئات",
+    "batches": "الدفعات",
     "profitAnalysis": "تحليل الأرباح",
     "productName": "اسم المنتج",
     "quantitySold": "الكمية المباعة",
@@ -398,7 +399,8 @@
     "easyReturns": "إرجاع سهل",
     "easyReturnsDesc": "ضمان استرجاع الأموال لمدة 30 يومًا",
     "securePayment": "دفع آمن مشفر بتقنية SSL 256-bit",
-    "shipping": "الشحن"
+    "shipping": "الشحن",
+    "swipeHint": "اسحب لتصفح الصور"
   },
   "ThankYou": {
     "title": "تم تأكيد الطلب",

@@ -6,7 +6,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard, Package, Tag, ShoppingCart,
-  Users, TrendingUp, Receipt, Truck, Flame, Settings, BarChart2,
+  Users, TrendingUp, Receipt, Truck, Flame, Settings, BarChart2, Layers,
 } from "lucide-react";
 
 const MainNav = ({
@@ -19,6 +19,7 @@ const MainNav = ({
   const links = [
     { title: t("overview"),        href: "/admin/overview",          icon: LayoutDashboard, hide: role !== "admin" },
     { title: t("products"),        href: "/admin/products",          icon: Package },
+    { title: t("batches"),         href: "/admin/batches",           icon: Layers,    hide: role !== "admin" },
     { title: t("categories"),      href: "/admin/categories",        icon: Tag },
     { title: t("orders"),          href: "/admin/orders",            icon: ShoppingCart },
     { title: t("modonStats"),      href: "/admin/modon-stats",       icon: BarChart2,  hide: role !== "admin" },

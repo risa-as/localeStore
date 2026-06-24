@@ -72,7 +72,7 @@ export default function UpdateOrderForm({
             status: order.status,
             actualShippingCost: order.actualShippingCost ?? "0",
             notes: order.notes ?? "",
-            modonQrId: order.modonQrId ?? "",
+            deliveryTrackingId: order.deliveryTrackingId ?? "",
         },
     });
 
@@ -274,10 +274,10 @@ export default function UpdateOrderForm({
 
                 <FormField
                     control={form.control}
-                    name="modonQrId"
+                    name="deliveryTrackingId"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>باركود مدن</FormLabel>
+                            <FormLabel>رقم تتبّع التوصيل</FormLabel>
                             <FormControl>
                                 <Input
                                     placeholder="رقم الباركود (اختياري)"

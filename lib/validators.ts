@@ -44,6 +44,20 @@ export const updateProductSchema = insertProductSchema.extend({
   id: z.string().min(1, "Id is required"),
 });
 
+// Schema for inserting product batches (دفعات)
+export const insertBatchSchema = z.object({
+  productId: z.string().uuid("Product is required"),
+  batchNumber: z.string().optional().nullable(),
+  quantity: z.coerce.number().int().positive("Quantity must be a positive number"),
+  costPrice: currency,
+  notes: z.string().optional().nullable(),
+});
+
+// Schema for updating a product batch
+export const updateBatchSchema = insertBatchSchema.extend({
+  id: z.string().min(1, "Id is required"),
+});
+
 // Schema for inserting categories
 export const insertCategorySchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -131,7 +145,7 @@ export const updateOrderSchema = insertOrderSchema.extend({
   shippingPrice: currency,
   notes: z.string().optional().nullable(),
   actualShippingCost: currency,
-  modonQrId: z.string().optional().nullable(),
+  deliveryTrackingId: z.string().optional().nullable(),
   orderItems: z
     .array(z.object({ productId: z.string(), qty: z.number().int().positive() }))
     .optional(),

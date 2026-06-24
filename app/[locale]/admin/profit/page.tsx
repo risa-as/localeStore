@@ -114,7 +114,10 @@ const ProfitPage = async (props: {
     : startOfMonth;
   const defaultTo = searchParams.to ? parseDate(searchParams.to) : now;
 
-  const [{ productStats, orderSummary }, expenseStats] = await Promise.all([
+  const [
+    { productStats, orderSummary, fefoActive, fefoFallbackQty },
+    expenseStats,
+  ] = await Promise.all([
     getOrderProfitStats({ from: defaultFrom, to: defaultTo }),
     getExpenseStatsForPeriod(defaultFrom, defaultTo),
   ]);
@@ -269,13 +272,23 @@ const ProfitPage = async (props: {
 
       {/* Product Breakdown */}
       <div className="space-y-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Package className="w-5 h-5 text-muted-foreground" />
           <h2 className="text-lg font-semibold">تفصيل المنتجات</h2>
           <span className="text-xs text-muted-foreground">
             (الإيراد = ما حُصِّل − تكلفة التوصيل الفعلية، موزَّع نسبياً على
             المنتجات)
           </span>
+          {fefoActive && (
+            <Badge className="bg-blue-100 text-blue-800 border-blue-200 hover:bg-blue-100">
+              التكلفة محسوبة حسب الدفعات (الأقدم أولاً)
+            </Badge>
+          )}
+          {fefoActive && fefoFallbackQty > 0 && (
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-100">
+              {fefoFallbackQty} قطعة بلا دفعة (تكلفة أساسية)
+            </Badge>
+          )}
         </div>
         <div className="rounded-xl border overflow-hidden">
           <Table>

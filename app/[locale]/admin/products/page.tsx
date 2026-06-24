@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Eye, Pencil, Package, Plus, Warehouse, Search, X } from "lucide-react";
 import { getAllProducts, deleteProduct } from "@/lib/actions/product.actions";
 import { formatCurrency } from "@/lib/utils";
+import BatchForm from "@/components/admin/batch-form";
 import Image from "next/image";
 import { PAGE_SIZE } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -161,7 +162,7 @@ const AdminProductsPage = async (props: {
               <TableHead className="text-center font-semibold">
                 {t("rating")}
               </TableHead>
-              <TableHead className="text-center font-semibold w-[100px]">
+              <TableHead className="text-center font-semibold w-[130px]">
                 {t("actions")}
               </TableHead>
             </TableRow>
@@ -262,6 +263,13 @@ const AdminProductsPage = async (props: {
 
                   <TableCell>
                     <div className="flex items-center justify-center gap-1">
+                      {isAdmin && (
+                        <BatchForm
+                          products={[{ id: product.id, name: product.name }]}
+                          presetProductId={product.id}
+                          compact
+                        />
+                      )}
                       <Button
                         asChild
                         variant="ghost"
