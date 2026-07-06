@@ -231,7 +231,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
 
           const FRAME_COUNT = portrait ? FRAMES_PORTRAIT : FRAMES_LANDSCAPE;
           const dir = portrait ? "seqv" : "seq";
-          const url = (i: number) => `${ASSET}/${dir}/f${String(i).padStart(3, "0")}.jpg`;
+          const url = (i: number) => `${ASSET}/${dir}/f${String(i).padStart(3, "0")}.webp`;
 
           const frames: (HTMLImageElement | undefined)[] = new Array(FRAME_COUNT);
           let loaded = 0,
@@ -289,7 +289,9 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           }
           function maybeReady() {
             if (ready) return;
-            if (loaded + errored >= FRAME_COUNT || loaded >= Math.ceil(FRAME_COUNT * 0.6)) {
+            // interleaved order below means ~1/3 loaded already covers the whole
+            // film sparsely (draw() falls back to the nearest loaded frame)
+            if (loaded + errored >= FRAME_COUNT || loaded >= Math.ceil(FRAME_COUNT * 0.34)) {
               if (loaded === 0) { showFallback(); return; }
               ready = true;
               if (loaderEl) (loaderEl as HTMLElement).style.opacity = "0";
@@ -300,24 +302,42 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           }
 
           if (reduce) { showFallback(); return; }
-          for (let i = 0; i < FRAME_COUNT; i++) {
-            const im = new Image();
-            im.decoding = "async";
-            im.onload = () => { frames[i] = im; loaded++; maybeReady(); };
-            im.onerror = () => { errored++; maybeReady(); };
-            im.src = url(i);
-          }
-          const t = setTimeout(() => {
-            if (!ready) {
-              if (loaded > 0) {
-                ready = true;
-                if (loaderEl) (loaderEl as HTMLElement).style.opacity = "0";
-                resize();
-                draw(progIdx());
-              } else showFallback();
+          // let the hero image win the bandwidth race: preload starts on the
+          // user's first interaction or after ~0.9s, whichever comes first —
+          // and in an interleaved order (every 3rd frame first) so the film is
+          // scrubbable end-to-end long before all frames arrive
+          let preloadStarted = false;
+          const startPreload = () => {
+            if (preloadStarted) return;
+            preloadStarted = true;
+            const order: number[] = [];
+            for (let s = 0; s < 3; s++) for (let i = s; i < FRAME_COUNT; i += 3) order.push(i);
+            for (const i of order) {
+              const im = new Image();
+              im.decoding = "async";
+              im.onload = () => { frames[i] = im; loaded++; maybeReady(); };
+              im.onerror = () => { errored++; maybeReady(); };
+              im.src = url(i);
             }
-          }, 9000);
-          disposers.push(() => clearTimeout(t));
+            const t = setTimeout(() => {
+              if (!ready) {
+                if (loaded > 0) {
+                  ready = true;
+                  if (loaderEl) (loaderEl as HTMLElement).style.opacity = "0";
+                  resize();
+                  draw(progIdx());
+                } else showFallback();
+              }
+            }, 9000);
+            disposers.push(() => clearTimeout(t));
+          };
+          const kickT = setTimeout(startPreload, 900);
+          const kickEvs: Array<keyof WindowEventMap> = ["wheel", "touchstart", "pointerdown", "keydown"];
+          kickEvs.forEach((ev) => window.addEventListener(ev, startPreload, { once: true, passive: true }));
+          disposers.push(() => {
+            clearTimeout(kickT);
+            kickEvs.forEach((ev) => window.removeEventListener(ev, startPreload));
+          });
           window.addEventListener("resize", resize, { passive: true });
           disposers.push(() => window.removeEventListener("resize", resize));
 
@@ -352,7 +372,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           // portrait phones get the 9:16 loop + a portrait poster frame
           const ctaSrc = portrait ? `${ASSET}/cta-p.mp4` : `${ASSET}/cta.mp4`;
           if (portrait) {
-            const pSrc = `${ASSET}/seqv/f092.jpg`;
+            const pSrc = `${ASSET}/seqv/f092.webp`;
             poster.src = pSrc;
             video.poster = pSrc;
           }
@@ -448,7 +468,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
               <div className="media-float">
                 <div className="media-tilt">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="hero-media" src={`${ASSET}/product-cut.png`} alt="سيت فاتح مفاصل" loading="eager" />
+                  <img className="hero-media" src={`${ASSET}/product-cut.webp`} alt="سيت فاتح مفاصل" loading="eager" fetchPriority="high" />
                   <span className="specular" aria-hidden="true" />
                 </div>
               </div>
@@ -467,7 +487,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           <div className="stage fallback-host">
             <canvas id="clpFilmCanvas" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="film-fallback" src={`${ASSET}/product-hero.jpg`} alt="سيت فاتح مفاصل" />
+            <img className="film-fallback" src={`${ASSET}/product-hero.webp`} alt="سيت فاتح مفاصل" />
             <div className="caps">
               <div className="cap" data-a="0.02" data-b="0.24">من الصندوق… تبدأ الاحترافية</div>
               <div className="cap" data-a="0.30" data-b="0.52">ثلاث لقم فولاذية… لكل المقاسات</div>
@@ -484,7 +504,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             <div className="grid">
               <div className="shot fallback-host reveal">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`${ASSET}/product-hero.jpg`} alt="سيت فاتح مفاصل — تفاصيل" loading="lazy" />
+                <img src={`${ASSET}/product-hero.webp`} alt="سيت فاتح مفاصل — تفاصيل" loading="lazy" />
               </div>
               <div className="copy">
                 <span className="idx reveal">٠١ — الهندسة</span>
@@ -509,7 +529,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           <div className="wrap">
             <div className="frame fallback-host">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`${ASSET}/ritual.jpg`} alt="في الورشة — فك أذرع الستيرن" loading="lazy" />
+              <img src={`${ASSET}/ritual.webp`} alt="في الورشة — فك أذرع الستيرن" loading="lazy" />
               <div className="copy reveal">
                 <span className="idx">٠٢ — في الورشة</span>
                 <h2 className="steel-text">يغنيك عن فك دودة الستيرن بالكامل</h2>
@@ -533,7 +553,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
               <article className="clp-offer-card reveal">
                 <div className="pic fallback-host">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${ASSET}/product-hero.jpg`} alt="سيت واحد" loading="lazy" />
+                  <img src={`${ASSET}/product-hero.webp`} alt="سيت واحد" loading="lazy" />
                 </div>
                 <div className="body">
                   <h3>سيت واحد</h3>
@@ -545,7 +565,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
                 <span className="badge">وفّر 6,000</span>
                 <div className="pic fallback-host">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${ASSET}/offer-2set.jpg`} alt="سيتان" loading="lazy" />
+                  <img src={`${ASSET}/offer-2set.webp`} alt="سيتان" loading="lazy" />
                 </div>
                 <div className="body">
                   <h3>سيتان</h3>
@@ -561,8 +581,8 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         <section className="clp-cta" data-ambient="#07090c" data-glow="0.5">
           <div className="stage fallback-host">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="cta-poster" id="clpCtaPoster" src={`${ASSET}/product-hero.jpg`} alt="" aria-hidden="true" />
-            <video id="clpCtaVideo" muted playsInline preload="none" poster={`${ASSET}/product-hero.jpg`} aria-hidden="true" />
+            <img className="cta-poster" id="clpCtaPoster" src={`${ASSET}/product-hero.webp`} alt="" aria-hidden="true" />
+            <video id="clpCtaVideo" muted playsInline preload="none" poster={`${ASSET}/product-hero.webp`} aria-hidden="true" />
             <div className="dim" id="clpCtaDim" />
             <div className="content" id="clpCtaContent">
               <span className="latin">Made for Professionals</span>

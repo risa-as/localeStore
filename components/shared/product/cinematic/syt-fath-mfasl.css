@@ -148,8 +148,8 @@
 }
 .clp-hero .specular {
   position: absolute; inset: 0; pointer-events: none; mix-blend-mode: screen; opacity: 0;
-  -webkit-mask: url("/lp/syt-fath-mfasl/product-cut.png") center / contain no-repeat;
-  mask: url("/lp/syt-fath-mfasl/product-cut.png") center / contain no-repeat;
+  -webkit-mask: url("/lp/syt-fath-mfasl/product-cut.webp") center / contain no-repeat;
+  mask: url("/lp/syt-fath-mfasl/product-cut.webp") center / contain no-repeat;
   background: linear-gradient(115deg, transparent 40%, rgba(219, 234, 254, 0.55) 50%, transparent 60%);
   background-size: 280% 280%;
   animation: clpSheen 7.5s ease-in-out 2.2s infinite;
