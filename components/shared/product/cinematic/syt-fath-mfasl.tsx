@@ -61,6 +61,7 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
       };
       const q = <T extends Element = HTMLElement>(sel: string) =>
         root.querySelector(sel) as T | null;
+      const portrait = window.matchMedia("(orientation: portrait)").matches;
 
       const disposers: Array<() => void> = [];
 
@@ -228,7 +229,6 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           const ctx2d = canvas.getContext("2d", { alpha: false });
           if (!ctx2d) return;
 
-          const portrait = window.matchMedia("(orientation: portrait)").matches;
           const FRAME_COUNT = portrait ? FRAMES_PORTRAIT : FRAMES_LANDSCAPE;
           const dir = portrait ? "seqv" : "seq";
           const url = (i: number) => `${ASSET}/${dir}/f${String(i).padStart(3, "0")}.jpg`;
@@ -349,11 +349,18 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           const dim = q("#clpCtaDim");
           const content = q("#clpCtaContent");
           if (!sec || !video || !poster || !dim || !content) return;
+          // portrait phones get the 9:16 loop + a portrait poster frame
+          const ctaSrc = portrait ? `${ASSET}/cta-p.mp4` : `${ASSET}/cta.mp4`;
+          if (portrait) {
+            const pSrc = `${ASSET}/seqv/f092.jpg`;
+            poster.src = pSrc;
+            video.poster = pSrc;
+          }
           let started = false;
           const start = () => {
             if (started) return;
             started = true;
-            video.src = `${ASSET}/cta.mp4`;
+            video.src = ctaSrc;
             const pr = video.play();
             if (pr && pr.catch) pr.catch(() => {});
           };

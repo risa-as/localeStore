@@ -20,7 +20,9 @@
   font-family: var(--font-tajawal), system-ui, sans-serif;
   font-weight: 300;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* clip, NOT hidden: overflow-x:hidden creates a scroll container and
+     silently breaks position:sticky pinning for the film/CTA stages */
+  overflow-x: clip;
   line-height: 1.8;
   min-height: 100vh;
 }
@@ -312,6 +314,13 @@
   transition: transform 0.2s;
 }
 .clp .wa-float:hover { transform: scale(1.1); }
+
+/* portrait phones: never crop the CTA media (near-black edges make the
+   letterbox invisible), and soften the ritual photo crop */
+@media (orientation: portrait) {
+  .clp-cta video, .clp-cta .cta-poster { object-fit: contain; }
+  .clp-ritual .frame { height: clamp(360px, 62vh, 700px); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .clp-hero .aura, .clp-hero .motes span, .clp-hero .specular, .clp-hero .media-float, .clp .scrollcue .bar { animation: none; }
