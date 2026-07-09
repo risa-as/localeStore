@@ -27,7 +27,11 @@ const FRAMES_LANDSCAPE = 93;
 const FRAMES_PORTRAIT = 93;
 const GROUND = "#07090c";
 
-export default function CinematicSytFathMfasl({ product }: { product: Product }) {
+export default function CinematicSytFathMfasl({
+  product,
+}: {
+  product: Product;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [eventId] = useState(() => uuidv4());
 
@@ -41,20 +45,24 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
     const root = rootRef.current;
     if (!root) return;
 
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reduce = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
     let cleanup: (() => void) | undefined;
     let cancelled = false;
 
     (async () => {
-      const [{ gsap }, { ScrollTrigger }, { default: Lenis }] = await Promise.all([
-        import("gsap"),
-        import("gsap/ScrollTrigger"),
-        import("lenis"),
-      ]);
+      const [{ gsap }, { ScrollTrigger }, { default: Lenis }] =
+        await Promise.all([
+          import("gsap"),
+          import("gsap/ScrollTrigger"),
+          import("lenis"),
+        ]);
       if (cancelled) return;
       gsap.registerPlugin(ScrollTrigger);
 
-      const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+      const clamp = (v: number, a: number, b: number) =>
+        Math.max(a, Math.min(b, v));
       const smooth = (e0: number, e1: number, x: number) => {
         const t = clamp((x - e0) / (e1 - e0), 0, 1);
         return t * t * (3 - 2 * t);
@@ -114,7 +122,8 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             if (progress) progress.style.transform = `scaleX(${s.progress})`;
             if (!header) return;
             header.classList.toggle("solid", s.scroll() > 40);
-            if (s.scroll() > 140) header.classList.toggle("hidden", s.direction === 1);
+            if (s.scroll() > 140)
+              header.classList.toggle("hidden", s.direction === 1);
             else header.classList.remove("hidden");
           },
         });
@@ -124,20 +133,27 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         const glow = q(".clp-glow");
         const applyAmbient = (c: string, g: number) => {
           if (!ambient || !glow) return;
-          gsap.to(ambient, { backgroundColor: c, duration: 1.1, overwrite: "auto", ease: "power2.out" });
+          gsap.to(ambient, {
+            backgroundColor: c,
+            duration: 1.1,
+            overwrite: "auto",
+            ease: "power2.out",
+          });
           gsap.to(glow, { opacity: g, duration: 1.1, overwrite: "auto" });
         };
-        root.querySelectorAll<HTMLElement>("section[data-ambient]").forEach((sec) => {
-          const c = sec.dataset.ambient as string;
-          const g = parseFloat(sec.dataset.glow || "0.5");
-          ScrollTrigger.create({
-            trigger: sec,
-            start: "top 60%",
-            end: "bottom 40%",
-            onEnter: () => applyAmbient(c, g),
-            onEnterBack: () => applyAmbient(c, g),
+        root
+          .querySelectorAll<HTMLElement>("section[data-ambient]")
+          .forEach((sec) => {
+            const c = sec.dataset.ambient as string;
+            const g = parseFloat(sec.dataset.glow || "0.5");
+            ScrollTrigger.create({
+              trigger: sec,
+              start: "top 60%",
+              end: "bottom 40%",
+              onEnter: () => applyAmbient(c, g),
+              onEnterBack: () => applyAmbient(c, g),
+            });
           });
-        });
 
         // ---- reveals
         root.querySelectorAll<HTMLElement>(".reveal").forEach((el) => {
@@ -157,25 +173,65 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         if (!reduce) {
           gsap
             .timeline({ defaults: { ease: "power3.out" } })
-            .fromTo(".clp-hero .hero-media", { opacity: 0, scale: 0.82, y: 60, rotateZ: -5 }, { opacity: 1, scale: 1, y: 0, rotateZ: 0, duration: 1.5 }, 0.15)
-            .fromTo(".clp-hero .latin", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.8 }, 0.55)
-            .fromTo(".clp-hero h1", { opacity: 0, y: 24, clipPath: "inset(0 0 100% 0)" }, { opacity: 1, y: 0, clipPath: "inset(0 0 0% 0)", duration: 1.1 }, 0.7)
-            .fromTo(".clp-hero .sub", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.8 }, 1.05)
-            .fromTo(".clp-hero .scrollcue", { opacity: 0 }, { opacity: 1, duration: 0.8 }, 1.3);
+            .fromTo(
+              ".clp-hero .hero-media",
+              { opacity: 0, scale: 0.82, y: 60, rotateZ: -5 },
+              { opacity: 1, scale: 1, y: 0, rotateZ: 0, duration: 1.5 },
+              0.15,
+            )
+            .fromTo(
+              ".clp-hero .latin",
+              { opacity: 0, y: 14 },
+              { opacity: 1, y: 0, duration: 0.8 },
+              0.55,
+            )
+            .fromTo(
+              ".clp-hero h1",
+              { opacity: 0, y: 24, clipPath: "inset(0 0 100% 0)" },
+              { opacity: 1, y: 0, clipPath: "inset(0 0 0% 0)", duration: 1.1 },
+              0.7,
+            )
+            .fromTo(
+              ".clp-hero .sub",
+              { opacity: 0, y: 12 },
+              { opacity: 1, y: 0, duration: 0.8 },
+              1.05,
+            )
+            .fromTo(
+              ".clp-hero .scrollcue",
+              { opacity: 0 },
+              { opacity: 1, duration: 0.8 },
+              1.3,
+            );
           gsap.to(".clp-hero .hero-inner", {
-            scrollTrigger: { trigger: ".clp-hero", start: "top top", end: "78% top", scrub: true },
+            scrollTrigger: {
+              trigger: ".clp-hero",
+              start: "top top",
+              end: "78% top",
+              scrub: true,
+            },
             y: -50,
             opacity: 0,
             ease: "none",
           });
           gsap.to(".clp-hero .aura", {
-            scrollTrigger: { trigger: ".clp-hero", start: "top top", end: "bottom top", scrub: true },
+            scrollTrigger: {
+              trigger: ".clp-hero",
+              start: "top top",
+              end: "bottom top",
+              scrub: true,
+            },
             scale: 1.5,
             opacity: 0,
             ease: "none",
           });
           gsap.to(".clp-ritual .frame img", {
-            scrollTrigger: { trigger: ".clp-ritual", start: "top bottom", end: "bottom top", scrub: true },
+            scrollTrigger: {
+              trigger: ".clp-ritual",
+              start: "top bottom",
+              end: "bottom top",
+              scrub: true,
+            },
             y: "-7%",
             ease: "none",
           });
@@ -211,7 +267,9 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           }
         } else {
           root
-            .querySelectorAll<HTMLElement>(".clp-hero .latin,.clp-hero .hero-media,.clp-hero h1,.clp-hero .sub,.clp-hero .scrollcue")
+            .querySelectorAll<HTMLElement>(
+              ".clp-hero .latin,.clp-hero .hero-media,.clp-hero h1,.clp-hero .sub,.clp-hero .scrollcue",
+            )
             .forEach((e) => {
               e.style.opacity = "1";
               e.style.clipPath = "none";
@@ -224,16 +282,21 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           const stage = canvas?.closest(".stage") as HTMLElement | null;
           const fallback = q<HTMLImageElement>(".clp-film .film-fallback");
           const loaderEl = q(".clp-film .loader");
-          const caps = Array.from(root.querySelectorAll<HTMLElement>(".clp-film .cap"));
+          const caps = Array.from(
+            root.querySelectorAll<HTMLElement>(".clp-film .cap"),
+          );
           if (!canvas || !stage) return;
           const ctx2d = canvas.getContext("2d", { alpha: false });
           if (!ctx2d) return;
 
           const FRAME_COUNT = portrait ? FRAMES_PORTRAIT : FRAMES_LANDSCAPE;
           const dir = portrait ? "seqv" : "seq";
-          const url = (i: number) => `${ASSET}/${dir}/f${String(i).padStart(3, "0")}.webp`;
+          const url = (i: number) =>
+            `${ASSET}/${dir}/f${String(i).padStart(3, "0")}.webp`;
 
-          const frames: (HTMLImageElement | undefined)[] = new Array(FRAME_COUNT);
+          const frames: (HTMLImageElement | undefined)[] = new Array(
+            FRAME_COUNT,
+          );
           let loaded = 0,
             errored = 0,
             ready = false,
@@ -241,13 +304,17 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             cur = -1,
             lastIdx = 0;
           let filmST: ScrollTrigger | null = null;
-          const progIdx = () => (filmST ? Math.round(clamp(filmST.progress, 0, 1) * (FRAME_COUNT - 1)) : 0);
+          const progIdx = () =>
+            filmST
+              ? Math.round(clamp(filmST.progress, 0, 1) * (FRAME_COUNT - 1))
+              : 0;
 
           function showFallback() {
             useFallback = true;
             ready = true;
             canvas!.style.display = "none";
-            if (fallback && fallback.complete && fallback.naturalWidth > 0) fallback.style.display = "block";
+            if (fallback && fallback.complete && fallback.naturalWidth > 0)
+              fallback.style.display = "block";
             else if (fallback) fallback.style.display = "none";
             if (loaderEl) (loaderEl as HTMLElement).style.opacity = "0";
           }
@@ -268,8 +335,14 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             let im = frames[i];
             if (!im) {
               for (let d = 1; d < FRAME_COUNT; d++) {
-                if (frames[i - d]) { im = frames[i - d]; break; }
-                if (frames[i + d]) { im = frames[i + d]; break; }
+                if (frames[i - d]) {
+                  im = frames[i - d];
+                  break;
+                }
+                if (frames[i + d]) {
+                  im = frames[i + d];
+                  break;
+                }
               }
               if (!im) return;
             }
@@ -291,17 +364,28 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             if (ready) return;
             // interleaved order below means ~1/3 loaded already covers the whole
             // film sparsely (draw() falls back to the nearest loaded frame)
-            if (loaded + errored >= FRAME_COUNT || loaded >= Math.ceil(FRAME_COUNT * 0.34)) {
-              if (loaded === 0) { showFallback(); return; }
+            if (
+              loaded + errored >= FRAME_COUNT ||
+              loaded >= Math.ceil(FRAME_COUNT * 0.34)
+            ) {
+              if (loaded === 0) {
+                showFallback();
+                return;
+              }
               ready = true;
               if (loaderEl) (loaderEl as HTMLElement).style.opacity = "0";
               resize();
               draw(progIdx());
             }
-            if (loaderEl && !ready) loaderEl.textContent = "… " + Math.round((loaded / FRAME_COUNT) * 100) + "%";
+            if (loaderEl && !ready)
+              loaderEl.textContent =
+                "… " + Math.round((loaded / FRAME_COUNT) * 100) + "%";
           }
 
-          if (reduce) { showFallback(); return; }
+          if (reduce) {
+            showFallback();
+            return;
+          }
           // let the hero image win the bandwidth race: preload starts on the
           // user's first interaction or after ~0.9s, whichever comes first —
           // and in an interleaved order (every 3rd frame first) so the film is
@@ -311,12 +395,20 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             if (preloadStarted) return;
             preloadStarted = true;
             const order: number[] = [];
-            for (let s = 0; s < 3; s++) for (let i = s; i < FRAME_COUNT; i += 3) order.push(i);
+            for (let s = 0; s < 3; s++)
+              for (let i = s; i < FRAME_COUNT; i += 3) order.push(i);
             for (const i of order) {
               const im = new Image();
               im.decoding = "async";
-              im.onload = () => { frames[i] = im; loaded++; maybeReady(); };
-              im.onerror = () => { errored++; maybeReady(); };
+              im.onload = () => {
+                frames[i] = im;
+                loaded++;
+                maybeReady();
+              };
+              im.onerror = () => {
+                errored++;
+                maybeReady();
+              };
               im.src = url(i);
             }
             const t = setTimeout(() => {
@@ -332,11 +424,23 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             disposers.push(() => clearTimeout(t));
           };
           const kickT = setTimeout(startPreload, 900);
-          const kickEvs: Array<keyof WindowEventMap> = ["wheel", "touchstart", "pointerdown", "keydown"];
-          kickEvs.forEach((ev) => window.addEventListener(ev, startPreload, { once: true, passive: true }));
+          const kickEvs: Array<keyof WindowEventMap> = [
+            "wheel",
+            "touchstart",
+            "pointerdown",
+            "keydown",
+          ];
+          kickEvs.forEach((ev) =>
+            window.addEventListener(ev, startPreload, {
+              once: true,
+              passive: true,
+            }),
+          );
           disposers.push(() => {
             clearTimeout(kickT);
-            kickEvs.forEach((ev) => window.removeEventListener(ev, startPreload));
+            kickEvs.forEach((ev) =>
+              window.removeEventListener(ev, startPreload),
+            );
           });
           window.addEventListener("resize", resize, { passive: true });
           disposers.push(() => window.removeEventListener("resize", resize));
@@ -348,12 +452,16 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             scrub: true,
             onUpdate: (self) => {
               const p = self.progress;
-              if (ready && !useFallback) draw(Math.round(p * (FRAME_COUNT - 1)));
+              if (ready && !useFallback)
+                draw(Math.round(p * (FRAME_COUNT - 1)));
               for (const c of caps) {
                 const a = parseFloat(c.dataset.a || "0"),
                   b = parseFloat(c.dataset.b || "1"),
                   mid = (a + b) / 2,
-                  o = Math.min(smooth(a, a + (mid - a) * 0.6, p), 1 - smooth(mid + (b - mid) * 0.4, b, p));
+                  o = Math.min(
+                    smooth(a, a + (mid - a) * 0.6, p),
+                    1 - smooth(mid + (b - mid) * 0.4, b, p),
+                  );
                 c.style.opacity = String(Math.max(0, o));
                 c.style.transform = `translateY(${12 * (1 - Math.max(0, o))}px)`;
               }
@@ -384,14 +492,36 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             const pr = video.play();
             if (pr && pr.catch) pr.catch(() => {});
           };
-          video.addEventListener("loadeddata", () => { poster.style.opacity = "0"; });
-          video.addEventListener("ended", () => { video.currentTime = 0; const p = video.play(); if (p && p.catch) p.catch(() => {}); });
-          video.addEventListener("error", () => { poster.style.opacity = "1"; });
-          const evs: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "wheel", "touchstart"];
-          evs.forEach((ev) => window.addEventListener(ev, start, { once: true, passive: true }));
-          disposers.push(() => evs.forEach((ev) => window.removeEventListener(ev, start)));
+          video.addEventListener("loadeddata", () => {
+            poster.style.opacity = "0";
+          });
+          video.addEventListener("ended", () => {
+            video.currentTime = 0;
+            const p = video.play();
+            if (p && p.catch) p.catch(() => {});
+          });
+          video.addEventListener("error", () => {
+            poster.style.opacity = "1";
+          });
+          const evs: Array<keyof WindowEventMap> = [
+            "pointerdown",
+            "keydown",
+            "wheel",
+            "touchstart",
+          ];
+          evs.forEach((ev) =>
+            window.addEventListener(ev, start, { once: true, passive: true }),
+          );
+          disposers.push(() =>
+            evs.forEach((ev) => window.removeEventListener(ev, start)),
+          );
           if (!reduce) {
-            ScrollTrigger.create({ trigger: sec, start: "top center", onEnter: start, onEnterBack: start });
+            ScrollTrigger.create({
+              trigger: sec,
+              start: "top center",
+              onEnter: start,
+              onEnterBack: start,
+            });
             ScrollTrigger.create({
               trigger: sec,
               start: "top top",
@@ -399,9 +529,14 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
               scrub: true,
               onUpdate: (s) => {
                 const p = s.progress;
-                (dim as HTMLElement).style.opacity = String(smooth(0.34, 0.66, p));
-                (content as HTMLElement).style.opacity = String(smooth(0.4, 0.72, p));
-                (content as HTMLElement).style.transform = `translateY(${28 * (1 - smooth(0.4, 0.72, p))}px)`;
+                (dim as HTMLElement).style.opacity = String(
+                  smooth(0.34, 0.66, p),
+                );
+                (content as HTMLElement).style.opacity = String(
+                  smooth(0.4, 0.72, p),
+                );
+                (content as HTMLElement).style.transform =
+                  `translateY(${28 * (1 - smooth(0.4, 0.72, p))}px)`;
               },
             });
           } else {
@@ -415,7 +550,8 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
       const onLoad = () => ScrollTrigger.refresh();
       window.addEventListener("load", onLoad);
       disposers.push(() => window.removeEventListener("load", onLoad));
-      if (document.fonts?.ready) document.fonts.ready.then(() => !cancelled && ScrollTrigger.refresh());
+      if (document.fonts?.ready)
+        document.fonts.ready.then(() => !cancelled && ScrollTrigger.refresh());
 
       cleanup = () => {
         disposers.forEach((d) => d());
@@ -431,7 +567,11 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
   }, []);
 
   return (
-    <div ref={rootRef} dir="rtl" className={`clp ${elMessiri.variable} ${tajawal.variable}`}>
+    <div
+      ref={rootRef}
+      dir="rtl"
+      className={`clp ${elMessiri.variable} ${tajawal.variable}`}
+    >
       <FbPixel eventName="PageView" eventId={eventId} data={{ url: "/" }} />
       <div className="clp-ambient" />
       <div className="clp-glow" />
@@ -454,26 +594,106 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           <div className="stage fallback-host">
             <div className="aura" aria-hidden="true" />
             <div className="motes" aria-hidden="true">
-              <span style={{ left: "24%", top: "64%", width: 7, height: 7, animationDuration: "9s", animationDelay: "0s" }} />
-              <span style={{ left: "38%", top: "72%", width: 5, height: 5, animationDuration: "11s", animationDelay: "1.4s" }} />
-              <span style={{ left: "52%", top: "60%", width: 9, height: 9, animationDuration: "13s", animationDelay: "3.1s" }} />
-              <span style={{ left: "63%", top: "70%", width: 4, height: 4, animationDuration: "10s", animationDelay: ".7s" }} />
-              <span style={{ left: "71%", top: "64%", width: 6, height: 6, animationDuration: "12s", animationDelay: "2.3s" }} />
-              <span style={{ left: "45%", top: "78%", width: 5, height: 5, animationDuration: "14s", animationDelay: "4.2s" }} />
-              <span style={{ left: "31%", top: "55%", width: 4, height: 4, animationDuration: "11s", animationDelay: "5.5s" }} />
-              <span style={{ left: "58%", top: "80%", width: 7, height: 7, animationDuration: "9.5s", animationDelay: "6.1s" }} />
+              <span
+                style={{
+                  left: "24%",
+                  top: "64%",
+                  width: 7,
+                  height: 7,
+                  animationDuration: "9s",
+                  animationDelay: "0s",
+                }}
+              />
+              <span
+                style={{
+                  left: "38%",
+                  top: "72%",
+                  width: 5,
+                  height: 5,
+                  animationDuration: "11s",
+                  animationDelay: "1.4s",
+                }}
+              />
+              <span
+                style={{
+                  left: "52%",
+                  top: "60%",
+                  width: 9,
+                  height: 9,
+                  animationDuration: "13s",
+                  animationDelay: "3.1s",
+                }}
+              />
+              <span
+                style={{
+                  left: "63%",
+                  top: "70%",
+                  width: 4,
+                  height: 4,
+                  animationDuration: "10s",
+                  animationDelay: ".7s",
+                }}
+              />
+              <span
+                style={{
+                  left: "71%",
+                  top: "64%",
+                  width: 6,
+                  height: 6,
+                  animationDuration: "12s",
+                  animationDelay: "2.3s",
+                }}
+              />
+              <span
+                style={{
+                  left: "45%",
+                  top: "78%",
+                  width: 5,
+                  height: 5,
+                  animationDuration: "14s",
+                  animationDelay: "4.2s",
+                }}
+              />
+              <span
+                style={{
+                  left: "31%",
+                  top: "55%",
+                  width: 4,
+                  height: 4,
+                  animationDuration: "11s",
+                  animationDelay: "5.5s",
+                }}
+              />
+              <span
+                style={{
+                  left: "58%",
+                  top: "80%",
+                  width: 7,
+                  height: 7,
+                  animationDuration: "9.5s",
+                  animationDelay: "6.1s",
+                }}
+              />
             </div>
             <div className="hero-inner">
               <span className="latin">Professional Steering Tool Kit</span>
               <div className="media-float">
                 <div className="media-tilt">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img className="hero-media" src={`${ASSET}/product-cut.webp`} alt="سيت فاتح مفاصل" loading="eager" fetchPriority="high" />
+                  <img
+                    className="hero-media"
+                    src={`${ASSET}/product-cut.webp`}
+                    alt="سيت فاتح مفاصل"
+                    loading="eager"
+                    fetchPriority="high"
+                  />
                   <span className="specular" aria-hidden="true" />
                 </div>
               </div>
               <h1>سيت فاتح مفاصل</h1>
-              <div className="sub">عدّة المحترف لفك وتركيب أذرع الستيرن — بلا مطرقة، بلا تلف</div>
+              <div className="sub">
+                عدّة المحترف لفك وتركيب أذرع الستيرن — بلا مطرقة، بلا تلف
+              </div>
             </div>
             <div className="scrollcue">
               <span>اسحب للأسفل</span>
@@ -487,12 +707,24 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           <div className="stage fallback-host">
             <canvas id="clpFilmCanvas" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="film-fallback" src={`${ASSET}/product-hero.webp`} alt="سيت فاتح مفاصل" />
+            <img
+              className="film-fallback"
+              src={`${ASSET}/product-hero.webp`}
+              alt="سيت فاتح مفاصل"
+            />
             <div className="caps">
-              <div className="cap" data-a="0.02" data-b="0.24">من الصندوق… تبدأ الاحترافية</div>
-              <div className="cap" data-a="0.30" data-b="0.52">ثلاث لقم فولاذية… لكل المقاسات</div>
-              <div className="cap" data-a="0.58" data-b="0.80">تُجمَّع في ثوانٍ… وتُمسك بإحكام</div>
-              <div className="cap" data-a="0.86" data-b="0.99">شغل نظيف يليق بورشتك</div>
+              <div className="cap" data-a="0.02" data-b="0.24">
+                من الصندوق… تبدأ الاحترافية
+              </div>
+              <div className="cap" data-a="0.30" data-b="0.52">
+                ثلاث لقم فولاذية… لكل المقاسات
+              </div>
+              <div className="cap" data-a="0.58" data-b="0.80">
+                تُجمَّع في ثوانٍ… وتُمسك بإحكام
+              </div>
+              <div className="cap" data-a="0.86" data-b="0.99">
+                شغل نظيف يليق بورشتك
+              </div>
             </div>
             <div className="loader">…</div>
           </div>
@@ -504,20 +736,39 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
             <div className="grid">
               <div className="shot fallback-host reveal">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`${ASSET}/product-hero.webp`} alt="سيت فاتح مفاصل — تفاصيل" loading="lazy" />
+                <img
+                  src={`${ASSET}/product-hero.webp`}
+                  alt="سيت فاتح مفاصل — تفاصيل"
+                  loading="lazy"
+                />
               </div>
               <div className="copy">
                 <span className="idx reveal">٠١ — الهندسة</span>
-                <h2 className="steel-text reveal">فولاذ ثقيل يتحمّل أقوى شدّ</h2>
+                <h2 className="steel-text reveal">
+                  فولاذ ثقيل يتحمّل أقوى شدّ
+                </h2>
                 <p className="lead reveal">
-                  مصنوع من سبائك الفولاذ الثقيل Heavy-Duty ليتحمل الضغط والعمل اليومي الشاق في الورشة —
-                  يمسك ذراع الستيرن بقوة ويمنع الانزلاق أثناء الفتح والشد.
+                  مصنوع من سبائك الفولاذ الثقيل Heavy-Duty ليتحمل الضغط والعمل
+                  اليومي الشاق في الورشة — يمسك ذراع الستيرن بقوة ويمنع الانزلاق
+                  أثناء الفتح والشد.
                 </p>
                 <ul className="specs">
-                  <li className="reveal"><span className="k">المادة</span><span className="v">سبائك فولاذ Heavy-Duty</span></li>
-                  <li className="reveal"><span className="k">المقاسات</span><span className="v">Ø 30–35 / 35–40 / 40–45 mm</span></li>
-                  <li className="reveal"><span className="k">السواقة</span><span className="v">1/2&Prime; — 32 mm</span></li>
-                  <li className="reveal"><span className="k">الضمان</span><span className="v">سنتان</span></li>
+                  <li className="reveal">
+                    <span className="k">المادة</span>
+                    <span className="v">سبائك فولاذ Heavy-Duty</span>
+                  </li>
+                  <li className="reveal">
+                    <span className="k">المقاسات</span>
+                    <span className="v">Ø 30–35 / 35–40 / 40–45 mm</span>
+                  </li>
+                  <li className="reveal">
+                    <span className="k">السواقة</span>
+                    <span className="v">1/2&Prime; — 32 mm</span>
+                  </li>
+                  <li className="reveal">
+                    <span className="k">الضمان</span>
+                    <span className="v">سنتان</span>
+                  </li>
                 </ul>
               </div>
             </div>
@@ -529,13 +780,18 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
           <div className="wrap">
             <div className="frame fallback-host">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={`${ASSET}/ritual.webp`} alt="في الورشة — فك أذرع الستيرن" loading="lazy" />
+              <img
+                src={`${ASSET}/ritual.webp`}
+                alt="في الورشة — فك أذرع الستيرن"
+                loading="lazy"
+              />
               <div className="copy reveal">
                 <span className="idx">٠٢ — في الورشة</span>
                 <h2 className="steel-text">يغنيك عن فك دودة الستيرن بالكامل</h2>
                 <p>
-                  وداعاً للطرق العشوائي بالمطرقة وتلف قطع الزبائن — فك وتركيب الأذرع الداخلية وأنت مرتاح،
-                  ووفّر ساعات من العمل المتعب بشغل نظيف يعطي انطباعاً ممتازاً عن ورشتك.
+                  وداعاً للطرق العشوائي بالمطرقة وتلف قطع الزبائن — فك وتركيب
+                  الأذرع الداخلية وأنت مرتاح، ووفّر ساعات من العمل المتعب بشغل
+                  نظيف يعطي انطباعاً ممتازاً عن ورشتك.
                 </p>
               </div>
             </div>
@@ -553,24 +809,34 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
               <article className="clp-offer-card reveal">
                 <div className="pic fallback-host">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${ASSET}/product-hero.webp`} alt="سيت واحد" loading="lazy" />
+                  <img
+                    src={`${ASSET}/product-hero.webp`}
+                    alt="سيت واحد"
+                    loading="lazy"
+                  />
                 </div>
                 <div className="body">
                   <h3>سيت واحد</h3>
-                  <div className="price">42,000 د.ع</div>
-                  <p className="note">التوصيل مجاني لكل المحافظات</p>
+                  <div className="price">السعر 47 الف</div>
+                  <p className="note">التوصيل 5 الاف لكل المحافظات</p>
                 </div>
               </article>
               <article className="clp-offer-card reveal">
-                <span className="badge">وفّر 6,000</span>
+                <span className="badge">وفر 9 الاف </span>
                 <div className="pic fallback-host">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={`${ASSET}/offer-2set.webp`} alt="سيتان" loading="lazy" />
+                  <img
+                    src={`${ASSET}/offer-2set.webp`}
+                    alt="سيتان"
+                    loading="lazy"
+                  />
                 </div>
                 <div className="body">
                   <h3>سيتان</h3>
-                  <div className="price">78,000 د.ع</div>
-                  <p className="note">التوصيل مجاني — اختر الكمية ٢ في الطلب</p>
+                  <div className="price">السعر 85 الف</div>
+                  <p className="note">
+                    التوصيل 5 الاف لكل المحافظات — اختر الكمية ٢ في الطلب
+                  </p>
                 </div>
               </article>
             </div>
@@ -581,15 +847,34 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         <section className="clp-cta" data-ambient="#07090c" data-glow="0.5">
           <div className="stage fallback-host">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="cta-poster" id="clpCtaPoster" src={`${ASSET}/product-hero.webp`} alt="" aria-hidden="true" />
-            <video id="clpCtaVideo" muted playsInline preload="none" poster={`${ASSET}/product-hero.webp`} aria-hidden="true" />
+            <img
+              className="cta-poster"
+              id="clpCtaPoster"
+              src={`${ASSET}/product-hero.webp`}
+              alt=""
+              aria-hidden="true"
+            />
+            <video
+              id="clpCtaVideo"
+              muted
+              playsInline
+              preload="none"
+              poster={`${ASSET}/product-hero.webp`}
+              aria-hidden="true"
+            />
             <div className="dim" id="clpCtaDim" />
             <div className="content" id="clpCtaContent">
               <span className="latin">Made for Professionals</span>
               <h2 className="steel-text">ارتقِ بورشتك</h2>
-              <p>اطلب الآن والدفع عند الاستلام — توصيل مجاني لكل محافظات العراق.</p>
+              <p>
+                اطلب الآن والدفع عند الاستلام — توصيل مجاني لكل محافظات العراق.
+              </p>
               <div className="btns">
-                <a className="btn btn-primary" href="#clp-order" data-goto-order>
+                <a
+                  className="btn btn-primary"
+                  href="#clp-order"
+                  data-goto-order
+                >
                   اطلب الآن — الدفع عند الاستلام
                 </a>
               </div>
@@ -598,12 +883,19 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         </section>
 
         {/* 7 · ORDER */}
-        <section id="clp-order" className="clp-order" data-ambient="#0b0e14" data-glow="0.55">
+        <section
+          id="clp-order"
+          className="clp-order"
+          data-ambient="#0b0e14"
+          data-glow="0.55"
+        >
           <div className="wrap">
             <div className="head">
               <span className="idx reveal">٠٤ — الطلب</span>
               <h2 className="steel-text reveal">أكمل طلبك</h2>
-              <p className="sub reveal">املأ معلوماتك وسنتواصل معك لتأكيد الطلب — الدفع عند الاستلام</p>
+              <p className="sub reveal">
+                املأ معلوماتك وسنتواصل معك لتأكيد الطلب — الدفع عند الاستلام
+              </p>
             </div>
             <div className="form-shell reveal">
               <div className="form-card" dir="rtl">
@@ -611,9 +903,15 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
               </div>
             </div>
             <div className="assure reveal">
-              <span><ShieldCheck className="w-4 h-4" /> ضمان سنتان</span>
-              <span><Truck className="w-4 h-4" /> توصيل مجاني</span>
-              <span><RotateCcw className="w-4 h-4" /> إرجاع سهل</span>
+              <span>
+                <ShieldCheck className="w-4 h-4" /> ضمان سنتان
+              </span>
+              <span>
+                <Truck className="w-4 h-4" /> توصيل مجاني
+              </span>
+              <span>
+                <RotateCcw className="w-4 h-4" /> إرجاع سهل
+              </span>
             </div>
           </div>
         </section>
@@ -621,7 +919,9 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         <footer>
           <div className="wrap">
             <div className="wm steel-text">سيت فاتح مفاصل</div>
-            <div className="cr">© {new Date().getFullYear()} — جميع الحقوق محفوظة</div>
+            <div className="cr">
+              © {new Date().getFullYear()} — جميع الحقوق محفوظة
+            </div>
           </div>
         </footer>
       </main>
@@ -633,7 +933,13 @@ export default function CinematicSytFathMfasl({ product }: { product: Product })
         aria-label="تواصل معنا على واتساب"
         className="wa-float"
       >
-        <svg viewBox="0 0 32 32" width="30" height="30" fill="white" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          viewBox="0 0 32 32"
+          width="30"
+          height="30"
+          fill="white"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path d="M16.003 2.667C8.639 2.667 2.667 8.639 2.667 16c0 2.364.636 4.674 1.843 6.692L2.667 29.333l6.825-1.787A13.267 13.267 0 0 0 16.003 29.333C23.363 29.333 29.333 23.361 29.333 16c0-7.361-5.97-13.333-13.33-13.333Zm0 24.267a11.01 11.01 0 0 1-5.616-1.539l-.402-.239-4.05 1.061 1.08-3.94-.262-.417A10.946 10.946 0 0 1 5.002 16C5.002 9.925 9.927 5 16.003 5 22.075 5 27 9.925 27 16c0 6.075-4.925 10.934-10.997 10.934Zm6.01-8.196c-.33-.165-1.948-.961-2.25-1.07-.302-.11-.522-.165-.74.165-.22.33-.852 1.07-1.044 1.29-.193.22-.385.247-.715.082-.33-.165-1.393-.513-2.653-1.637-.98-.875-1.642-1.955-1.834-2.285-.193-.33-.02-.508.144-.672.148-.148.33-.385.495-.577.165-.193.22-.33.33-.55.11-.22.055-.413-.027-.578-.083-.165-.74-1.787-1.015-2.447-.267-.642-.538-.554-.74-.565l-.632-.011c-.22 0-.578.083-.88.413-.302.33-1.154 1.128-1.154 2.75 0 1.622 1.18 3.19 1.345 3.41.165.22 2.323 3.547 5.63 4.972.787.34 1.4.543 1.878.695.79.252 1.508.216 2.076.131.633-.094 1.948-.797 2.222-1.566.275-.77.275-1.43.193-1.567-.083-.138-.302-.22-.632-.385Z" />
         </svg>
       </a>

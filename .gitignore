@@ -43,3 +43,9 @@ next-env.d.ts
 /lib/generated/prisma
 
 .vercel
+
+# ملفات عمل مؤقتة وأدوات مساعدة — ليست جزءاً من التطبيق
+/tmp/
+/cinematic-landing-kit-main/
+/.agents/
+skills-lock.json
