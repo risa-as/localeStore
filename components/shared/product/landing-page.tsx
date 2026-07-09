@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Tag,
+  Images,
 } from "lucide-react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
@@ -26,6 +27,7 @@ export default function LandingPage({ product }: { product: Product }) {
   const t = useTranslations("LandingPage");
   const locale = useLocale();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
   const images =
     product.images && product.images.length > 0
       ? product.images
@@ -33,11 +35,25 @@ export default function LandingPage({ product }: { product: Product }) {
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % images.length);
+    setShowSwipeHint(false);
   };
 
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev - 1 + images.length) % images.length);
+    setShowSwipeHint(false);
   };
+
+  const goToImage = (idx: number) => {
+    setCurrentImageIndex(idx);
+    setShowSwipeHint(false);
+  };
+
+  // Auto-hide the swipe hint after a few seconds even without interaction
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const timer = setTimeout(() => setShowSwipeHint(false), 5000);
+    return () => clearTimeout(timer);
+  }, [images.length]);
 
   //Start API Code
   const [eventId] = useState(() => uuidv4());
@@ -80,36 +96,98 @@ export default function LandingPage({ product }: { product: Product }) {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.6 }}
-                  className="absolute inset-0"
+                  className={cn(
+                    "absolute inset-0",
+                    images.length > 1 &&
+                      "cursor-grab active:cursor-grabbing touch-pan-y select-none",
+                  )}
+                  drag={images.length > 1 ? "x" : false}
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(_, info) => {
+                    setShowSwipeHint(false);
+                    if (info.offset.x < -60) {
+                      nextImage();
+                    } else if (info.offset.x > 60) {
+                      prevImage();
+                    }
+                  }}
                 >
                   <Image
                     src={images[currentImageIndex]}
                     alt={product.name}
                     fill
-                    className="object-contain"
+                    draggable={false}
+                    className="object-contain pointer-events-none"
                     priority
                     sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 40vw"
                   />
                 </motion.div>
               </AnimatePresence>
 
-              {/* Navigation Arrows */}
+              {/* Navigation Arrows (always visible on touch, on hover for desktop) */}
               {images.length > 1 && (
-                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                <div className="absolute inset-x-4 top-1/2 -translate-y-1/2 flex justify-between opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                   <button
                     onClick={prevImage}
-                    className="pointer-events-auto w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-slate-900 flex items-center justify-center transition-all duration-300 shadow-lg hover:scale-110"
+                    aria-label="Previous image"
+                    className="pointer-events-auto w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-slate-900 flex items-center justify-center transition-all duration-300 shadow-lg hover:scale-110"
                   >
                     <ChevronLeft className="w-6 h-6" />
                   </button>
                   <button
                     onClick={nextImage}
-                    className="pointer-events-auto w-12 h-12 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-slate-900 flex items-center justify-center transition-all duration-300 shadow-lg hover:scale-110"
+                    aria-label="Next image"
+                    className="pointer-events-auto w-12 h-12 rounded-full bg-black/30 backdrop-blur-md border border-white/20 text-white hover:bg-white hover:text-slate-900 flex items-center justify-center transition-all duration-300 shadow-lg hover:scale-110"
                   >
                     <ChevronRight className="w-6 h-6" />
                   </button>
                 </div>
               )}
+
+              {/* Image Counter Badge */}
+              {images.length > 1 && (
+                <div className="absolute top-6 right-6 flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/70 backdrop-blur-md text-white text-xs font-bold rounded-full shadow-lg border border-white/10">
+                  <Images className="w-3.5 h-3.5" />
+                  <span>
+                    {currentImageIndex + 1} / {images.length}
+                  </span>
+                </div>
+              )}
+
+              {/* Swipe Hint */}
+              <AnimatePresence>
+                {images.length > 1 && showSwipeHint && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 px-4 py-2 bg-slate-900/70 backdrop-blur-md text-white text-xs font-medium rounded-full shadow-lg border border-white/10 pointer-events-none whitespace-nowrap"
+                  >
+                    <motion.span
+                      animate={{ x: [-4, 4, -4] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 1.6,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </motion.span>
+                    <span>{t("swipeHint")}</span>
+                    <motion.span
+                      animate={{ x: [4, -4, 4] }}
+                      transition={{
+                        repeat: Infinity,
+                        duration: 1.6,
+                        ease: "easeInOut",
+                      }}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </motion.span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Floating Badges */}
               <div className="absolute top-6 left-6 flex flex-col gap-2">
@@ -132,7 +210,7 @@ export default function LandingPage({ product }: { product: Product }) {
                 {images.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setCurrentImageIndex(idx)}
+                    onClick={() => goToImage(idx)}
                     className={cn(
                       "relative w-20 h-20 rounded-xl overflow-hidden transition-all duration-300 flex-shrink-0 border-2 p-1 mt-2",
                       currentImageIndex === idx

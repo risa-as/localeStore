@@ -285,6 +285,7 @@
     "phoneNumber": "Phone Number",
     "status": "Status",
     "categories": "Categories",
+    "batches": "Batches",
     "profitAnalysis": "Profit Analysis",
     "productName": "Product Name",
     "quantitySold": "Quantity Sold",
@@ -319,7 +320,8 @@
     "address": "Address",
     "quantity": "Qty",
     "noItems": "No items",
-    "expenses": "Expenses"
+    "expenses": "Expenses",
+    "chats": "Chats"
   },
   "Categories": {
     "selectCategory": "Select a Category",
@@ -398,7 +400,8 @@
     "easyReturns": "Easy Returns",
     "easyReturnsDesc": "30-day money back guarantee",
     "securePayment": "Secure Payment 256-bit SSL Encrypted",
-    "shipping": "Shipping"
+    "shipping": "Shipping",
+    "swipeHint": "Swipe to browse photos"
   },
   "ThankYou": {
     "title": "Order Confirmed",

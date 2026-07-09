@@ -11,12 +11,41 @@ import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
-import {
-  sendOrderToModon,
-  fetchModonOrders,
-  MODON_CITY_MAP,
-  MODON_STATUS_MAP,
-} from "@/lib/modon/api";
+import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
+import { buildFefoContexts, saleKey } from "@/lib/fefo-cogs";
+import { sendOrderConfirmation, sendOrderReturned } from "@/lib/whatsapp";
+
+// يبني مدخل التوصيل الموحّد من بيانات الطلب.
+// يطبّق ×1000 على السعر المختصر (طريقة تخزيننا)، ويجمّع أسماء المنتجات.
+function buildDeliveryInput(o: {
+  id?: string;
+  fullName?: string | null;
+  phoneNumber?: string | null;
+  governorate?: string | null;
+  address?: string | null;
+  quantity?: number | null;
+  totalPrice?: Prisma.Decimal | number | string | null;
+  notes?: string | null;
+  orderitems?: { name: string }[] | null;
+}): DeliveryOrderInput {
+  const rawPrice = Number(o.totalPrice ?? 0);
+  const price = rawPrice > 0 && rawPrice < 1000 ? rawPrice * 1000 : rawPrice;
+  const productNames =
+    o.orderitems && o.orderitems.length > 0
+      ? o.orderitems.map((i) => i.name).join(" + ")
+      : "طلب إلكتروني";
+  return {
+    clientName: o.fullName ?? "",
+    phone: o.phoneNumber ?? "",
+    governorate: o.governorate ?? "",
+    address: o.address ?? undefined,
+    itemsNumber: o.quantity ?? 1,
+    price,
+    productNames,
+    notes: o.notes ?? undefined,
+    referenceId: o.id ?? undefined,
+  };
+}
 
 // Helper to check for fraud
 async function checkForFraud(
@@ -272,34 +301,18 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
-    //Start N8N
+    // WhatsApp: رسالة تأكيد الطلب (كانت عبر n8n سابقاً)
     try {
-      const res = await fetch(
-        "https://n8n.srv1667498.hstgr.cloud/webhook/create-order",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: insertedOrderId,
-            fullName: orderData.fullName,
-            phone: "964" + orderData.phoneNumber.substring(1),
-            product: product.name,
-            quantity: orderData.quantity,
-            price: price,
-            address: orderData.address,
-            governorate: orderData.governorate,
-          }),
-        },
-      );
-
-      const text = await res.text();
-      console.log("✅ n8n response:", text);
+      await sendOrderConfirmation({
+        fullName: orderData.fullName,
+        phoneNumber: orderData.phoneNumber,
+        product: product.name,
+        quantity: orderData.quantity,
+        price: price,
+      });
     } catch (err) {
-      console.error("❌ n8n error:", err);
+      console.error("❌ WhatsApp order confirmation error:", err);
     }
-    // End N8N
     return {
       success: true,
       message: "Order created",
@@ -587,7 +600,7 @@ export async function getAllOrders({
             { phoneNumber: { contains: query, mode: "insensitive" } },
             { address: { contains: query, mode: "insensitive" } },
             { governorate: { contains: query, mode: "insensitive" } },
-            { modonQrId: { contains: query, mode: "insensitive" } },
+            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
           ],
         }
       : {};
@@ -681,7 +694,7 @@ export async function getAllOrdersForExport({
             { phoneNumber: { contains: query, mode: "insensitive" } },
             { address: { contains: query, mode: "insensitive" } },
             { governorate: { contains: query, mode: "insensitive" } },
-            { modonQrId: { contains: query, mode: "insensitive" } },
+            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
           ],
         }
       : {};
@@ -780,12 +793,12 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
   try {
     const order = updateOrderSchema.parse(data);
 
-    // جلب بيانات الطلب الحالية (للتحقق من modonQrId والحالة)
+    // جلب بيانات الطلب الحالية (للتحقق من معرّف التوصيل والحالة)
     const existingOrder = await prisma.order.findUnique({
       where: { id: order.id },
       select: {
         status: true,
-        modonQrId: true,
+        deliveryTrackingId: true,
         fullName: true,
         phoneNumber: true,
         governorate: true,
@@ -837,89 +850,62 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           status: order.status,
           notes: order.notes,
           actualShippingCost: order.actualShippingCost,
-          ...(order.modonQrId !== undefined && {
-            modonQrId: order.modonQrId || null,
+          ...(order.deliveryTrackingId !== undefined && {
+            deliveryTrackingId: order.deliveryTrackingId || null,
           }),
-          ...(enteringPending && { modonQrId: null, modonSentAt: null }),
+          ...(enteringPending && {
+            deliveryTrackingId: null,
+            deliverySentAt: null,
+          }),
         },
       });
     });
 
-    // ── إرسال تلقائي لموذن عند الانتقال إلى "pending" ──
+    // ── إرسال تلقائي لشركة التوصيل عند الانتقال إلى "pending" ──
     if (order.status === "pending" && existingOrder?.status !== "pending") {
-      const govRaw = order.governorate ?? existingOrder?.governorate ?? "";
-      const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
-
-      let phoneRaw = order.phoneNumber ?? existingOrder?.phoneNumber ?? "";
-      if (phoneRaw.startsWith("0")) {
-        phoneRaw = "+964" + phoneRaw.slice(1);
-      } else if (!phoneRaw.startsWith("+")) {
-        phoneRaw = "+" + phoneRaw;
-      }
-
-      let rawPrice = Number(order.totalPrice ?? existingOrder?.totalPrice ?? 0);
-      let finalModonPrice =
-        rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
-
-      let productNames = "طلب إلكتروني";
-      if (existingOrder?.orderitems && existingOrder.orderitems.length > 0) {
-        productNames = existingOrder.orderitems
-          .map((i: any) => i.name)
-          .join(" + ");
-      }
-
-      const modonRes = await sendOrderToModon({
-        client_name: order.fullName ?? existingOrder?.fullName ?? "",
-        client_mobile: phoneRaw,
-        city_id: cityId,
-        location: order.address ?? existingOrder?.address ?? undefined,
-        items_number: existingOrder?.quantity ?? 1,
-        price: finalModonPrice,
-        type_name: productNames,
-        merchant_notes: order.notes ?? existingOrder?.notes ?? undefined,
+      const input = buildDeliveryInput({
+        id: order.id,
+        fullName: order.fullName ?? existingOrder?.fullName,
+        phoneNumber: order.phoneNumber ?? existingOrder?.phoneNumber,
+        governorate: order.governorate ?? existingOrder?.governorate,
+        address: order.address ?? existingOrder?.address,
+        quantity: existingOrder?.quantity,
+        totalPrice: order.totalPrice ?? existingOrder?.totalPrice,
+        notes: order.notes ?? existingOrder?.notes,
+        orderitems: existingOrder?.orderitems,
       });
 
-      const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
-      if (qrIdStr) {
+      const result = await getDeliveryProvider().sendOrder(input);
+      if (result.success && result.trackingId) {
         await prisma.order.update({
           where: { id: order.id },
           data: {
-            modonQrId: String(qrIdStr),
-            modonSentAt: new Date(),
+            deliveryTrackingId: result.trackingId,
+            deliverySentAt: new Date(),
           },
         });
       }
     }
 
     revalidatePath("/admin/orders");
-    // Start N8N
+    // WhatsApp: رسالة الطلب الراجع (كانت عبر n8n سابقاً)
     if (order.status === "returned" && existingOrder?.status !== "returned") {
       try {
-        const phone =
-          "964" +
-          (order.phoneNumber ?? existingOrder?.phoneNumber ?? "").substring(1);
         const productNames =
           existingOrder?.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
         const price = order.totalPrice ?? existingOrder?.totalPrice ?? 0;
 
-        await fetch(
-          "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phone,
-              fullName: order.fullName ?? existingOrder?.fullName ?? "",
-              product: productNames,
-              price: price.toString(),
-            }),
-          },
-        );
+        await sendOrderReturned({
+          fullName: order.fullName ?? existingOrder?.fullName ?? "",
+          phoneNumber:
+            order.phoneNumber ?? existingOrder?.phoneNumber ?? "",
+          product: productNames,
+          price: price.toString(),
+        });
       } catch (err) {
-        console.error("❌ n8n returned order error:", err);
+        console.error("❌ WhatsApp returned order error:", err);
       }
     }
-    // End N8N
 
     return {
       success: true,
@@ -945,10 +931,10 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
     let modonFailed = 0;
 
     if (status === "pending") {
-      // مسح بيانات مدن القديمة لإعادة الإرسال دائماً
+      // مسح بيانات التوصيل القديمة لإعادة الإرسال دائماً
       await prisma.order.updateMany({
         where: { id: { in: ids } },
-        data: { modonQrId: null, modonSentAt: null },
+        data: { deliveryTrackingId: null, deliverySentAt: null },
       });
 
       const ordersToSend = await prisma.order.findMany({
@@ -977,46 +963,17 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
         return nameA.localeCompare(nameB, "ar");
       });
 
-      // إرسال بالتسلسل للحفاظ على الترتيب في نظام مدن
+      // إرسال بالتسلسل للحفاظ على الترتيب في نظام شركة التوصيل
+      const provider = getDeliveryProvider();
       const results: { success: boolean }[] = [];
       for (const o of ordersToSend) {
-        let phoneRaw = o.phoneNumber ?? "";
-        if (phoneRaw.startsWith("0")) {
-          phoneRaw = "+964" + phoneRaw.slice(1);
-        } else if (!phoneRaw.startsWith("+")) {
-          phoneRaw = "+" + phoneRaw;
-        }
-
-        const govRaw = o.governorate ?? "";
-        const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
-
-        const rawPrice = Number(o.totalPrice ?? 0);
-        const finalModonPrice =
-          rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
-
-        const productNames =
-          o.orderitems && o.orderitems.length > 0
-            ? o.orderitems.map((i: any) => i.name).join(" + ")
-            : "طلب إلكتروني";
-
-        const modonRes = await sendOrderToModon({
-          client_name: o.fullName ?? "",
-          client_mobile: phoneRaw,
-          city_id: cityId,
-          location: o.address ?? undefined,
-          items_number: o.quantity ?? 1,
-          price: finalModonPrice,
-          type_name: productNames,
-          merchant_notes: o.notes ?? undefined,
-        });
-
-        const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
-        if (qrIdStr) {
+        const result = await provider.sendOrder(buildDeliveryInput(o));
+        if (result.success && result.trackingId) {
           await prisma.order.update({
             where: { id: o.id },
             data: {
-              modonQrId: String(qrIdStr),
-              modonSentAt: new Date(),
+              deliveryTrackingId: result.trackingId,
+              deliverySentAt: new Date(),
             },
           });
           results.push({ success: true });
@@ -1031,8 +988,7 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     revalidatePath("/admin/orders");
 
-    // start n8n
-
+    // WhatsApp: رسائل الطلبات الراجعة (كانت عبر n8n سابقاً)
     if (status === "returned") {
       const returnedOrders = await prisma.order.findMany({
         where: { id: { in: ids } },
@@ -1046,33 +1002,24 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
       for (const o of returnedOrders) {
         try {
-          const phone = "964" + (o.phoneNumber ?? "").substring(1);
           const productNames =
             o.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
 
-          await fetch(
-            "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                phone,
-                fullName: o.fullName ?? "",
-                product: productNames,
-                price: o.totalPrice?.toString() ?? "0",
-              }),
-            },
-          );
+          await sendOrderReturned({
+            fullName: o.fullName ?? "",
+            phoneNumber: o.phoneNumber ?? "",
+            product: productNames,
+            price: o.totalPrice?.toString() ?? "0",
+          });
         } catch (err) {
-          console.error("❌ n8n returned order error:", err);
+          console.error("❌ WhatsApp returned order error:", err);
         }
       }
     }
-    // end n8n
     const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
     const modonMsg =
       status === "pending" && modonSent + modonFailed > 0
-        ? ` مدن: ✅ ${modonSent} أُرسل، ❌ ${modonFailed} فشل.`
+        ? ` التوصيل: ✅ ${modonSent} أُرسل، ❌ ${modonFailed} فشل.`
         : "";
 
     return {
@@ -1101,7 +1048,7 @@ export async function resendOrderToModon(orderId: string) {
         quantity: true,
         totalPrice: true,
         notes: true,
-        modonQrId: true,
+        deliveryTrackingId: true,
         status: true,
         orderitems: {
           select: { name: true, qty: true },
@@ -1110,54 +1057,26 @@ export async function resendOrderToModon(orderId: string) {
     });
 
     if (!order) return { success: false, message: "الطلب غير موجود" };
-    if (order.modonQrId)
-      return { success: false, message: "الطلب مُرسل لمدن مسبقاً" };
+    if (order.deliveryTrackingId)
+      return { success: false, message: "الطلب مُرسل لشركة التوصيل مسبقاً" };
 
-    let phoneRaw = order.phoneNumber ?? "";
-    if (phoneRaw.startsWith("0")) {
-      phoneRaw = "+964" + phoneRaw.slice(1);
-    } else if (!phoneRaw.startsWith("+")) {
-      phoneRaw = "+" + phoneRaw;
-    }
+    const result = await getDeliveryProvider().sendOrder(
+      buildDeliveryInput(order),
+    );
 
-    const govRaw = order.governorate ?? "";
-    const cityId = MODON_CITY_MAP[govRaw.trim()] ?? "1";
-
-    let rawPrice = Number(order.totalPrice ?? 0);
-    // التصحيح التلقائي للسعر: معالجة (25) لتصبح (25000)
-    let finalModonPrice =
-      rawPrice < 1000 && rawPrice > 0 ? rawPrice * 1000 : rawPrice;
-
-    const productNames =
-      order.orderitems && order.orderitems.length > 0
-        ? order.orderitems.map((i: any) => i.name).join(" + ")
-        : "طلب إلكتروني";
-
-    const modonRes = await sendOrderToModon({
-      client_name: order.fullName ?? "",
-      client_mobile: phoneRaw,
-      city_id: cityId,
-      location: order.address ?? undefined,
-      items_number: order.quantity ?? 1,
-      price: finalModonPrice,
-      type_name: productNames,
-      merchant_notes: order.notes ?? undefined,
-    });
-
-    const qrIdStr = modonRes?.data?.qr_id || modonRes?.qr_id;
-    if (qrIdStr) {
+    if (result.success && result.trackingId) {
       await prisma.order.update({
         where: { id: orderId },
         data: {
-          modonQrId: String(qrIdStr),
-          modonSentAt: new Date(),
+          deliveryTrackingId: result.trackingId,
+          deliverySentAt: new Date(),
         },
       });
       revalidatePath("/admin/orders");
-      return { success: true, message: "✅ تم الإرسال لمدن بنجاح" };
+      return { success: true, message: "✅ تم الإرسال لشركة التوصيل بنجاح" };
     }
 
-    const errorMsg = modonRes?.msg || "خطأ غير معروف في البيانات المدخلة";
+    const errorMsg = result.error || "خطأ غير معروف في البيانات المدخلة";
     return {
       success: false,
       message: `❌ التوصيل: ${errorMsg}`,
@@ -1493,6 +1412,8 @@ export async function getOrderProfitStats({
         status: { in: ["completed", "completedAccountant"] },
       },
       select: {
+        id: true,
+        createdAt: true,
         totalPrice: true,
         shippingPrice: true,
         actualShippingCost: true,
@@ -1532,6 +1453,17 @@ export async function getOrderProfitStats({
       );
     }
   }
+
+  // FEFO cost layer: for products that have batches, the cost of goods sold is
+  // derived from batches (earliest-expiry first) instead of the frozen snapshot.
+  // Only sales created on/after a product's first batch use FEFO; older sales
+  // keep their snapshot cost so historical numbers never change.
+  const productIdsInRange = Array.from(
+    new Set(orders.flatMap((o) => o.orderitems.map((i) => i.productId))),
+  );
+  const fefoContexts = await buildFefoContexts(productIdsInRange);
+  const fefoActive = fefoContexts.size > 0;
+  let fefoFallbackQty = 0;
 
   const statsMap = new Map<
     string,
@@ -1586,7 +1518,19 @@ export async function getOrderProfitStats({
         rawItemsTotal > 0
           ? (rawRevenue / rawItemsTotal) * orderNetRevenue
           : rawRevenue;
-      const cost = Number(item.costPrice) * item.qty;
+
+      // Default to the frozen snapshot cost; override with FEFO when available.
+      let cost = Number(item.costPrice) * item.qty;
+      const ctx = fefoContexts.get(item.productId);
+      if (ctx && new Date(order.createdAt) >= ctx.fefoStart) {
+        const key = saleKey(order.id, item.productId);
+        const fefoCost = ctx.saleCost.get(key);
+        if (fefoCost !== undefined) {
+          cost = fefoCost;
+          fefoFallbackQty += ctx.saleFallbackQty.get(key) ?? 0;
+        }
+      }
+
       const profit = revenue - cost;
 
       if (statsMap.has(item.productId)) {
@@ -1641,6 +1585,8 @@ export async function getOrderProfitStats({
 
   return {
     productStats,
+    fefoActive,
+    fefoFallbackQty,
     orderSummary: {
       totalOrderCount,
       baghdadOrderCount,
@@ -1657,46 +1603,48 @@ export async function getOrderProfitStats({
 // ── مزامنة حالات طلبات مدن ──
 export async function syncModonOrders() {
   try {
-    const modonOrders = await fetchModonOrders();
-    if (!modonOrders || modonOrders.length === 0) {
+    // جلب جميع الطلبات المحلية التي لديها معرّف تتبّع وليست مكتملة/راجعة نهائياً
+    const localOrders = await prisma.order.findMany({
+      where: {
+        deliveryTrackingId: { not: null },
+        status: { notIn: ["completed", "returnReceived"] },
+      },
+      select: { id: true, deliveryTrackingId: true, status: true },
+    });
+
+    if (localOrders.length === 0) {
       return {
         success: false,
-        message: "لا توجد طلبات في مدن للمزامنة",
+        message: "لا توجد طلبات للمزامنة",
         updatedOrders: 0,
       };
     }
 
-    // جلب جميع الطلبات المحلية التي لديها qr_id وليست مكتملة/راجعة نهائياً
-    const localOrders = await prisma.order.findMany({
-      where: {
-        modonQrId: { not: null },
-        status: { notIn: ["completed", "returnReceived"] },
-      },
-      select: { id: true, modonQrId: true, status: true },
-    });
+    const remoteOrders = await getDeliveryProvider().fetchRemoteOrders(
+      localOrders.map((o) => String(o.deliveryTrackingId)),
+    );
+
+    // فهرسة الطلبات البعيدة حسب معرّف التتبّع لتسريع المطابقة
+    const byTrackingId = new Map(remoteOrders.map((o) => [o.trackingId, o]));
 
     let updatedCount = 0;
 
     for (const localOrder of localOrders) {
-      const remoteOrder = modonOrders.find(
-        (o: any) => String(o.id ?? o.qr_id) === localOrder.modonQrId,
-      );
+      const remote = byTrackingId.get(String(localOrder.deliveryTrackingId));
+      if (!remote || !remote.localStatus) continue;
 
-      if (remoteOrder && remoteOrder.status_id != null) {
-        const newLocalStatus = MODON_STATUS_MAP[String(remoteOrder.status_id)];
-        if (newLocalStatus && newLocalStatus !== localOrder.status) {
-          const updateData: Prisma.OrderUpdateInput = {
-            status: newLocalStatus,
-          };
-          if (newLocalStatus === "completed" && remoteOrder.price != null) {
-            updateData.modonCollectedPrice = Number(remoteOrder.price) / 1000;
-          }
-          await prisma.order.update({
-            where: { id: localOrder.id },
-            data: updateData,
-          });
-          updatedCount++;
+      if (remote.localStatus !== localOrder.status) {
+        const updateData: Prisma.OrderUpdateInput = {
+          status: remote.localStatus,
+        };
+        if (remote.localStatus === "completed" && remote.collectedPrice != null) {
+          updateData.deliveryCollectedPrice = remote.collectedPrice / 1000;
         }
+        await prisma.order.update({
+          where: { id: localOrder.id },
+          data: updateData,
+        });
+        updatedCount++;
       }
     }
 
@@ -1858,13 +1806,13 @@ export async function getModonStats() {
     "failed",
   ];
 
-  // جلب طلباتنا التي أُرسلت لمدن (لديها باركود)
-  const [localOrders, priceDiffs, dailySent, modonOrders] = await Promise.all([
+  // جلب طلباتنا التي أُرسلت لشركة التوصيل (لديها معرّف تتبّع)
+  const [localOrders, priceDiffs, dailySent] = await Promise.all([
     prisma.order.findMany({
-      where: { modonQrId: { not: null } },
+      where: { deliveryTrackingId: { not: null } },
       select: {
         id: true,
-        modonQrId: true,
+        deliveryTrackingId: true,
         status: true,
         fullName: true,
         phoneNumber: true,
@@ -1873,24 +1821,27 @@ export async function getModonStats() {
     }),
 
     prisma.order.findMany({
-      where: { status: "completed", modonCollectedPrice: { not: null } },
-      select: { totalPrice: true, modonCollectedPrice: true },
+      where: { status: "completed", deliveryCollectedPrice: { not: null } },
+      select: { totalPrice: true, deliveryCollectedPrice: true },
     }),
 
     prisma.order.findMany({
       where: {
-        modonSentAt: {
+        deliverySentAt: {
           not: null,
           gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         },
       },
-      select: { modonSentAt: true },
+      select: { deliverySentAt: true },
     }),
-
-    fetchModonOrders(),
   ]);
 
-  // إحصائيات الحالات (فقط طلبات أُرسلت لمدن)
+  // مدن تتجاهل المعرّفات وتجلب الكل؛ برايم يستعلم بها (shipments-info).
+  const remoteOrders = await getDeliveryProvider().fetchRemoteOrders(
+    localOrders.map((o) => String(o.deliveryTrackingId)),
+  );
+
+  // إحصائيات الحالات (فقط طلبات أُرسلت لشركة التوصيل)
   const counts: Record<string, number> = {};
   for (const s of MODON_STATUSES) counts[s] = 0;
   for (const o of localOrders) {
@@ -1898,27 +1849,27 @@ export async function getModonStats() {
   }
   const totalSentToModon = localOrders.length;
 
-  // مقارنة: طلباتنا ذات الباركود vs طلبات مدن
-  const localQrIds = new Set(localOrders.map((o) => String(o.modonQrId)));
-  const modonIds = new Set(
-    (modonOrders as any[]).map((o: any) => String(o.id ?? o.qr_id)),
+  // مقارنة: طلباتنا ذات المعرّف vs طلبات شركة التوصيل
+  const localQrIds = new Set(
+    localOrders.map((o) => String(o.deliveryTrackingId)),
   );
+  const modonIds = new Set(remoteOrders.map((o) => o.trackingId));
 
-  // موجودة عندنا لكن مفقودة من مدن
+  // موجودة عندنا لكن مفقودة من شركة التوصيل
   const missingInModon = localOrders.filter(
-    (o) => !modonIds.has(String(o.modonQrId)),
+    (o) => !modonIds.has(String(o.deliveryTrackingId)),
   );
 
-  // موجودة في مدن لكن مفقودة من نظامنا
-  const missingInLocal = (modonOrders as any[]).filter(
-    (o: any) => !localQrIds.has(String(o.id ?? o.qr_id)),
+  // موجودة لدى شركة التوصيل لكن مفقودة من نظامنا
+  const missingInLocal = remoteOrders.filter(
+    (o) => !localQrIds.has(o.trackingId),
   );
 
   // مقارنة الأسعار
   const priceStats = priceDiffs.reduce(
     (acc, o) => {
       const expected = Number(o.totalPrice);
-      const collected = Number(o.modonCollectedPrice);
+      const collected = Number(o.deliveryCollectedPrice);
       acc.total++;
       if (collected < expected) {
         acc.less++;
@@ -1935,7 +1886,7 @@ export async function getModonStats() {
   // تجميع يومي
   const dailyMap: Record<string, number> = {};
   for (const o of dailySent) {
-    const localDate = new Date(o.modonSentAt!.getTime() + 3 * 60 * 60 * 1000);
+    const localDate = new Date(o.deliverySentAt!.getTime() + 3 * 60 * 60 * 1000);
     const day = localDate.toISOString().slice(0, 10);
     dailyMap[day] = (dailyMap[day] ?? 0) + 1;
   }
@@ -1949,17 +1900,17 @@ export async function getModonStats() {
     totalInModon: modonIds.size,
     missingInModon: missingInModon.map((o) => ({
       id: o.id,
-      modonQrId: o.modonQrId,
+      modonQrId: o.deliveryTrackingId,
       fullName: o.fullName,
       phoneNumber: o.phoneNumber,
       status: o.status,
       createdAt: o.createdAt,
     })),
-    missingInLocal: missingInLocal.map((o: any) => ({
-      modonId: String(o.id ?? o.qr_id),
-      clientName: o.client_name ?? "-",
-      phone: o.client_mobile ?? "-",
-      statusId: o.status_id,
+    missingInLocal: missingInLocal.map((o) => ({
+      modonId: o.trackingId,
+      clientName: o.clientName ?? "-",
+      phone: o.phone ?? "-",
+      statusId: o.rawStatus,
     })),
     priceStats,
     daily,
