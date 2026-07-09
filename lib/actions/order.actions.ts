@@ -13,6 +13,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
 import { buildFefoContexts, saleKey } from "@/lib/fefo-cogs";
+import { sendOrderConfirmation, sendOrderReturned } from "@/lib/whatsapp";
 
 // يبني مدخل التوصيل الموحّد من بيانات الطلب.
 // يطبّق ×1000 على السعر المختصر (طريقة تخزيننا)، ويجمّع أسماء المنتجات.
@@ -300,34 +301,18 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
-    //Start N8N
+    // WhatsApp: رسالة تأكيد الطلب (كانت عبر n8n سابقاً)
     try {
-      const res = await fetch(
-        "https://n8n.srv1667498.hstgr.cloud/webhook/create-order",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            orderId: insertedOrderId,
-            fullName: orderData.fullName,
-            phone: "964" + orderData.phoneNumber.substring(1),
-            product: product.name,
-            quantity: orderData.quantity,
-            price: price,
-            address: orderData.address,
-            governorate: orderData.governorate,
-          }),
-        },
-      );
-
-      const text = await res.text();
-      console.log("✅ n8n response:", text);
+      await sendOrderConfirmation({
+        fullName: orderData.fullName,
+        phoneNumber: orderData.phoneNumber,
+        product: product.name,
+        quantity: orderData.quantity,
+        price: price,
+      });
     } catch (err) {
-      console.error("❌ n8n error:", err);
+      console.error("❌ WhatsApp order confirmation error:", err);
     }
-    // End N8N
     return {
       success: true,
       message: "Order created",
@@ -903,34 +888,24 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
     }
 
     revalidatePath("/admin/orders");
-    // Start N8N
+    // WhatsApp: رسالة الطلب الراجع (كانت عبر n8n سابقاً)
     if (order.status === "returned" && existingOrder?.status !== "returned") {
       try {
-        const phone =
-          "964" +
-          (order.phoneNumber ?? existingOrder?.phoneNumber ?? "").substring(1);
         const productNames =
           existingOrder?.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
         const price = order.totalPrice ?? existingOrder?.totalPrice ?? 0;
 
-        await fetch(
-          "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              phone,
-              fullName: order.fullName ?? existingOrder?.fullName ?? "",
-              product: productNames,
-              price: price.toString(),
-            }),
-          },
-        );
+        await sendOrderReturned({
+          fullName: order.fullName ?? existingOrder?.fullName ?? "",
+          phoneNumber:
+            order.phoneNumber ?? existingOrder?.phoneNumber ?? "",
+          product: productNames,
+          price: price.toString(),
+        });
       } catch (err) {
-        console.error("❌ n8n returned order error:", err);
+        console.error("❌ WhatsApp returned order error:", err);
       }
     }
-    // End N8N
 
     return {
       success: true,
@@ -1013,8 +988,7 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     revalidatePath("/admin/orders");
 
-    // start n8n
-
+    // WhatsApp: رسائل الطلبات الراجعة (كانت عبر n8n سابقاً)
     if (status === "returned") {
       const returnedOrders = await prisma.order.findMany({
         where: { id: { in: ids } },
@@ -1028,29 +1002,20 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
       for (const o of returnedOrders) {
         try {
-          const phone = "964" + (o.phoneNumber ?? "").substring(1);
           const productNames =
             o.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
 
-          await fetch(
-            "https://n8n.srv1667498.hstgr.cloud/webhook/order-returned",
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                phone,
-                fullName: o.fullName ?? "",
-                product: productNames,
-                price: o.totalPrice?.toString() ?? "0",
-              }),
-            },
-          );
+          await sendOrderReturned({
+            fullName: o.fullName ?? "",
+            phoneNumber: o.phoneNumber ?? "",
+            product: productNames,
+            price: o.totalPrice?.toString() ?? "0",
+          });
         } catch (err) {
-          console.error("❌ n8n returned order error:", err);
+          console.error("❌ WhatsApp returned order error:", err);
         }
       }
     }
-    // end n8n
     const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
     const modonMsg =
       status === "pending" && modonSent + modonFailed > 0

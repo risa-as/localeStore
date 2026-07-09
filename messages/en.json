@@ -320,7 +320,8 @@
     "address": "Address",
     "quantity": "Qty",
     "noItems": "No items",
-    "expenses": "Expenses"
+    "expenses": "Expenses",
+    "chats": "Chats"
   },
   "Categories": {
     "selectCategory": "Select a Category",

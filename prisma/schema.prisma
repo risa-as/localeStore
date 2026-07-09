@@ -229,3 +229,31 @@ model WhatsAppFailedDelivery {
   errorCode String?
   createdAt DateTime @default(now())
 }
+
+model WaConversation {
+  id                 String      @id @default(cuid())
+  phone              String      @unique // بصيغة محلية 07XXXXXXXXX
+  customerName       String?
+  lastMessageAt      DateTime    @default(now())
+  lastMessagePreview String?
+  unreadCount        Int         @default(0)
+  windowExpiresAt    DateTime? // آخر رسالة واردة + 24 ساعة (نافذة الرد المجاني)
+  createdAt          DateTime    @default(now())
+  messages           WaMessage[]
+}
+
+model WaMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId    String?        @unique // معرف Meta — لمنع التكرار وربط حالات التسليم
+  direction      String // "in" | "out"
+  type           String         @default("text") // text|template|image|audio|video|document|sticker|unsupported
+  body           String?
+  mediaId        String? // معرف الوسائط لدى Meta — تُجلب عبر مسار الوسيط
+  status         String         @default("sent") // sending|sent|delivered|read|failed
+  errorCode      String?
+  timestamp      DateTime       @default(now())
+
+  @@index([conversationId, timestamp])
+}

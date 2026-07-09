@@ -320,7 +320,8 @@
     "address": "العنوان",
     "quantity": "الكمية",
     "noItems": "لا يوجد عناصر",
-    "expenses": "المصاريف"
+    "expenses": "المصاريف",
+    "chats": "المحادثات"
   },
   "Categories": {
     "selectCategory": "اختر فئة",
