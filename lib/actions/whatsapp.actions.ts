@@ -2,7 +2,12 @@
 
 import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
-import { sendWaText, getWaConfig } from "@/lib/whatsapp";
+import {
+  sendWaText,
+  sendWaImage,
+  uploadWaMedia,
+  getWaConfig,
+} from "@/lib/whatsapp";
 
 async function requireStaff() {
   const session = await auth();
@@ -165,6 +170,80 @@ export async function sendWaReply(conversationId: string, text: string) {
   } catch (err) {
     console.error("❌ sendWaReply error:", err);
     return { success: false, message: "فشل الإرسال — تحقق من إعدادات واتساب" };
+  }
+}
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // حد Meta للصور
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/** إرسال صورة — مسموح فقط ضمن نافذة الـ 24 ساعة */
+export async function sendWaImageReply(formData: FormData) {
+  await requireStaff();
+
+  const conversationId = String(formData.get("conversationId") ?? "");
+  const caption = String(formData.get("caption") ?? "").trim();
+  const file = formData.get("file");
+
+  if (!(file instanceof File) || file.size === 0) {
+    return { success: false, message: "لم يتم اختيار صورة" };
+  }
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return { success: false, message: "صيغة غير مدعومة — استخدم JPG أو PNG أو WEBP" };
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return { success: false, message: "حجم الصورة أكبر من 5 ميغابايت" };
+  }
+
+  const conversation = await prisma.waConversation.findUnique({
+    where: { id: conversationId },
+  });
+  if (!conversation) return { success: false, message: "المحادثة غير موجودة" };
+
+  if (
+    !conversation.windowExpiresAt ||
+    conversation.windowExpiresAt < new Date()
+  ) {
+    return {
+      success: false,
+      message:
+        "انتهت نافذة الـ 24 ساعة — لا يمكن إرسال صورة حتى يراسلك الزبون مجدداً",
+    };
+  }
+
+  try {
+    // نرفع أولاً ثم نرسل: الفشل في الرفع يجب ألا يترك رسالة معلّقة في السجل.
+    const mediaId = await uploadWaMedia(file);
+    const waMessageId = await sendWaImage({
+      phoneNumber: conversation.phone,
+      mediaId,
+      caption: caption || undefined,
+    });
+
+    await prisma.$transaction([
+      prisma.waMessage.create({
+        data: {
+          conversationId,
+          waMessageId,
+          direction: "out",
+          type: "image",
+          body: caption || null,
+          mediaId,
+          status: "sent",
+        },
+      }),
+      prisma.waConversation.update({
+        where: { id: conversationId },
+        data: {
+          lastMessageAt: new Date(),
+          lastMessagePreview: caption ? caption.slice(0, 120) : "📷 صورة",
+        },
+      }),
+    ]);
+
+    return { success: true, message: "تم إرسال الصورة" };
+  } catch (err) {
+    console.error("❌ sendWaImageReply error:", err);
+    return { success: false, message: "فشل إرسال الصورة — تحقق من إعدادات واتساب" };
   }
 }
 
