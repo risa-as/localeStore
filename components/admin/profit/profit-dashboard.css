@@ -319,6 +319,59 @@
   font-size: 15px;
 }
 
+/* ── Data-integrity warning (amber — distinct from the red margin alert) ── */
+
+.pa-root {
+  --pa-warn-fg: oklch(0.62 0.13 70);
+}
+
+.dark .pa-root {
+  --pa-warn-fg: oklch(0.8 0.14 80);
+}
+
+.pa-warn {
+  background: oklch(0.75 0.15 80 / 0.1);
+  border: 1px solid oklch(0.75 0.15 80 / 0.4);
+  border-radius: 14px;
+  padding: 18px 20px;
+}
+
+.pa-warn-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: oklch(0.75 0.15 80);
+  color: oklch(0.2 0.02 80);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pa-warn-title {
+  font-weight: 800;
+  color: var(--pa-warn-fg);
+  font-size: 15px;
+}
+
+.pa-warn-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--pa-text-primary);
+  background: var(--pa-bg-panel);
+  border: 1px solid var(--pa-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  transition: border-color 0.15s ease;
+}
+
+.pa-warn-row:hover {
+  border-color: oklch(0.75 0.15 80 / 0.6);
+}
+
 /* ── Tabs ───────────────────────────────────────────────────────────────── */
 
 .pa-tab {

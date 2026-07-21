@@ -1489,6 +1489,20 @@ export async function getOrderProfitStats({
   let baghdadActualShippingCost = 0;
   let othersActualShippingCost = 0;
 
+  // Orders whose totalPrice disagrees with their own line items. The profit page
+  // treats totalPrice as the source of truth (it is what was actually collected)
+  // and spreads it across the items, so a mismatch silently distorts that
+  // product's per-unit selling price — and usually means the recorded quantity
+  // is wrong, which understates cost and leaves stock over-counted.
+  const inconsistentOrders: {
+    id: string;
+    date: string;
+    expected: number;
+    actual: number;
+    diff: number;
+    items: string;
+  }[] = [];
+
   // Per-day buckets for the dashboard chart, keyed by Iraq-local calendar day.
   const dailyMap = new Map<
     string,
@@ -1525,6 +1539,21 @@ export async function getOrderProfitStats({
       (sum, i) => sum + Number(i.price) * i.qty,
       0,
     );
+
+    // Flag orders that do not add up. Tolerance is 1 IQD (values are stored in
+    // thousands), which is well below any real rounding.
+    const expectedTotal = rawItemsTotal + Number(order.shippingPrice);
+    const totalDiff = Number(order.totalPrice) - expectedTotal;
+    if (Math.abs(totalDiff) > 0.001) {
+      inconsistentOrders.push({
+        id: order.id,
+        date: iraqDayKey(order.createdAt),
+        expected: expectedTotal,
+        actual: Number(order.totalPrice),
+        diff: totalDiff,
+        items: orderItems.map((i) => `${i.name} × ${i.qty}`).join(" + "),
+      });
+    }
 
     for (const item of orderItems) {
       const rawRevenue = Number(item.price) * item.qty;
@@ -1631,6 +1660,7 @@ export async function getOrderProfitStats({
   return {
     productStats,
     dailySeries,
+    inconsistentOrders,
     fefoActive,
     fefoFallbackQty,
     orderSummary: {

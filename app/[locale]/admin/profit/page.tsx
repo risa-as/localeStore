@@ -41,8 +41,14 @@ const ProfitPage = async (props: {
     getExpenseStatsForPeriod(prevFrom, prevTo),
   ]);
 
-  const { productStats, dailySeries, orderSummary, fefoActive, fefoFallbackQty } =
-    current;
+  const {
+    productStats,
+    dailySeries,
+    inconsistentOrders,
+    orderSummary,
+    fefoActive,
+    fefoFallbackQty,
+  } = current;
 
   const productTotals = productStats.reduce(
     (acc, item) => ({
@@ -127,6 +133,7 @@ const ProfitPage = async (props: {
           expenseByCategory: expenseStats.expenseByCategory,
         }}
         comparison={comparison}
+        inconsistentOrders={inconsistentOrders}
       />
     </div>
   );

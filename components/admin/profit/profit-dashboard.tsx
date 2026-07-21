@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import Link from "next/link";
 import { Tajawal } from "next/font/google";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -65,6 +66,15 @@ export type ProfitDashboardProps = {
     margin: number;
     orders: number;
   } | null;
+  /** Orders whose totalPrice does not equal their own line items + shipping. */
+  inconsistentOrders: {
+    id: string;
+    date: string;
+    expected: number;
+    actual: number;
+    diff: number;
+    items: string;
+  }[];
 };
 
 const DONUT_PALETTE = [
@@ -93,6 +103,7 @@ export default function ProfitDashboard({
   fefoFallbackQty,
   expenses,
   comparison,
+  inconsistentOrders,
 }: ProfitDashboardProps) {
   // Expense inputs start from the real database figures and can be overridden
   // locally for what-if analysis. Overrides are never persisted.
@@ -373,6 +384,52 @@ export default function ProfitDashboard({
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
       <div className="pa-inner">
+        {/* ── Data integrity warning ───────────────────────────────────── */}
+        {inconsistentOrders.length > 0 && (
+          <div className="pa-warn">
+            <div className="flex items-center gap-2.5">
+              <span className="pa-warn-icon" aria-hidden>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+              <div className="pa-warn-title">
+                تنبيه: {inconsistentOrders.length} طلب مبلغه لا يطابق أصنافه
+              </div>
+            </div>
+            <div className="pa-meta mt-2 mb-3">
+              المبلغ المُحصَّل يختلف عن (مجموع الأصناف + التوصيل). النظام يعتمد
+              المبلغ المُحصَّل، لذا يُوزَّع الفرق على المنتجات ويرفع أو يخفض سعر
+              بيع الوحدة. غالباً السبب أن الكمية المسجّلة في الطلب أقل من الكمية
+              التي شُحنت فعلاً — وهذا يعني أن التكلفة أقل من الحقيقة والمخزون
+              أعلى من الحقيقة.
+            </div>
+            <div className="flex flex-col gap-2">
+              {inconsistentOrders.map((o) => (
+                <Link
+                  key={o.id}
+                  href={`/order/${o.id}`}
+                  className="pa-warn-row"
+                >
+                  <span className="flex-1 min-w-0">
+                    <span className="font-bold">{o.items}</span>
+                    <span className="pa-meta"> · {o.date}</span>
+                  </span>
+                  <span className="pa-meta whitespace-nowrap">
+                    متوقع {formatCurrency(o.expected)} ← فعلي{" "}
+                    {formatCurrency(o.actual)}
+                  </span>
+                  <span
+                    className="font-extrabold whitespace-nowrap"
+                    style={{ color: "var(--pa-warn-fg)" }}
+                  >
+                    {o.diff > 0 ? "+" : ""}
+                    {formatCurrency(o.diff)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* ── Insights ─────────────────────────────────────────────────── */}
         {insights.length > 0 && (
           <div className="pa-grid">
