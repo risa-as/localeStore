@@ -366,7 +366,9 @@ export default function ProfitDashboard({
     ];
   }, [ranked, netProfit, orderSummary.totalOrderCount]);
 
-  const colSpan = adsActive ? 13 : 9;
+  // 13 fixed columns: #, name, qty, returned, revenue, cost, profit, margin,
+  // the 4 ad columns, and revenue share.
+  const colSpan = 13;
 
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
@@ -802,10 +804,7 @@ export default function ProfitDashboard({
           </div>
 
           <div className="pa-table-wrap">
-            <table
-              className="pa-table"
-              style={{ minWidth: adsActive ? 1220 : 920 }}
-            >
+            <table className="pa-table" style={{ minWidth: 1220 }}>
               <thead>
                 <tr>
                   <th>#</th>
@@ -839,14 +838,10 @@ export default function ProfitDashboard({
                   >
                     هامش الربح {sortArrow("margin")}
                   </th>
-                  {adsActive && (
-                    <>
-                      <th>مصاريف الإعلان</th>
-                      <th>إعلان / طلب</th>
-                      <th>الربح بعد الإعلان</th>
-                      <th>هامش بعد الإعلان</th>
-                    </>
-                  )}
+                  <th>مصاريف الإعلان</th>
+                  <th>إعلان / طلب</th>
+                  <th>الربح بعد الإعلان</th>
+                  <th>هامش بعد الإعلان</th>
                   <th>% من الإيراد</th>
                 </tr>
               </thead>
@@ -930,34 +925,41 @@ export default function ProfitDashboard({
                               {m.toFixed(1)}%
                             </span>
                           </td>
-                          {adsActive && (
-                            <>
-                              <td>{adCost > 0 ? formatCurrency(adCost) : "—"}</td>
-                              <td>
-                                {adCost > 0 && p.orderCount > 0
-                                  ? formatCurrency(adCost / p.orderCount)
-                                  : "—"}
-                              </td>
-                              <td
-                                style={{
-                                  color:
-                                    profitAfterAds >= 0
-                                      ? "var(--pa-green-value)"
-                                      : "var(--pa-danger)",
-                                  fontWeight: 700,
-                                }}
+                          {/* Ad columns stay visible even with no ad spend, so
+                              the table shape never shifts; they read "—" until a
+                              campaign covers the product. */}
+                          <td>{adCost > 0 ? formatCurrency(adCost) : "—"}</td>
+                          <td>
+                            {adCost > 0 && p.orderCount > 0
+                              ? formatCurrency(adCost / p.orderCount)
+                              : "—"}
+                          </td>
+                          <td
+                            style={
+                              adCost > 0
+                                ? {
+                                    color:
+                                      profitAfterAds >= 0
+                                        ? "var(--pa-green-value)"
+                                        : "var(--pa-danger)",
+                                    fontWeight: 700,
+                                  }
+                                : undefined
+                            }
+                          >
+                            {adCost > 0 ? formatCurrency(profitAfterAds) : "—"}
+                          </td>
+                          <td>
+                            {adCost > 0 ? (
+                              <span
+                                className={`pa-badge ${marginAfterAds >= 15 ? "pa-badge--green" : "pa-badge--danger"}`}
                               >
-                                {formatCurrency(profitAfterAds)}
-                              </td>
-                              <td>
-                                <span
-                                  className={`pa-badge ${marginAfterAds >= 15 ? "pa-badge--green" : "pa-badge--danger"}`}
-                                >
-                                  {marginAfterAds.toFixed(1)}%
-                                </span>
-                              </td>
-                            </>
-                          )}
+                                {marginAfterAds.toFixed(1)}%
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                           <td>
                             <div className="flex items-center gap-2 justify-center">
                               <div className="pa-bar-track--sm">
@@ -1043,24 +1045,20 @@ export default function ProfitDashboard({
                     {formatCurrency(netProfit)}
                   </td>
                   <td>{margin.toFixed(1)}%</td>
-                  {adsActive && (
-                    <>
-                      <td>{formatCurrency(adsExpense)}</td>
-                      <td>—</td>
-                      <td style={{ color: "var(--pa-green-value)" }}>
-                        {formatCurrency(netProfit - adsExpense)}
-                      </td>
-                      <td>
-                        {totals.revenue > 0
-                          ? (
-                              ((netProfit - adsExpense) / totals.revenue) *
-                              100
-                            ).toFixed(1)
-                          : "0.0"}
-                        %
-                      </td>
-                    </>
-                  )}
+                  <td>{adsActive ? formatCurrency(adsExpense) : "—"}</td>
+                  <td>—</td>
+                  <td
+                    style={
+                      adsActive ? { color: "var(--pa-green-value)" } : undefined
+                    }
+                  >
+                    {adsActive ? formatCurrency(netProfit - adsExpense) : "—"}
+                  </td>
+                  <td>
+                    {adsActive && totals.revenue > 0
+                      ? `${(((netProfit - adsExpense) / totals.revenue) * 100).toFixed(1)}%`
+                      : "—"}
+                  </td>
                   <td>100%</td>
                 </tr>
               </tfoot>
