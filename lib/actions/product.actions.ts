@@ -152,9 +152,34 @@ export async function deleteProduct(id: string) {
 export async function createProduct(data: z.infer<typeof insertProductSchema>) {
   try {
     const product = insertProductSchema.parse(data);
-    await prisma.product.create({ data: product });
+
+    // Create the product AND its opening batch in one transaction, so the
+    // quantity entered here shows up on /admin/batches and feeds the FEFO cost
+    // engine. Without the batch the product is invisible to the batches page and
+    // its sales silently fall back to the frozen snapshot cost.
+    //
+    // The batch quantity is the raw stock (not `stock − sold`): a brand-new
+    // product has no sales yet, so the two are equal. This keeps the invariant
+    // `Product.stock == SUM(batch.quantity)` true from creation onwards.
+    await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({ data: product });
+
+      if (created.stock > 0) {
+        await tx.productBatch.create({
+          data: {
+            productId: created.id,
+            batchNumber: "1",
+            quantity: created.stock,
+            costPrice: created.costPrice,
+            notes: "دفعة افتتاحية أُنشئت تلقائياً عند إضافة المنتج",
+          },
+        });
+      }
+    });
 
     revalidatePath("/admin/products");
+    revalidatePath("/admin/batches");
+    revalidatePath("/admin/profit");
     revalidateTag("products", {});
 
     return {
@@ -178,12 +203,22 @@ export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
 
     if (!productExists) throw new Error("Product not found");
 
+    // Batches own the stock number. Editing `stock` directly here would break the
+    // invariant `Product.stock == SUM(batch.quantity)` and silently desync the
+    // products page from the batches page — which is exactly the drift this fix
+    // removes. So we drop the incoming `stock` and keep the stored value;
+    // inventory changes go through /admin/batches (add / edit / delete a batch),
+    // which updates both sides atomically.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { stock: _ignoredStock, ...productWithoutStock } = product;
+
     await prisma.product.update({
       where: { id: product.id },
-      data: product,
+      data: productWithoutStock,
     });
 
     revalidatePath("/admin/products");
+    revalidatePath("/admin/batches");
     revalidateTag("products", {});
 
     return {

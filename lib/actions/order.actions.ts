@@ -9,6 +9,7 @@ import { prisma } from "@/db/prisma";
 import { CartItem } from "@/types";
 import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
+import { REVENUE_STATUSES } from "../constants/order-statuses";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
@@ -1409,7 +1410,9 @@ export async function getOrderProfitStats({
     prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
-        status: { in: ["completed", "completedAccountant"] },
+        // Revenue only — `pending` is excluded here on purpose (goods shipped but
+        // cash not collected). Inventory consumption uses the wider list.
+        status: { in: REVENUE_STATUSES },
       },
       select: {
         id: true,

@@ -27,6 +27,7 @@ import { Textarea } from "../ui/textarea";
 import { createProduct, updateProduct } from "@/lib/actions/product.actions";
 import { Card, CardContent } from "../ui/card";
 import Image from "next/image";
+import Link from "next/link";
 import { Checkbox } from "../ui/checkbox";
 import { UploadButton } from "@/lib/uploadthing";
 import { useTranslations } from "next-intl";
@@ -345,8 +346,26 @@ const ProductForm = ({
                 <FormItem className="w-full">
                   <FormLabel>{t('stock')}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t('placeholderStock')} {...field} />
+                    <Input
+                      placeholder={t('placeholderStock')}
+                      {...field}
+                      // عند التعديل: الكمية تُدار من صفحة الدفعات فقط، حتى يبقى
+                      // مخزون المنتج مطابقاً لمجموع الدفعات.
+                      disabled={type === "Update"}
+                    />
                   </FormControl>
+                  {type === "Update" && (
+                    <p className="text-xs text-muted-foreground">
+                      الكمية تُدار من صفحة{" "}
+                      <Link
+                        href="/admin/batches"
+                        className="text-primary hover:underline"
+                      >
+                        الدفعات
+                      </Link>{" "}
+                      — أضِف دفعة جديدة لزيادة المخزون.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
