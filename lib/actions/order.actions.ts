@@ -730,9 +730,11 @@ export async function getOrdersSummaryStats({
     totalValue,
     actualShippingCost,
     chargedShipping,
-    // Product value alone — what the orders are worth once the delivery portion
-    // the customer paid is taken back out.
-    valueWithoutShipping: totalValue - chargedShipping,
+    // What actually reaches the business: the courier collects the full order
+    // amount from the customer and deducts its own fee before remitting, so the
+    // ACTUAL shipping cost is the right subtrahend — not the amount charged to
+    // the customer. This matches `orderNetRevenue` on the profit page.
+    netAfterShipping: totalValue - actualShippingCost,
   };
 }
 

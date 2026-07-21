@@ -260,8 +260,8 @@ const AdminOrdersPage = async (props: {
         />
         <StatCard
           label="قيمة الطلبات بدون توصيل"
-          value={formatCurrency(stats.valueWithoutShipping)}
-          sub={`قيمة المنتجات فقط = القيمة − التوصيل المُحصَّل (${formatCurrency(stats.chargedShipping)})`}
+          value={formatCurrency(stats.netAfterShipping)}
+          sub={`الصافي بعد خصم شركة التوصيل = القيمة − ${formatCurrency(stats.actualShippingCost)}`}
           icon={Package}
         />
       </div>
