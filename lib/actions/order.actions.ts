@@ -1489,10 +1489,21 @@ export async function getOrderProfitStats({
   let baghdadActualShippingCost = 0;
   let othersActualShippingCost = 0;
 
+  // Per-day buckets for the dashboard chart, keyed by Iraq-local calendar day.
+  const dailyMap = new Map<
+    string,
+    { revenue: number; profit: number; orders: number }
+  >();
+  const iraqDayKey = (d: Date) =>
+    new Date(new Date(d).getTime() + 3 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
   for (const order of orders) {
     const orderItems = order.orderitems;
     const isBaghdad = order.governorate === "Baghdad";
     const actualShipping = Number(order.actualShippingCost);
+    let orderProfit = 0;
 
     if (isBaghdad) {
       baghdadOrderCount++;
@@ -1535,6 +1546,7 @@ export async function getOrderProfitStats({
       }
 
       const profit = revenue - cost;
+      orderProfit += profit;
 
       if (statsMap.has(item.productId)) {
         const stats = statsMap.get(item.productId)!;
@@ -1556,6 +1568,13 @@ export async function getOrderProfitStats({
         });
       }
     }
+
+    const dayKey = iraqDayKey(order.createdAt);
+    const bucket = dailyMap.get(dayKey) ?? { revenue: 0, profit: 0, orders: 0 };
+    bucket.revenue += orderNetRevenue;
+    bucket.profit += orderProfit;
+    bucket.orders += 1;
+    dailyMap.set(dayKey, bucket);
   }
 
   // Attach returned qty to each product stat
@@ -1586,8 +1605,32 @@ export async function getOrderProfitStats({
   const avgOrderValue =
     totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
 
+  // Walk every calendar day in the range so the chart has no gaps — days with no
+  // orders must render as zero, not be skipped (which would distort the x-axis).
+  const dailySeries: {
+    date: string;
+    revenue: number;
+    profit: number;
+    orders: number;
+  }[] = [];
+  const cursor = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+  const lastDay = new Date(endDate.getTime() + 3 * 60 * 60 * 1000);
+  // Guard against a pathological range producing an unbounded loop.
+  for (let i = 0; i < 400 && cursor <= lastDay; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    const bucket = dailyMap.get(key);
+    dailySeries.push({
+      date: key,
+      revenue: bucket?.revenue ?? 0,
+      profit: bucket?.profit ?? 0,
+      orders: bucket?.orders ?? 0,
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
   return {
     productStats,
+    dailySeries,
     fefoActive,
     fefoFallbackQty,
     orderSummary: {
