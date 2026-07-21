@@ -55,11 +55,15 @@ function StatCard({
   value,
   sub,
   icon: Icon,
+  note,
+  noteTone,
 }: {
   label: string;
   value: string;
   sub: string;
   icon: React.ElementType;
+  note?: string;
+  noteTone?: "good" | "bad";
 }) {
   return (
     <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
@@ -73,6 +77,15 @@ function StatCard({
         {value}
       </p>
       <p className="text-[11px] text-muted-foreground">{sub}</p>
+      {note && (
+        <p
+          className={`text-[11px] font-semibold ${
+            noteTone === "bad" ? "text-red-600" : "text-green-600"
+          }`}
+        >
+          {note}
+        </p>
+      )}
     </div>
   );
 }
@@ -114,6 +127,9 @@ const AdminOrdersPage = async (props: {
 
   const scopeLabel =
     status && status !== "all" ? t(`Orders.Status.${status}`) : "جميع الحالات";
+
+  // موجب = ربحت من التوصيل، سالب = دفعت لشركة التوصيل أكثر مما حصّلت.
+  const shippingMargin = stats.chargedShipping - stats.actualShippingCost;
 
   const statuses = [
     "home",
@@ -225,16 +241,27 @@ const AdminOrdersPage = async (props: {
           sub="مجموع أسعار الطلبات"
           icon={Wallet}
         />
+        {/* البطاقتان التاليتان تستخدمان رقمَي توصيل مختلفين عمداً: المدفوع
+            لشركة التوصيل مقابل المُحصَّل من الزبون. نعرضهما معاً حتى لا تبدو
+            عملية الطرح خاطئة، ولأن الفرق بينهما هو ربح/خسارة التوصيل. */}
         <StatCard
           label="تكلفة التوصيل"
           value={formatCurrency(stats.actualShippingCost)}
-          sub="إجمالي فعلي"
+          sub={`فعلي · مُحصَّل من الزبون: ${formatCurrency(stats.chargedShipping)}`}
           icon={Truck}
+          note={
+            shippingMargin === 0
+              ? undefined
+              : shippingMargin > 0
+                ? `ربح توصيل: ${formatCurrency(shippingMargin)}`
+                : `خسارة توصيل: ${formatCurrency(Math.abs(shippingMargin))}`
+          }
+          noteTone={shippingMargin >= 0 ? "good" : "bad"}
         />
         <StatCard
           label="قيمة الطلبات بدون توصيل"
           value={formatCurrency(stats.valueWithoutShipping)}
-          sub="قيمة المنتجات فقط"
+          sub={`قيمة المنتجات فقط = القيمة − التوصيل المُحصَّل (${formatCurrency(stats.chargedShipping)})`}
           icon={Package}
         />
       </div>
