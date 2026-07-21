@@ -114,8 +114,8 @@ export default function ProfitDashboard({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("profit");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  // Open by default — a data-integrity problem should be seen, not hunted for.
-  const [warnOpen, setWarnOpen] = useState(true);
+  const [warnOpen, setWarnOpen] = useState(false);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const totals = useMemo(
     () =>
@@ -291,8 +291,41 @@ export default function ProfitDashboard({
       return `${d}/${m}`;
     });
 
-    return { isLine, linePath, areaPath, bars, labels, coords, W, H };
+    return {
+      isLine,
+      linePath,
+      areaPath,
+      bars,
+      labels,
+      coords,
+      W,
+      H,
+      values,
+      dates: points.map((p) => p.date),
+      // Per-index anchor positions, so the hover indicator lines up with both
+      // the line's vertices and the tops of the bars.
+      xs: values.map((_, i) => x(i)),
+      ys: values.map((v) => y(v)),
+      count: points.length,
+    };
   }, [dailySeries, chartMetric]);
+
+  /**
+   * Map a pointer position to the nearest data point. The SVG's internal
+   * coordinate system stays left-to-right even inside `dir="rtl"`, and
+   * getBoundingClientRect is in screen space, so this mapping holds in RTL.
+   */
+  const pickHoverIndex = (clientX: number, el: SVGSVGElement) => {
+    if (!chart || chart.count === 0) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const ratio = (clientX - rect.left) / rect.width;
+    const idx = Math.round(ratio * (chart.count - 1));
+    setHoverIdx(Math.max(0, Math.min(chart.count - 1, idx)));
+  };
+
+  const formatChartValue = (v: number) =>
+    chartMetric === "orders" ? `${v} طلب` : formatCurrency(v);
 
   const chartMeta: Record<ChartMetric, { title: string; sub: string }> = {
     profit: {
@@ -688,12 +721,44 @@ export default function ProfitDashboard({
           </div>
 
           {chart ? (
-            <div className="mt-3.5">
+            <div className="mt-3.5 pa-chart-wrap">
+              {hoverIdx !== null && (
+                <div
+                  className="pa-tooltip"
+                  style={{
+                    // Clamped so the bubble stays inside the panel at the two
+                    // ends of the axis, where it is centred on x=0 / x=max.
+                    left: `${Math.min(
+                      90,
+                      Math.max(10, (chart.xs[hoverIdx] / chart.W) * 100),
+                    )}%`,
+                  }}
+                >
+                  <div className="pa-tooltip-date">
+                    {(() => {
+                      const [, m, d] = chart.dates[hoverIdx].split("-");
+                      return `${d}/${m}`;
+                    })()}
+                  </div>
+                  <div className="pa-tooltip-value">
+                    {formatChartValue(chart.values[hoverIdx])}
+                  </div>
+                </div>
+              )}
               <svg
                 viewBox={`0 0 ${chart.W} ${chart.H}`}
                 style={{ width: "100%", height: 240, display: "block" }}
                 role="img"
                 aria-label={chartMeta[chartMetric].title}
+                onMouseMove={(e) => pickHoverIndex(e.clientX, e.currentTarget)}
+                onMouseLeave={() => setHoverIdx(null)}
+                onTouchStart={(e) =>
+                  pickHoverIndex(e.touches[0].clientX, e.currentTarget)
+                }
+                onTouchMove={(e) =>
+                  pickHoverIndex(e.touches[0].clientX, e.currentTarget)
+                }
+                onTouchEnd={() => setHoverIdx(null)}
               >
                 <defs>
                   <linearGradient id="paAreaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -755,11 +820,41 @@ export default function ProfitDashboard({
                       height={b.h}
                       rx="3"
                       fill="oklch(0.72 0.15 155)"
+                      opacity={
+                        hoverIdx === null || hoverIdx === i ? 1 : 0.45
+                      }
                     />
                   ))
                 )}
+
+                {/* Hover indicator */}
+                {hoverIdx !== null && (
+                  <g pointerEvents="none">
+                    <line
+                      x1={chart.xs[hoverIdx]}
+                      x2={chart.xs[hoverIdx]}
+                      y1={12}
+                      y2={chart.H - 20}
+                      stroke="var(--pa-text-muted)"
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                    />
+                    <circle
+                      cx={chart.xs[hoverIdx]}
+                      cy={chart.ys[hoverIdx]}
+                      r="5"
+                      fill="oklch(0.72 0.15 155)"
+                      stroke="var(--pa-bg-panel)"
+                      strokeWidth="3"
+                    />
+                  </g>
+                )}
               </svg>
-              <div className="flex justify-between mt-2">
+              {/* dir="ltr" is required: the SVG plots the oldest day at x=0
+                  (visually left) regardless of direction, but inside dir="rtl"
+                  a flex row lays its first child out on the RIGHT — which would
+                  put the oldest label at the newest end of the chart. */}
+              <div className="flex justify-between mt-2" dir="ltr">
                 {chart.labels.map((l, i) => (
                   <span key={i} className="pa-meta" style={{ fontSize: 11 }}>
                     {l}

@@ -422,6 +422,45 @@
   color: oklch(0.15 0.02 155);
 }
 
+/* ── Chart hover tooltip ────────────────────────────────────────────────── */
+
+.pa-chart-wrap {
+  position: relative;
+}
+
+.pa-chart-wrap svg {
+  touch-action: pan-y;
+}
+
+.pa-tooltip {
+  position: absolute;
+  top: -4px;
+  transform: translateX(-50%);
+  background: var(--pa-bg-panel);
+  border: 1px solid var(--pa-border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  box-shadow: var(--pa-shadow);
+  pointer-events: none;
+  z-index: 5;
+  white-space: nowrap;
+  text-align: center;
+  /* Keep the bubble inside the panel at the extreme ends of the axis. */
+  max-width: max-content;
+}
+
+.pa-tooltip-date {
+  font-size: 11px;
+  color: var(--pa-text-muted);
+  direction: ltr;
+}
+
+.pa-tooltip-value {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--pa-text-primary);
+}
+
 /* ── Table ──────────────────────────────────────────────────────────────── */
 
 .pa-table-wrap {
