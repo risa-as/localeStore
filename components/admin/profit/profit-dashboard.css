@@ -354,6 +354,31 @@
   font-size: 15px;
 }
 
+.pa-warn-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: right;
+  color: var(--pa-warn-fg);
+}
+
+.pa-warn-chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+  transform: rotate(-90deg);
+}
+
+.pa-warn-chevron--open {
+  transform: rotate(0deg);
+}
+
 .pa-warn-row {
   display: flex;
   align-items: center;

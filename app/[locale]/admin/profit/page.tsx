@@ -20,13 +20,27 @@ const ProfitPage = async (props: {
 
   const searchParams = await props.searchParams;
 
-  const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Both defaults are normalised to the same midday-UTC form the date picker
+  // submits, built from the Iraq-local calendar date (UTC+3).
+  //
+  // Constructing them with `new Date(y, m, 1)` instead would take local midnight,
+  // whose UTC instant falls on the PREVIOUS day — and the downstream day-window
+  // helper reads the date via toISOString(), so "this month" silently began a day
+  // early and pulled the last day of the previous month into the report.
   const parseDate = (s: string) => new Date(`${s}T12:00:00.000Z`);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const now = new Date();
+  const iraqNow = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const iraqYear = iraqNow.getUTCFullYear();
+  const iraqMonth = pad(iraqNow.getUTCMonth() + 1);
+  const iraqDay = pad(iraqNow.getUTCDate());
+
   const defaultFrom = searchParams.from
     ? parseDate(searchParams.from)
-    : startOfMonth;
-  const defaultTo = searchParams.to ? parseDate(searchParams.to) : now;
+    : parseDate(`${iraqYear}-${iraqMonth}-01`);
+  const defaultTo = searchParams.to
+    ? parseDate(searchParams.to)
+    : parseDate(`${iraqYear}-${iraqMonth}-${iraqDay}`);
 
   // Immediately preceding window of the same length, for the delta badges.
   const DAY = 24 * 60 * 60 * 1000;

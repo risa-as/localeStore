@@ -114,6 +114,8 @@ export default function ProfitDashboard({
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [chartMetric, setChartMetric] = useState<ChartMetric>("profit");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Open by default — a data-integrity problem should be seen, not hunted for.
+  const [warnOpen, setWarnOpen] = useState(true);
 
   const totals = useMemo(
     () =>
@@ -387,46 +389,60 @@ export default function ProfitDashboard({
         {/* ── Data integrity warning ───────────────────────────────────── */}
         {inconsistentOrders.length > 0 && (
           <div className="pa-warn">
-            <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              className="pa-warn-toggle"
+              onClick={() => setWarnOpen((v) => !v)}
+              aria-expanded={warnOpen}
+            >
               <span className="pa-warn-icon" aria-hidden>
                 <AlertTriangle className="w-3.5 h-3.5" />
               </span>
-              <div className="pa-warn-title">
+              <span className="pa-warn-title flex-1 text-right">
                 تنبيه: {inconsistentOrders.length} طلب مبلغه لا يطابق أصنافه
-              </div>
-            </div>
-            <div className="pa-meta mt-2 mb-3">
-              المبلغ المُحصَّل يختلف عن (مجموع الأصناف + التوصيل). النظام يعتمد
-              المبلغ المُحصَّل، لذا يُوزَّع الفرق على المنتجات ويرفع أو يخفض سعر
-              بيع الوحدة. غالباً السبب أن الكمية المسجّلة في الطلب أقل من الكمية
-              التي شُحنت فعلاً — وهذا يعني أن التكلفة أقل من الحقيقة والمخزون
-              أعلى من الحقيقة.
-            </div>
-            <div className="flex flex-col gap-2">
-              {inconsistentOrders.map((o) => (
-                <Link
-                  key={o.id}
-                  href={`/order/${o.id}`}
-                  className="pa-warn-row"
-                >
-                  <span className="flex-1 min-w-0">
-                    <span className="font-bold">{o.items}</span>
-                    <span className="pa-meta"> · {o.date}</span>
-                  </span>
-                  <span className="pa-meta whitespace-nowrap">
-                    متوقع {formatCurrency(o.expected)} ← فعلي{" "}
-                    {formatCurrency(o.actual)}
-                  </span>
-                  <span
-                    className="font-extrabold whitespace-nowrap"
-                    style={{ color: "var(--pa-warn-fg)" }}
-                  >
-                    {o.diff > 0 ? "+" : ""}
-                    {formatCurrency(o.diff)}
-                  </span>
-                </Link>
-              ))}
-            </div>
+              </span>
+              <ChevronDown
+                className={`w-4 h-4 pa-warn-chevron ${warnOpen ? "pa-warn-chevron--open" : ""}`}
+                aria-hidden
+              />
+            </button>
+
+            {warnOpen && (
+              <>
+                <div className="pa-meta mt-2 mb-3">
+                  المبلغ المُحصَّل يختلف عن (مجموع الأصناف + التوصيل). النظام
+                  يعتمد المبلغ المُحصَّل، لذا يُوزَّع الفرق على المنتجات ويرفع أو
+                  يخفض سعر بيع الوحدة. غالباً السبب أن الكمية المسجّلة في الطلب
+                  أقل من الكمية التي شُحنت فعلاً — وهذا يعني أن التكلفة أقل من
+                  الحقيقة والمخزون أعلى من الحقيقة.
+                </div>
+                <div className="flex flex-col gap-2">
+                  {inconsistentOrders.map((o) => (
+                    <Link
+                      key={o.id}
+                      href={`/order/${o.id}`}
+                      className="pa-warn-row"
+                    >
+                      <span className="flex-1 min-w-0">
+                        <span className="font-bold">{o.items}</span>
+                        <span className="pa-meta"> · {o.date}</span>
+                      </span>
+                      <span className="pa-meta whitespace-nowrap">
+                        متوقع {formatCurrency(o.expected)} ← فعلي{" "}
+                        {formatCurrency(o.actual)}
+                      </span>
+                      <span
+                        className="font-extrabold whitespace-nowrap"
+                        style={{ color: "var(--pa-warn-fg)" }}
+                      >
+                        {o.diff > 0 ? "+" : ""}
+                        {formatCurrency(o.diff)}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
