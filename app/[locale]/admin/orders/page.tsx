@@ -1,5 +1,9 @@
 import Pagination from "@/components/shared/pagination";
-import { getAllOrders } from "@/lib/actions/order.actions";
+import {
+  getAllOrders,
+  getOrdersSummaryStats,
+} from "@/lib/actions/order.actions";
+import { formatCurrency } from "@/lib/utils";
 import { requireAdmin } from "@/lib/auth-guard";
 import { Metadata } from "next";
 import Link from "next/link";
@@ -11,7 +15,14 @@ import OrdersImportButton from "@/components/admin/orders-import-button";
 import BulkUpdateByDateDialog from "@/components/admin/bulk-update-by-date-dialog";
 import ModonSyncButton from "@/components/admin/modon-sync-button";
 import { PAGE_SIZE } from "@/lib/constants";
-import { X, BarChart2 } from "lucide-react";
+import {
+  X,
+  BarChart2,
+  ShoppingBag,
+  Wallet,
+  Truck,
+  Package,
+} from "lucide-react";
 
 // n8n
 import { prisma } from "@/db/prisma";
@@ -39,6 +50,33 @@ const STATUS_COLORS: Record<string, string> = {
   banned: "data-[active=true]:bg-black       data-[active=true]:text-white",
 };
 
+function StatCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  icon: React.ElementType;
+}) {
+  return (
+    <div className="rounded-xl border bg-card p-4 flex flex-col gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-muted-foreground font-medium">{label}</p>
+        <div className="p-1.5 rounded-lg bg-muted shrink-0">
+          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+        </div>
+      </div>
+      <p className="text-xl font-bold tracking-tight text-foreground">
+        {value}
+      </p>
+      <p className="text-[11px] text-muted-foreground">{sub}</p>
+    </div>
+  );
+}
+
 const AdminOrdersPage = async (props: {
   searchParams: Promise<{
     page: string;
@@ -60,15 +98,22 @@ const AdminOrdersPage = async (props: {
   });
   const failedPhone = new Set(failedWhatsapp.map((t) => t.phone));
   //
-  const orders = await getAllOrders({
-    page: Number(page),
-    limit: PAGE_SIZE,
-    query: searchText,
-    status,
-    sort,
-  });
+  const [orders, stats] = await Promise.all([
+    getAllOrders({
+      page: Number(page),
+      limit: PAGE_SIZE,
+      query: searchText,
+      status,
+      sort,
+    }),
+    // Scoped to the same status tab + search as the table below.
+    getOrdersSummaryStats({ query: searchText, status }),
+  ]);
 
   const t = await getTranslations("Admin");
+
+  const scopeLabel =
+    status && status !== "all" ? t(`Orders.Status.${status}`) : "جميع الحالات";
 
   const statuses = [
     "home",
@@ -164,6 +209,34 @@ const AdminOrdersPage = async (props: {
             </Link>
           );
         })}
+      </div>
+
+      {/* ── Summary Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard
+          label="إجمالي الطلبات"
+          value={String(stats.orderCount)}
+          sub={scopeLabel}
+          icon={ShoppingBag}
+        />
+        <StatCard
+          label="قيمة الطلبات"
+          value={formatCurrency(stats.totalValue)}
+          sub="مجموع أسعار الطلبات"
+          icon={Wallet}
+        />
+        <StatCard
+          label="تكلفة التوصيل"
+          value={formatCurrency(stats.actualShippingCost)}
+          sub="إجمالي فعلي"
+          icon={Truck}
+        />
+        <StatCard
+          label="قيمة الطلبات بدون توصيل"
+          value={formatCurrency(stats.valueWithoutShipping)}
+          sub="قيمة المنتجات فقط"
+          icon={Package}
+        />
       </div>
 
       {/* ── Orders Table ── */}

@@ -678,6 +678,64 @@ export async function getAllOrders({
 
 // Get All Orders For Export (No Pagination)
 // Get All Orders For Export (No Pagination)
+/** Shared search/status filter so the summary always matches the listed rows. */
+function buildOrdersFilter(query: string, status?: string) {
+  const filter: Prisma.OrderWhereInput =
+    query && query !== "all"
+      ? {
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+  if (status && status !== "all") filter.status = status;
+  return filter;
+}
+
+/**
+ * Totals for the orders page header cards.
+ *
+ * Deliberately scoped to the SAME filter as the table below it (status tab +
+ * search), so the cards describe what is on screen rather than the whole table —
+ * otherwise the numbers contradict the rows the admin is looking at.
+ */
+export async function getOrdersSummaryStats({
+  query,
+  status,
+}: {
+  query: string;
+  status?: string;
+}) {
+  const result = await prisma.order.aggregate({
+    where: buildOrdersFilter(query, status),
+    _count: { _all: true },
+    _sum: {
+      totalPrice: true,
+      actualShippingCost: true,
+      shippingPrice: true,
+    },
+  });
+
+  const totalValue = Number(result._sum.totalPrice ?? 0);
+  const actualShippingCost = Number(result._sum.actualShippingCost ?? 0);
+  const chargedShipping = Number(result._sum.shippingPrice ?? 0);
+
+  return {
+    orderCount: result._count._all,
+    totalValue,
+    actualShippingCost,
+    chargedShipping,
+    // Product value alone — what the orders are worth once the delivery portion
+    // the customer paid is taken back out.
+    valueWithoutShipping: totalValue - chargedShipping,
+  };
+}
+
 export async function getAllOrdersForExport({
   query,
   status,
