@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: {{ t.scrollThumb }}; border-radius: 8px; }
+    input[type=number]::-webkit-inner-spin-button { opacity: 0.6; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</helmet>
+<div dir="rtl" lang="ar" style="{{ pageStyle }}">
+
+  <!-- Header -->
+  <div style="{{ headerWrapStyle }}" class="no-print">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;max-width:1440px;margin:0 auto;">
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <h1 style="{{ h1Style }}">تحليل الأرباح</h1>
+          <span style="{{ pillStyle }}">{{ totals.orders }} طلب مكتمل</span>
+        </div>
+        <div style="{{ subTextStyle }}">نظرة شاملة على الإيرادات، التكاليف، وصافي الربح للفترة المحددة</div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div style="{{ rangeBoxStyle }}">
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span style="{{ rangeLabelStyle }}">من</span>
+            <span style="{{ rangeValStyle }}">07/01/2026</span>
+          </div>
+          <div style="{{ rangeDividerStyle }}"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <span style="{{ rangeLabelStyle }}">إلى</span>
+            <span style="{{ rangeValStyle }}">07/21/2026</span>
+          </div>
+        </div>
+
+        <button style="{{ ghostBtnStyle }}" onClick="{{ printPage }}">⎙ PDF</button>
+        <button style="{{ exportBtnStyle }}" onClick="{{ exportCsv }}">⭳ تصدير Excel</button>
+
+        <button style="{{ themeToggleStyle }}" onClick="{{ toggleTheme }}" aria-label="تبديل الوضع">
+          <span style="{{ toggleKnobStyle }}"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div style="max-width:1440px;margin:0 auto;padding:0 28px 110px;display:flex;flex-direction:column;gap:26px;">
+
+    <!-- Insights -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;">
+      <sc-for list="{{ insights }}" as="ins" hint-placeholder-count="3">
+        <div style="{{ ins.cardStyle }}">
+          <div style="{{ ins.dotStyle }}"></div>
+          <div style="display:flex;flex-direction:column;gap:4px;min-width:0;">
+            <div style="{{ subTextStyle }}">{{ ins.label }}</div>
+            <div style="{{ ins.valueStyle }}">{{ ins.value }}</div>
+            <div style="font-size:12px;color:{{ t.textMuted }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ ins.meta }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- KPI Row 1 -->
+    <div>
+      <div style="{{ sectionTitleStyle }}">ملخّص الإيرادات والتكاليف</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;">
+        <sc-for list="{{ kpiRow1 }}" as="k" hint-placeholder-count="4">
+          <div style="{{ k.cardStyle }}">
+            <div style="{{ k.labelStyle }}">{{ k.label }}</div>
+            <div style="{{ k.valueStyle }}">{{ k.value }}</div>
+            <div style="{{ k.metaStyle }}">{{ k.meta }}</div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="{{ compBarWrapStyle }}">
+        <div style="{{ compTrackStyle }}">
+          <div style="{{ compGoodsStyle }}"></div>
+          <div style="{{ compDeliveryStyle }}"></div>
+          <div style="{{ compExpenseStyle }}"></div>
+          <div style="{{ compProfitStyle }}"></div>
+        </div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:8px;">
+          <sc-for list="{{ compLegend }}" as="l" hint-placeholder-count="4">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:{{ t.textSecondary }};">
+              <span style="{{ l.dotStyle }}"></span>{{ l.label }} · {{ l.pct }}%
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI Row 2: expenses (editable) -->
+    <div>
+      <div style="{{ sectionTitleStyle }}">المصاريف <span style="font-weight:400;color:{{ t.textMuted }};font-size:13px;">— أدخل المصاريف لتحديث صافي الربح الحقيقي تلقائياً</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;">
+        <div style="{{ expenseCardStyle }}">
+          <div style="{{ subTextStyle }}">مصاريف الإعلانات</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" min="0" style="{{ expenseInputStyle }}" value="{{ adsExpense }}" onChange="{{ onAdsChange }}"></input>
+            <span style="{{ subTextStyle }}">د.ع</span>
+          </div>
+          <div style="{{ expenseMetaStyle }}">{{ adsMeta }}</div>
+        </div>
+        <div style="{{ expenseCardStyle }}">
+          <div style="{{ subTextStyle }}">المصاريف التشغيلية</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" min="0" style="{{ expenseInputStyle }}" value="{{ opexExpense }}" onChange="{{ onOpexChange }}"></input>
+            <span style="{{ subTextStyle }}">د.ع</span>
+          </div>
+          <div style="{{ expenseMetaStyle }}">{{ opexMeta }}</div>
+        </div>
+        <div style="{{ k2CardStyle }}">
+          <div style="{{ subTextStyle }}">إجمالي المصاريف</div>
+          <div style="{{ k2ValueStyle }}">{{ totals.allExpensesLabel }}</div>
+          <div style="{{ subTextStyle }}">إعلانات + تشغيلية</div>
+        </div>
+        <div style="{{ k2EmphStyle }}">
+          <div style="{{ subTextStyle }}">صافي الربح الحقيقي</div>
+          <div style="{{ k2EmphValueStyle }}">{{ totals.realProfitLabel }}</div>
+          <div style="{{ subTextStyle }}">هامش حقيقي: {{ totals.realMarginLabel }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Low margin alert -->
+    <sc-if value="{{ hasLowMarginAlerts }}" hint-placeholder-val="{{ true }}">
+      <div style="{{ alertBoxStyle }}">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="{{ alertIconStyle }}">!</span>
+          <div style="{{ alertTitleStyle }}">تنبيه: منتجات بهامش ربح منخفض (أقل من 15%)</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+          <sc-for list="{{ lowMarginProducts }}" as="p" hint-placeholder-count="1">
+            <div style="{{ alertRowStyle }}">
+              <span>{{ p.name }}</span>
+              <span style="{{ alertMarginStyle }}">هامش {{ p.marginLabel }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </sc-if>
+
+    <!-- Chart + Comparison -->
+    <div style="{{ panelStyle }}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+        <div>
+          <div style="{{ panelTitleStyle }}">{{ chartTitle }}</div>
+          <div style="{{ subTextStyle }}">{{ chartSubtitle }}</div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <sc-for list="{{ comparisonBadges }}" as="c" hint-placeholder-count="4">
+            <div style="{{ c.wrapStyle }}">
+              <div style="{{ subTextStyle }}">{{ c.label }}</div>
+              <div style="{{ c.valueStyle }}">{{ c.arrow }} {{ c.deltaLabel }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+        <sc-for list="{{ chartTabs }}" as="tab" hint-placeholder-count="3">
+          <button style="{{ tab.style }}" onClick="{{ tab.onClick }}">{{ tab.label }}</button>
+        </sc-for>
+      </div>
+      <div style="margin-top:14px;">
+        <svg viewBox="0 0 800 260" style="width:100%;height:240px;display:block;overflow:visible;">
+          <defs>
+            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="oklch(0.72 0.15 155)" stop-opacity="0.35"></stop>
+              <stop offset="100%" stop-color="oklch(0.72 0.15 155)" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <sc-for list="{{ gridLines }}" as="g" hint-placeholder-count="4">
+            <line x1="0" x2="800" y1="{{ g.y }}" y2="{{ g.y }}" stroke="{{ t.gridLine }}" stroke-width="1"></line>
+          </sc-for>
+          <sc-if value="{{ chartIsBar }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ chartBars }}" as="b" hint-placeholder-count="21">
+              <rect x="{{ b.x }}" y="{{ b.y }}" width="{{ b.w }}" height="{{ b.h }}" rx="3" fill="oklch(0.72 0.15 155)"></rect>
+            </sc-for>
+          </sc-if>
+          <sc-if value="{{ chartIsLine }}" hint-placeholder-val="{{ true }}">
+            <path d="{{ chartAreaPath }}" fill="url(#areaGrad)"></path>
+            <path d="{{ chartLinePath }}" fill="none" stroke="oklch(0.72 0.15 155)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path>
+            <circle cx="{{ chartLastPoint.x }}" cy="{{ chartLastPoint.y }}" r="5" fill="oklch(0.72 0.15 155)" stroke="{{ t.bgPanel }}" stroke-width="3"></circle>
+          </sc-if>
+        </svg>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;">
+          <sc-for list="{{ chartXLabels }}" as="lbl" hint-placeholder-count="6">
+            <span style="{{ subTextStyle }}font-size:11px;">{{ lbl }}</span>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- Orders distribution -->
+    <div>
+      <div style="{{ sectionTitleStyle }}">توزيع الطلبات والتوصيل</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;">
+        <div style="{{ panelStyle }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="{{ panelTitleStyle }}">طلبات بغداد</div>
+            <span style="{{ badgeGreenStyle }}">{{ distribution.baghdadPct }}%</span>
+          </div>
+          <div style="{{ bigValueStyle }}">{{ distribution.baghdadOrders }} طلب</div>
+          <div style="{{ barTrackStyle }}"><div style="{{ distribution.baghdadBarStyle }}"></div></div>
+          <div style="{{ subTextStyle }}">تكلفة توصيل: {{ distribution.baghdadCost }}</div>
+        </div>
+        <div style="{{ panelStyle }}">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="{{ panelTitleStyle }}">طلبات باقي المحافظات</div>
+            <span style="{{ badgeGreenStyle }}">{{ distribution.otherPct }}%</span>
+          </div>
+          <div style="{{ bigValueStyle }}">{{ distribution.otherOrders }} طلب</div>
+          <div style="{{ barTrackStyle }}"><div style="{{ distribution.otherBarStyle }}"></div></div>
+          <div style="{{ subTextStyle }}">تكلفة توصيل: {{ distribution.otherCost }}</div>
+        </div>
+        <div style="{{ panelStyle }}">
+          <div style="{{ panelTitleStyle }}">إجمالي تكلفة التوصيل</div>
+          <div style="{{ bigValueStyle }}color:{{ t.textPrimary }};">{{ distribution.totalCost }}</div>
+          <div style="{{ subTextStyle }}">مُدمجة ضمن الإيراد الصافي للمنتجات ولا تُحتسب مرة أخرى</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revenue share donut -->
+    <div>
+      <div style="{{ sectionTitleStyle }}">توزيع الإيراد على المنتجات</div>
+      <div style="{{ panelStyle }}display:flex;align-items:center;gap:32px;flex-wrap:wrap;">
+        <div style="{{ donutCenterStyle }}">
+          <div style="{{ donutStyle }}"></div>
+          <div style="{{ donutHoleStyle }}">
+            <div style="font-size:15px;font-weight:800;color:{{ t.textPrimary }};">{{ donutTotalLabel }}</div>
+            <div style="font-size:11px;color:{{ t.textMuted }};">{{ donutTotalSub }}</div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:240px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;">
+          <sc-for list="{{ donutLegend }}" as="d" hint-placeholder-count="7">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="{{ d.dotStyle }}"></span>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:13px;font-weight:700;color:{{ t.textPrimary }};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ d.name }}</div>
+                <div style="font-size:11px;color:{{ t.textMuted }};">{{ d.revenueLabel }} · {{ d.pct }}%</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <!-- Products table -->
+    <div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+        <div style="{{ sectionTitleStyle }}">تفصيل المنتجات</div>
+        <div style="{{ subTextStyle }}">الإيراد = ما حُصِّل − تكلفة التوصيل الفعلية، موزَّع نسبياً. التكلفة محسوبة حسب الدفعات (الأقدم أولاً)</div>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+        <input type="text" placeholder="بحث عن منتج…" style="{{ searchInputStyle }}" value="{{ searchQuery }}" onChange="{{ onSearchChange }}"></input>
+        <div style="{{ subTextStyle }}">{{ filteredCountLabel }}</div>
+      </div>
+
+      <div style="{{ tableWrapStyle }}">
+        <table style="width:100%;border-collapse:collapse;min-width:{{ tableMinWidth }};">
+          <thead>
+            <tr>
+              <th style="{{ thStyle }}">#</th>
+              <th style="{{ thSortStyle }}text-align:right;" onClick="{{ sortByName }}">المنتج {{ sortArrow.name }}</th>
+              <th style="{{ thSortStyle }}" onClick="{{ sortByQty }}">الكمية {{ sortArrow.qty }}</th>
+              <th style="{{ thStyle }}">الراجع</th>
+              <th style="{{ thSortStyle }}" onClick="{{ sortByRevenue }}">الإيراد الصافي {{ sortArrow.revenue }}</th>
+              <th style="{{ thStyle }}">تكلفة البضاعة</th>
+              <th style="{{ thSortStyle }}" onClick="{{ sortByProfit }}">صافي الربح {{ sortArrow.profit }}</th>
+              <th style="{{ thSortStyle }}" onClick="{{ sortByMargin }}">هامش الربح {{ sortArrow.margin }}</th>
+              <sc-if value="{{ adsActive }}" hint-placeholder-val="{{ false }}">
+                <th style="{{ thStyle }}">مصاريف الإعلان</th>
+                <th style="{{ thStyle }}">إعلان/طلب</th>
+                <th style="{{ thStyle }}">الربح بعد الإعلان</th>
+                <th style="{{ thStyle }}">هامش بعد الإعلان</th>
+              </sc-if>
+              <th style="{{ thStyle }}">% من الإيراد</th>
+            </tr>
+          </thead>
+          <tbody>
+            <sc-for list="{{ visibleProducts }}" as="p" hint-placeholder-count="7">
+              <tr style="{{ p.rowStyle }}" onClick="{{ p.toggle }}">
+                <td style="{{ tdStyle }}"><span style="{{ p.rankBadgeStyle }}">{{ p.rank }}</span></td>
+                <td style="{{ tdStyle }}text-align:right;font-weight:700;color:{{ t.textPrimary }};"><span style="color:{{ t.textMuted }};margin-left:6px;">{{ p.chevron }}</span>{{ p.name }}</td>
+                <td style="{{ tdStyle }}">{{ p.qty }}</td>
+                <td style="{{ tdStyle }}">{{ p.returnedLabel }}</td>
+                <td style="{{ tdStyle }}">{{ p.revenueLabel }}</td>
+                <td style="{{ tdStyle }}">{{ p.costLabel }}</td>
+                <td style="{{ tdStyle }}color:oklch(0.62 0.14 155);font-weight:700;">{{ p.profitLabel }}</td>
+                <td style="{{ tdStyle }}"><span style="{{ p.marginBadgeStyle }}">{{ p.marginLabel }}</span></td>
+                <sc-if value="{{ adsActive }}" hint-placeholder-val="{{ false }}">
+                  <td style="{{ tdStyle }}">{{ p.adCostLabel }}</td>
+                  <td style="{{ tdStyle }}">{{ p.adPerOrderLabel }}</td>
+                  <td style="{{ tdStyle }}">{{ p.profitAfterAdsLabel }}</td>
+                  <td style="{{ tdStyle }}">{{ p.marginAfterAdsLabel }}</td>
+                </sc-if>
+                <td style="{{ tdStyle }}">
+                  <div style="display:flex;align-items:center;gap:8px;justify-content:center;">
+                    <div style="{{ barTrackSmStyle }}"><div style="{{ p.shareBarStyle }}"></div></div>
+                    <span style="min-width:32px;">{{ p.sharePct }}%</span>
+                  </div>
+                </td>
+              </tr>
+              <sc-if value="{{ p.expanded }}" hint-placeholder-val="{{ false }}">
+                <tr>
+                  <td colspan="{{ detailColspan }}" style="{{ detailCellStyle }}">
+                    <div style="{{ detailGridStyle }}">
+                      <div style="{{ detailItemStyle }}"><div style="{{ detailLabelStyle }}">سعر بيع الوحدة (صافي)</div><div style="{{ detailValueStyle }}">{{ p.unitPriceLabel }}</div></div>
+                      <div style="{{ detailItemStyle }}"><div style="{{ detailLabelStyle }}">تكلفة الوحدة</div><div style="{{ detailValueStyle }}">{{ p.unitCostLabel }}</div></div>
+                      <div style="{{ detailItemStyle }}"><div style="{{ detailLabelStyle }}">ربح الوحدة</div><div style="{{ detailValueStyle }}color:oklch(0.62 0.14 155);">{{ p.unitProfitLabel }}</div></div>
+                      <div style="{{ detailItemStyle }}"><div style="{{ detailLabelStyle }}">القطع المباعة</div><div style="{{ detailValueStyle }}">{{ p.qty }}</div></div>
+                      <div style="{{ detailItemStyle }}"><div style="{{ detailLabelStyle }}">الراجع</div><div style="{{ detailValueStyle }}">{{ p.returnedLabel }}</div></div>
+                    </div>
+                    <div style="font-size:12px;color:{{ t.textMuted }};margin-top:10px;">التكلفة محسوبة حسب الدفعات (الأقدم أولاً) — FIFO. الإيراد الصافي موزّع نسبياً بعد خصم تكلفة التوصيل الفعلية.</div>
+                  </td>
+                </tr>
+              </sc-if>
+            </sc-for>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td style="{{ tfStyle }}">—</td>
+              <td style="{{ tfStyle }}text-align:right;">المجموع</td>
+              <td style="{{ tfStyle }}">{{ totals.qty }}</td>
+              <td style="{{ tfStyle }}">{{ totals.returnedLabel }}</td>
+              <td style="{{ tfStyle }}">{{ totals.revenueLabel }}</td>
+              <td style="{{ tfStyle }}">{{ totals.costLabel }}</td>
+              <td style="{{ tfStyle }}color:oklch(0.62 0.14 155);">{{ totals.profitLabel }}</td>
+              <td style="{{ tfStyle }}">{{ totals.marginLabel }}</td>
+              <sc-if value="{{ adsActive }}" hint-placeholder-val="{{ false }}">
+                <td style="{{ tfStyle }}">{{ totals.adsLabel }}</td>
+                <td style="{{ tfStyle }}">—</td>
+                <td style="{{ tfStyle }}">{{ totals.realProfitLabel }}</td>
+                <td style="{{ tfStyle }}">{{ totals.realMarginLabel }}</td>
+              </sc-if>
+              <td style="{{ tfStyle }}">100%</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div style="{{ noteBoxStyle }}">{{ adsNote }}</div>
+    </div>
+  </div>
+
+  <!-- Sticky summary footer -->
+  <div style="{{ footerBarStyle }}" class="no-print">
+    <div style="max-width:1440px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:14px 28px;">
+      <div style="display:flex;gap:28px;flex-wrap:wrap;">
+        <div>
+          <div style="{{ footerLabelStyle }}">إجمالي ما حُصِّل</div>
+          <div style="{{ footerValStyle }}">{{ totals.collectedLabel }}</div>
+        </div>
+        <div>
+          <div style="{{ footerLabelStyle }}">إجمالي المصاريف (توصيل + بضاعة + تشغيل + إعلان)</div>
+          <div style="{{ footerValStyle }}">{{ totals.allCostsLabel }}</div>
+        </div>
+        <div>
+          <div style="{{ footerLabelStyle }}">صافي الربح الحقيقي</div>
+          <div style="{{ footerValStyle }}color:oklch(0.62 0.14 155);">{{ totals.realProfitLabel }}</div>
+        </div>
+        <div>
+          <div style="{{ footerLabelStyle }}">هامش الربح الحقيقي</div>
+          <div style="{{ footerValStyle }}color:oklch(0.62 0.14 155);">{{ totals.realMarginLabel }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { theme: 'dark', adsExpense: 0, opexExpense: 0, searchQuery: '', sortKey: null, sortDir: 'asc', chartMetric: 'profit', expandedRank: null };
+
+  fmt(n) {
+    return new Intl.NumberFormat('ar-IQ').format(Math.round(n)) + ' د.ع';
+  }
+
+  getTheme(name) {
+    if (name === 'light') {
+      return {
+        bgPage: 'oklch(0.97 0.004 250)', bgPanel: 'oklch(1 0 0)', bgCard: 'oklch(1 0 0)',
+        border: 'oklch(0.90 0.006 250)', textPrimary: 'oklch(0.22 0.01 250)', textSecondary: 'oklch(0.48 0.01 250)',
+        textMuted: 'oklch(0.62 0.008 250)', shadow: '0 1px 2px oklch(0.2 0.01 250 / 0.06), 0 8px 24px oklch(0.2 0.01 250 / 0.05)',
+        gridLine: 'oklch(0.92 0.006 250)', scrollThumb: 'oklch(0.85 0.006 250)', headerBg: 'oklch(1 0 0)', rowAlt: 'oklch(0.985 0.003 250)',
+        emphBg: 'oklch(1 0 0)', emphValue: 'oklch(0.50 0.13 155)',
+      };
+    }
+    return {
+      bgPage: 'oklch(0.17 0.008 250)', bgPanel: 'oklch(0.21 0.01 250)', bgCard: 'oklch(0.21 0.01 250)',
+      border: 'oklch(0.30 0.012 250)', textPrimary: 'oklch(0.96 0.004 250)', textSecondary: 'oklch(0.68 0.01 250)',
+      textMuted: 'oklch(0.55 0.01 250)', shadow: '0 1px 2px oklch(0 0 0 / 0.3), 0 8px 24px oklch(0 0 0 / 0.25)',
+      gridLine: 'oklch(0.28 0.01 250)', scrollThumb: 'oklch(0.35 0.012 250)', headerBg: 'oklch(0.14 0.008 250)', rowAlt: 'oklch(0.185 0.009 250)',
+      emphBg: 'linear-gradient(160deg, oklch(0.24 0.03 155), oklch(0.21 0.01 250))', emphValue: 'oklch(0.72 0.15 155)',
+    };
+  }
+
+  buildKpi(t, label, value, meta, opts) {
+    opts = opts || {};
+    const emphasize = !!opts.emphasize;
+    return {
+      label, value, meta,
+      cardStyle: `background:${emphasize ? t.emphBg : t.bgCard};border:1px solid ${emphasize ? 'oklch(0.72 0.15 155 / 0.4)' : t.border};border-radius:16px;padding:20px 22px;box-shadow:${t.shadow};display:flex;flex-direction:column;gap:6px;`,
+      labelStyle: `font-size:13px;font-weight:500;color:${t.textSecondary};`,
+      valueStyle: `font-size:26px;font-weight:800;color:${emphasize ? t.emphValue : t.textPrimary};letter-spacing:-0.3px;`,
+      metaStyle: `font-size:12px;color:${t.textMuted};`,
+    };
+  }
+
+  renderVals() {
+    const theme = this.state.theme;
+    const t = this.getTheme(theme);
+    const dark = theme === 'dark';
+    const adsExpense = Number(this.state.adsExpense) || 0;
+    const opexExpense = Number(this.state.opexExpense) || 0;
+    const allExpenses = adsExpense + opexExpense;
+
+    const netProfit = 467500, goodsCost = 453500, deliveryCost = 113000, collected = 1034000, revenueBase = 921000;
+    const realProfit = netProfit - allExpenses;
+    const realMargin = (realProfit / revenueBase) * 100;
+
+    const totals = {
+      collected, deliveryCost, goodsCost, netProfit, margin: 50.8,
+      orders: 24, baghdadOrders: 7, baghdadCost: 28000, otherOrders: 17, otherCost: 85000,
+      qty: 24, revenue: revenueBase, cost: goodsCost, profit: netProfit,
+    };
+    totals.collectedLabel = this.fmt(collected);
+    totals.allCostsLabel = this.fmt(deliveryCost + goodsCost + allExpenses);
+    totals.allExpensesLabel = this.fmt(allExpenses);
+    totals.realProfitLabel = this.fmt(realProfit);
+    totals.realMarginLabel = realMargin.toFixed(1) + '%';
+    totals.revenueLabel = this.fmt(revenueBase);
+    totals.costLabel = this.fmt(goodsCost);
+    totals.profitLabel = this.fmt(netProfit);
+    totals.marginLabel = ((netProfit / revenueBase) * 100).toFixed(1) + '%';
+    totals.returnedLabel = '1 (4.0%)';
+    totals.adsLabel = this.fmt(adsExpense);
+
+    const kpiRow1 = [
+      this.buildKpi(t, 'إجمالي ما حُصِّل', this.fmt(collected), 'من 24 طلب مكتمل'),
+      this.buildKpi(t, 'تكلفة التوصيل الفعلية', this.fmt(deliveryCost), 'بغداد: 28,000 د.ع | غيرها: 85,000 د.ع'),
+      this.buildKpi(t, 'تكلفة البضاعة', this.fmt(goodsCost), '24 قطعة مباعة'),
+      this.buildKpi(t, 'صافي الربح', this.fmt(netProfit), 'هامش الربح: 50.8%', { emphasize: true }),
+    ];
+
+    // cost composition bar (of collected amount)
+    const goodsPct = (goodsCost / collected) * 100;
+    const deliveryPct = (deliveryCost / collected) * 100;
+    const expensePct = (allExpenses / collected) * 100;
+    const profitPct = Math.max(0, 100 - goodsPct - deliveryPct - expensePct);
+    const compLegend = [
+      { label: 'تكلفة البضاعة', pct: goodsPct.toFixed(1), dotStyle: 'width:8px;height:8px;border-radius:2px;background:oklch(0.62 0.03 250);display:inline-block;' },
+      { label: 'تكلفة التوصيل', pct: deliveryPct.toFixed(1), dotStyle: 'width:8px;height:8px;border-radius:2px;background:oklch(0.72 0.14 230);display:inline-block;' },
+      { label: 'المصاريف', pct: expensePct.toFixed(1), dotStyle: 'width:8px;height:8px;border-radius:2px;background:oklch(0.62 0.18 25);display:inline-block;' },
+      { label: 'صافي الربح', pct: profitPct.toFixed(1), dotStyle: 'width:8px;height:8px;border-radius:2px;background:oklch(0.72 0.15 155);display:inline-block;' },
+    ];
+
+    const expenseCardStyle = `background:${t.bgCard};border:1px solid ${t.border};border-radius:16px;padding:20px 22px;box-shadow:${t.shadow};display:flex;flex-direction:column;gap:8px;`;
+    const expenseInputStyle = `flex:1;font-family:'Tajawal',sans-serif;font-size:24px;font-weight:800;color:${t.textPrimary};background:transparent;border:none;outline:none;width:100%;padding:0;`;
+    const expenseMetaStyle = `font-size:12px;color:${t.textMuted};`;
+
+    // previous period comparison
+    const prev = { collected: 890000, realProfit: 398000, realMargin: 44.7, orders: 19 };
+    const pct = (cur, old) => ((cur - old) / old) * 100;
+    const badge = (label, deltaPct, isPoint) => {
+      const up = deltaPct >= 0;
+      const color = up ? 'oklch(0.62 0.14 155)' : 'oklch(0.62 0.18 25)';
+      return {
+        label, arrow: up ? '▲' : '▼',
+        deltaLabel: (isPoint ? Math.abs(deltaPct).toFixed(1) + ' نقطة' : Math.abs(deltaPct).toFixed(1) + '%') + ' مقابل الفترة السابقة',
+        valueStyle: `font-size:13px;font-weight:700;color:${color};`,
+        wrapStyle: `background:${t.bgPage};border:1px solid ${t.border};border-radius:10px;padding:8px 12px;min-width:150px;`,
+      };
+    };
+    const comparisonBadges = [
+      badge('ما حُصِّل', pct(collected, prev.collected)),
+      badge('صافي الربح الحقيقي', pct(realProfit, prev.realProfit)),
+      badge('هامش الربح', realMargin - prev.realMargin, true),
+      badge('عدد الطلبات', pct(totals.orders, prev.orders)),
+    ];
+
+    // synthetic daily distribution (21 days)
+    const weights = [0.5,0.8,1.2,1,1.6,2.4,2,2.8,3.6,3,4.2,5,4.6,6,7.2,6.4,8,9.2,8.4,10,9.5];
+    const wsum = weights.reduce((a,b)=>a+b,0);
+    const n = weights.length;
+    const dailyProfit = weights.map(w => (w/wsum) * netProfit);
+    const dailyRevenue = weights.map(w => (w/wsum) * revenueBase);
+    const dailyOrders = weights.map(w => (w/wsum) * totals.orders);
+    let cum = 0;
+    const cumSeries = dailyProfit.map(v => { cum += v; return cum; });
+    const maxV = cumSeries[n-1];
+    const toXY = (i, v) => ({ x: (i/(n-1))*780 + 10, y: 230 - (v/maxV)*210 });
+    const pts = cumSeries.map((v,i) => toXY(i,v));
+    const linePath = pts.map((p,i) => (i===0?'M':'L') + p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+    const areaPath = linePath + ` L${pts[n-1].x.toFixed(1)},232 L${pts[0].x.toFixed(1)},232 Z`;
+    const gridLines = [0,1,2,3].map(i => ({ y: 20 + i*70 }));
+    const chartXLabels = ['01/07','05/07','09/07','13/07','17/07','21/07'];
+
+    const chartMetric = this.state.chartMetric;
+    const barSeries = chartMetric === 'revenue' ? dailyRevenue : dailyOrders;
+    const barMax = Math.max(...barSeries);
+    const slotW = 780 / n;
+    const barW = slotW * 0.62;
+    const chartBars = barSeries.map((v, i) => {
+      const h = (v / barMax) * 210;
+      return { x: (10 + i*slotW + (slotW-barW)/2).toFixed(1), y: (230 - h).toFixed(1), w: barW.toFixed(1), h: h.toFixed(1) };
+    });
+    const chartIsBar = chartMetric !== 'profit';
+    const chartIsLine = chartMetric === 'profit';
+    const chartMeta = {
+      profit: { title: 'تطور صافي الربح خلال الفترة', sub: 'تراكمي، يومياً من 01/07 إلى 21/07' },
+      revenue: { title: 'الإيراد الصافي اليومي', sub: 'موزّع يومياً من 01/07 إلى 21/07' },
+      orders: { title: 'عدد الطلبات اليومية', sub: 'موزّع يومياً من 01/07 إلى 21/07' },
+    }[chartMetric];
+    const mkTab = (key, label) => ({
+      label,
+      onClick: () => this.setState({ chartMetric: key }),
+      style: `font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;padding:7px 16px;border-radius:9px;cursor:pointer;border:1px solid ${chartMetric===key?'oklch(0.72 0.15 155 / 0.5)':t.border};background:${chartMetric===key?'oklch(0.72 0.15 155 / 0.15)':'transparent'};color:${chartMetric===key?'oklch(0.55 0.13 155)':t.textSecondary};`,
+    });
+    const chartTabs = [ mkTab('profit','صافي الربح'), mkTab('revenue','الإيراد'), mkTab('orders','الطلبات') ];
+
+    const distribution = {
+      baghdadOrders: 7, otherOrders: 17,
+      baghdadPct: Math.round(7/24*100), otherPct: Math.round(17/24*100),
+      baghdadCost: this.fmt(28000), otherCost: this.fmt(85000), totalCost: this.fmt(113000),
+      baghdadBarStyle: `width:${Math.round(7/24*100)}%;height:100%;border-radius:6px;background:oklch(0.72 0.15 155);`,
+      otherBarStyle: `width:${Math.round(17/24*100)}%;height:100%;border-radius:6px;background:oklch(0.62 0.03 250);`,
+    };
+
+    const rawProducts = [
+      { name: 'سيت تركيب المكبس', qty: 6, returned: 0, revenue: 332000, cost: 160500, profit: 171500, sharePct: 36 },
+      { name: 'رافعة فولاذية', qty: 8, returned: 0, revenue: 299000, cost: 127500, profit: 171500, sharePct: 32 },
+      { name: 'سيت فخات صدر سيارة', qty: 1, returned: 0, revenue: 71000, cost: 20000, profit: 51000, sharePct: 8 },
+      { name: 'قناع لحيم', qty: 4, returned: 0, revenue: 70000, cost: 27000, profit: 43000, sharePct: 8 },
+      { name: 'كابسة حلقات', qty: 1, returned: 0, revenue: 18000, cost: 4500, profit: 13500, sharePct: 2 },
+      { name: 'بساط صيانة حراري', qty: 1, returned: 0, revenue: 20000, cost: 9750, profit: 10250, sharePct: 2 },
+      { name: 'سيت فاتح مفاصل', qty: 3, returned: 1, returnedPct: 25.0, revenue: 111000, cost: 104250, profit: 6750, sharePct: 12 },
+    ];
+    const medalBg = ['oklch(0.78 0.15 90)', 'oklch(0.80 0.01 250)', 'oklch(0.68 0.09 55)'];
+    let products = rawProducts.map((p, i) => {
+      const margin = (p.profit / p.revenue) * 100;
+      const low = margin < 15;
+      const adCost = adsExpense * (p.sharePct / 100);
+      const profitAfterAds = p.profit - adCost;
+      const marginAfterAds = (profitAfterAds / p.revenue) * 100;
+      return {
+        ...p, rank: i + 1,
+        rankBadgeStyle: `display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-weight:800;font-size:12px;color:${i<3?'oklch(0.2 0.02 250)':t.textSecondary};background:${i<3?medalBg[i]:t.bgPage};`,
+        returnedLabel: p.returned ? `${p.returned} (${p.returnedPct.toFixed(1)}%)` : '—',
+        revenueLabel: this.fmt(p.revenue), costLabel: this.fmt(p.cost), profitLabel: this.fmt(p.profit),
+        marginLabel: margin.toFixed(1) + '%', margin,
+        marginBadgeStyle: `display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:700;background:${low ? 'oklch(0.62 0.18 25 / 0.15)' : 'oklch(0.72 0.15 155 / 0.15)'};color:${low ? 'oklch(0.62 0.18 25)' : 'oklch(0.55 0.13 155)'};`,
+        shareBarStyle: `width:${p.sharePct}%;height:100%;border-radius:5px;background:oklch(0.72 0.15 155);`,
+        rowStyle: `border-bottom:1px solid ${t.border};`,
+        lowMargin: low,
+        adCostLabel: adsExpense > 0 ? this.fmt(adCost) : '—',
+        adPerOrderLabel: adsExpense > 0 ? this.fmt(adCost / p.qty) : '—',
+        profitAfterAdsLabel: adsExpense > 0 ? this.fmt(profitAfterAds) : '—',
+        marginAfterAdsLabel: adsExpense > 0 ? marginAfterAds.toFixed(1) + '%' : '—',
+        unitPriceLabel: this.fmt(p.revenue / p.qty),
+        unitCostLabel: this.fmt(p.cost / p.qty),
+        unitProfitLabel: this.fmt(p.profit / p.qty),
+      };
+    });
+
+    const lowMarginProducts = products.filter(p => p.lowMargin);
+
+    // search + sort
+    const q = (this.state.searchQuery || '').trim();
+    let visibleProducts = q ? products.filter(p => p.name.includes(q)) : products.slice();
+    const sortKey = this.state.sortKey;
+    if (sortKey) {
+      const dir = this.state.sortDir === 'asc' ? 1 : -1;
+      visibleProducts.sort((a, b) => {
+        const av = sortKey === 'name' ? a.name : a[sortKey];
+        const bv = sortKey === 'name' ? b.name : b[sortKey];
+        if (typeof av === 'string') return av.localeCompare(bv, 'ar') * dir;
+        return (av - bv) * dir;
+      });
+    }
+    const expandedRank = this.state.expandedRank;
+    visibleProducts.forEach((p, i) => {
+      const isOpen = expandedRank === p.rank;
+      p.rowStyle = `border-bottom:1px solid ${isOpen ? 'transparent' : t.border};background:${isOpen ? 'oklch(0.72 0.15 155 / 0.06)' : (i%2? t.rowAlt : 'transparent')};cursor:pointer;`;
+      p.expanded = isOpen;
+      p.chevron = isOpen ? '▾' : '▸';
+      p.toggle = () => this.setState(s => ({ expandedRank: s.expandedRank === p.rank ? null : p.rank }));
+    });
+    const detailColspan = adsExpense > 0 ? 13 : 9;
+    const detailCellStyle = `padding:0 16px 18px;background:oklch(0.72 0.15 155 / 0.06);border-bottom:1px solid ${t.border};`;
+    const detailGridStyle = `display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;`;
+    const detailItemStyle = `background:${t.bgPage};border:1px solid ${t.border};border-radius:10px;padding:12px 14px;`;
+    const detailLabelStyle = `font-size:11px;color:${t.textMuted};margin-bottom:4px;`;
+    const detailValueStyle = `font-size:15px;font-weight:800;color:${t.textPrimary};`;
+
+    // revenue-share donut
+    const donutPalette = ['oklch(0.72 0.15 155)','oklch(0.66 0.13 175)','oklch(0.68 0.13 200)','oklch(0.70 0.13 230)','oklch(0.64 0.11 260)','oklch(0.66 0.10 290)','oklch(0.62 0.03 250)'];
+    let acc = 0;
+    const donutStops = rawProducts.map((p, i) => {
+      const start = acc; acc += p.sharePct; const end = acc;
+      return `${donutPalette[i]} ${start}% ${end}%`;
+    }).join(', ');
+    const donutStyle = `width:170px;height:170px;border-radius:50%;background:conic-gradient(${donutStops});flex-shrink:0;`;
+    const donutHoleStyle = `position:absolute;inset:34px;border-radius:50%;background:${t.bgPanel};display:flex;flex-direction:column;align-items:center;justify-content:center;`;
+    const donutLegend = rawProducts.map((p, i) => ({
+      name: p.name, pct: p.sharePct, revenueLabel: this.fmt(p.revenue),
+      dotStyle: `width:10px;height:10px;border-radius:3px;background:${donutPalette[i]};flex-shrink:0;`,
+    }));
+
+    const arrowFor = (key) => this.state.sortKey === key ? (this.state.sortDir === 'asc' ? '↑' : '↓') : '';
+    const makeSorter = (key) => () => this.setState(s => ({ sortKey: key, sortDir: s.sortKey === key && s.sortDir === 'asc' ? 'desc' : 'asc' }));
+
+    // insights
+    const topProfit = rawProducts.reduce((a,b) => b.profit > a.profit ? b : a);
+    const worstMargin = rawProducts.reduce((a,b) => (b.profit/b.revenue) < (a.profit/a.revenue) ? b : a);
+    const avgProfitPerOrder = netProfit / totals.orders;
+    const insights = [
+      { label: 'أعلى منتج ربحاً', value: topProfit.name, meta: this.fmt(topProfit.profit) + ' صافي ربح',
+        cardStyle: `background:${t.bgPanel};border:1px solid ${t.border};border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:${t.shadow};`,
+        dotStyle: 'width:10px;height:10px;border-radius:50%;background:oklch(0.72 0.15 155);flex-shrink:0;',
+        valueStyle: `font-size:15px;font-weight:800;color:${t.textPrimary};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` },
+      { label: 'أقل هامش ربح', value: worstMargin.name, meta: 'هامش ' + ((worstMargin.profit/worstMargin.revenue)*100).toFixed(1) + '%',
+        cardStyle: `background:${t.bgPanel};border:1px solid ${t.border};border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:${t.shadow};`,
+        dotStyle: 'width:10px;height:10px;border-radius:50%;background:oklch(0.62 0.18 25);flex-shrink:0;',
+        valueStyle: `font-size:15px;font-weight:800;color:${t.textPrimary};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;` },
+      { label: 'متوسط الربح لكل طلب', value: this.fmt(avgProfitPerOrder), meta: `من أصل ${totals.orders} طلب`,
+        cardStyle: `background:${t.bgPanel};border:1px solid ${t.border};border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:${t.shadow};`,
+        dotStyle: 'width:10px;height:10px;border-radius:50%;background:oklch(0.72 0.14 230);flex-shrink:0;',
+        valueStyle: `font-size:18px;font-weight:800;color:${t.textPrimary};` },
+    ];
+
+    const csv = () => {
+      const header = ['#','المنتج','الكمية','الراجع','الإيراد الصافي','تكلفة البضاعة','صافي الربح','هامش الربح','% من الإيراد'];
+      const rows = products.map(p => [p.rank, p.name, p.qty, p.returnedLabel, p.revenue, p.cost, p.profit, p.marginLabel, p.sharePct + '%']);
+      rows.push(['—','المجموع', totals.qty, totals.returnedLabel, totals.revenue, totals.cost, totals.profit, totals.marginLabel, '100%']);
+      const csvContent = '\uFEFF' + [header, ...rows].map(r => r.join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'تحليل-الأرباح.csv'; a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    const adsActive = adsExpense > 0;
+
+    return {
+      t, theme,
+      pageStyle: `min-height:100vh;background:${t.bgPage};font-family:'Tajawal',sans-serif;color:${t.textPrimary};transition:background .25s ease;`,
+      headerWrapStyle: `background:${t.headerBg};border-bottom:1px solid ${t.border};padding:22px 28px;position:sticky;top:0;z-index:10;backdrop-filter:blur(8px);`,
+      h1Style: `font-size:24px;font-weight:800;margin:0;letter-spacing:-0.3px;`,
+      pillStyle: `font-size:12px;font-weight:700;background:oklch(0.72 0.15 155 / 0.15);color:oklch(0.55 0.13 155);padding:4px 12px;border-radius:999px;`,
+      subTextStyle: `font-size:13px;color:${t.textSecondary};`,
+      rangeBoxStyle: `display:flex;align-items:center;gap:14px;background:${t.bgPanel};border:1px solid ${t.border};border-radius:12px;padding:8px 16px;`,
+      rangeLabelStyle: `font-size:11px;color:${t.textMuted};`,
+      rangeValStyle: `font-size:13px;font-weight:700;color:${t.textPrimary};`,
+      rangeDividerStyle: `width:1px;height:24px;background:${t.border};`,
+      exportBtnStyle: `display:flex;align-items:center;gap:8px;background:oklch(0.72 0.15 155);color:oklch(0.15 0.02 155);border:none;border-radius:12px;padding:10px 18px;font-family:'Tajawal',sans-serif;font-weight:800;font-size:14px;cursor:pointer;`,
+      ghostBtnStyle: `display:flex;align-items:center;gap:6px;background:transparent;color:${t.textPrimary};border:1px solid ${t.border};border-radius:12px;padding:10px 16px;font-family:'Tajawal',sans-serif;font-weight:700;font-size:14px;cursor:pointer;`,
+      themeToggleStyle: `width:52px;height:30px;border-radius:999px;background:${dark ? 'oklch(0.72 0.15 155)' : t.border};border:none;cursor:pointer;padding:3px;display:flex;justify-content:${dark?'flex-start':'flex-end'};`,
+      toggleKnobStyle: `width:24px;height:24px;border-radius:50%;background:${t.bgPanel};box-shadow:0 1px 3px rgba(0,0,0,0.3);`,
+      toggleTheme: () => this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' })),
+      exportCsv: csv,
+      printPage: () => window.print(),
+
+      insights,
+      sectionTitleStyle: `font-size:16px;font-weight:800;margin-bottom:12px;color:${t.textPrimary};`,
+      kpiRow1,
+      compBarWrapStyle: `margin-top:14px;`,
+      compTrackStyle: `display:flex;width:100%;height:14px;border-radius:8px;overflow:hidden;background:${t.bgPage};`,
+      compGoodsStyle: `width:${goodsPct}%;background:oklch(0.62 0.03 250);`,
+      compDeliveryStyle: `width:${deliveryPct}%;background:oklch(0.72 0.14 230);`,
+      compExpenseStyle: `width:${expensePct}%;background:oklch(0.62 0.18 25);`,
+      compProfitStyle: `width:${profitPct}%;background:oklch(0.72 0.15 155);`,
+      compLegend,
+
+      expenseCardStyle, expenseInputStyle, expenseMetaStyle,
+      adsExpense, opexExpense,
+      adsMeta: '0 منتج معلن حتى الآن' + (adsExpense > 0 ? ' — موزّعة حسب حصة كل منتج من الإيراد' : ''),
+      opexMeta: '0 تصنيف مسجّل حتى الآن',
+      onAdsChange: (e) => this.setState({ adsExpense: e.target.value === '' ? 0 : Number(e.target.value) }),
+      onOpexChange: (e) => this.setState({ opexExpense: e.target.value === '' ? 0 : Number(e.target.value) }),
+      k2CardStyle: `background:${t.bgCard};border:1px solid ${t.border};border-radius:16px;padding:20px 22px;box-shadow:${t.shadow};display:flex;flex-direction:column;gap:6px;`,
+      k2ValueStyle: `font-size:26px;font-weight:800;color:${t.textPrimary};`,
+      k2EmphStyle: `background:${t.emphBg};border:1px solid oklch(0.72 0.15 155 / 0.4);border-radius:16px;padding:20px 22px;box-shadow:${t.shadow};display:flex;flex-direction:column;gap:6px;`,
+      k2EmphValueStyle: `font-size:26px;font-weight:800;color:${t.emphValue};`,
+
+      hasLowMarginAlerts: lowMarginProducts.length > 0,
+      lowMarginProducts,
+      alertBoxStyle: `background:oklch(0.62 0.18 25 / 0.1);border:1px solid oklch(0.62 0.18 25 / 0.35);border-radius:14px;padding:18px 20px;`,
+      alertIconStyle: `width:24px;height:24px;border-radius:50%;background:oklch(0.62 0.18 25);color:white;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0;`,
+      alertTitleStyle: `font-weight:800;color:oklch(0.62 0.18 25);font-size:15px;`,
+      alertRowStyle: `display:flex;justify-content:space-between;font-size:14px;color:${t.textPrimary};padding:0 34px;`,
+      alertMarginStyle: `font-weight:800;color:oklch(0.62 0.18 25);`,
+
+      panelStyle: `background:${t.bgPanel};border:1px solid ${t.border};border-radius:16px;padding:20px 22px;box-shadow:${t.shadow};`,
+      panelTitleStyle: `font-size:15px;font-weight:800;color:${t.textPrimary};`,
+      comparisonBadges,
+      chartAreaPath: areaPath, chartLinePath: linePath, chartLastPoint: pts[n-1],
+      gridLines, chartXLabels,
+      chartTabs, chartBars, chartIsBar, chartIsLine,
+      chartTitle: chartMeta.title, chartSubtitle: chartMeta.sub,
+      donutStyle, donutHoleStyle, donutLegend,
+      donutCenterStyle: `position:relative;width:170px;height:170px;display:flex;align-items:center;justify-content:center;`,
+      donutTotalLabel: this.fmt(revenueBase), donutTotalSub: 'إجمالي الإيراد الصافي',
+      detailColspan, detailCellStyle, detailGridStyle, detailItemStyle, detailLabelStyle, detailValueStyle,
+
+      distribution,
+      bigValueStyle: `font-size:28px;font-weight:800;margin:8px 0;`,
+      badgeGreenStyle: `font-size:12px;font-weight:800;background:oklch(0.72 0.15 155 / 0.15);color:oklch(0.55 0.13 155);padding:3px 10px;border-radius:999px;`,
+      barTrackStyle: `width:100%;height:8px;background:${t.bgPage};border-radius:6px;overflow:hidden;margin:6px 0;`,
+      barTrackSmStyle: `width:60px;height:6px;background:${t.bgPage};border-radius:6px;overflow:hidden;`,
+
+      searchQuery: this.state.searchQuery,
+      searchInputStyle: `font-family:'Tajawal',sans-serif;font-size:14px;background:${t.bgPanel};border:1px solid ${t.border};border-radius:10px;padding:9px 14px;color:${t.textPrimary};min-width:220px;outline:none;`,
+      onSearchChange: (e) => this.setState({ searchQuery: e.target.value }),
+      filteredCountLabel: `${visibleProducts.length} من ${products.length} منتج`,
+      sortByName: makeSorter('name'), sortByQty: makeSorter('qty'), sortByRevenue: makeSorter('revenue'),
+      sortByProfit: makeSorter('profit'), sortByMargin: makeSorter('margin'),
+      sortArrow: { name: arrowFor('name'), qty: arrowFor('qty'), revenue: arrowFor('revenue'), profit: arrowFor('profit'), margin: arrowFor('margin') },
+
+      visibleProducts, totals, adsActive,
+      tableMinWidth: adsActive ? '1220px' : '920px',
+      tableWrapStyle: `background:${t.bgPanel};border:1px solid ${t.border};border-radius:16px;overflow-x:auto;box-shadow:${t.shadow};`,
+      thStyle: `text-align:center;font-size:12px;font-weight:800;color:${t.textSecondary};padding:14px 12px;border-bottom:1px solid ${t.border};white-space:nowrap;`,
+      thSortStyle: `text-align:center;font-size:12px;font-weight:800;color:${t.textSecondary};padding:14px 12px;border-bottom:1px solid ${t.border};white-space:nowrap;cursor:pointer;user-select:none;`,
+      tdStyle: `text-align:center;font-size:13px;color:${t.textSecondary};padding:12px;white-space:nowrap;`,
+      tfStyle: `text-align:center;font-size:13px;font-weight:800;color:${t.textPrimary};padding:14px 12px;border-top:2px solid ${t.border};background:${t.bgPage};`,
+      noteBoxStyle: `margin-top:10px;font-size:12px;color:${t.textMuted};padding:0 4px;`,
+      adsNote: adsActive ? 'مصاريف الإعلان موزّعة على المنتجات حسب حصة كل منتج من الإيراد.' : 'المصاريف التشغيلية غير مفعّلة حالياً (0 تصنيف) — أدخل مصروف إعلانات أعلاه لعرض أعمدة تحليل الإعلان.',
+
+      footerBarStyle: `position:sticky;bottom:0;background:${t.headerBg};border-top:1px solid ${t.border};backdrop-filter:blur(8px);`,
+      footerLabelStyle: `font-size:11px;color:${t.textMuted};`,
+      footerValStyle: `font-size:17px;font-weight:800;color:${t.textPrimary};`,
+    };
+  }
+}
+
+</script>
+</body>
+</html>
