@@ -7,7 +7,9 @@
  * server component or action without creating an action endpoint.
  *
  * Key design decisions (see plan):
- *  - Consumption counts only completed orders: `completed` + `completedAccountant`.
+ *  - Consumption counts every order whose goods left the warehouse — see
+ *    `STOCK_CONSUMED_STATUSES` (completed + completedAccountant + pending).
+ *    Revenue uses a narrower list (`REVENUE_STATUSES`) because pending is not paid yet.
  *  - Per-product FEFO start = the createdAt of the product's earliest batch.
  *    Sales whose order.createdAt is before that keep their frozen snapshot cost
  *    (historical numbers never change). Only sales on/after it use FEFO.
@@ -16,8 +18,9 @@
 
 import { prisma } from "@/db/prisma";
 import { computeFefo, type FefoBatch } from "./fefo";
+import { STOCK_CONSUMED_STATUSES } from "./constants/order-statuses";
 
-export const COMPLETED_STATUSES = ["completed", "completedAccountant"];
+export { STOCK_CONSUMED_STATUSES };
 
 export type BatchWithMeta = FefoBatch & {
   batchNumber: string | null;
@@ -99,7 +102,7 @@ export async function buildFefoContexts(
   const orderItems = await prisma.orderItem.findMany({
     where: {
       productId: { in: batchedProductIds },
-      order: { status: { in: COMPLETED_STATUSES } },
+      order: { status: { in: STOCK_CONSUMED_STATUSES } },
     },
     select: {
       orderId: true,

@@ -105,7 +105,20 @@
       "Bash(C:/Users/dell/AppData/Local/Programs/Python/Python313/Lib/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe -y -i D:/Programming/Next-Store/prostore/tmp/lp-assets/clips/cta-p.mp4 -vf scale=720:-2 -c:v libx264 -crf 26 -preset slow -movflags +faststart -an D:/Programming/Next-Store/prostore/public/lp/syt-fath-mfasl/cta-p.mp4)",
       "PowerShell(Get-ChildItem -Recurse -Directory \"app\" | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\(\\(Get-Location\\).Path + '\\\\', ''\\) })",
       "PowerShell(npx prisma db push 2>&1)",
-      "PowerShell(npx prisma generate 2>&1)"
+      "PowerShell(npx prisma generate 2>&1)",
+      "PowerShell(\"WT_SESSION=$env:WT_SESSION\"; \"TERM_PROGRAM=$env:TERM_PROGRAM\"; \"TERM=$env:TERM\"; \"SESSIONNAME=$env:SESSIONNAME\"; [Console]::OutputEncoding.EncodingName)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(Remove-Item \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.205-win32-x64\" -Recurse -Force -Confirm:$false && Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\" -Directory | Where-Object Name -match 'claude' | Select-Object -ExpandProperty Name)",
+      "Bash(rg -n --pcre2 'stock:\\\\s*\\(?!true|false\\)' --glob '!node_modules' --glob '*.ts' --glob '*.tsx' .)",
+      "Bash(git stash *)",
+      "Bash(npx jest *)",
+      "Bash(git checkout *)",
+      "Bash(git commit -m '@ *)",
+      "Bash(git commit *)",
+      "WebFetch(domain:claude.ai)",
+      "Bash(npx next *)",
+      "WebSearch",
+      "WebFetch(domain:developers.facebook.com)"
     ]
   }
 }

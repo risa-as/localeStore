@@ -21,6 +21,9 @@ dotenv.config({ path: path.resolve(process.cwd(), ".env") });
  */
 async function main() {
   const { prisma } = await import("../db/prisma");
+  const { STOCK_CONSUMED_STATUSES } = await import(
+    "../lib/constants/order-statuses"
+  );
 
   console.log("📦 Seeding opening-balance batches...\n");
 
@@ -30,9 +33,7 @@ async function main() {
     }),
     prisma.orderItem.findMany({
       where: {
-        order: {
-          status: { in: ["completed", "completedAccountant", "pending"] },
-        },
+        order: { status: { in: STOCK_CONSUMED_STATUSES } },
       },
       select: { productId: true, qty: true },
     }),

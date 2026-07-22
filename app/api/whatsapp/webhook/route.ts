@@ -56,6 +56,20 @@ type WaInboundMessage = {
   sticker?: { id: string };
   button?: { text: string };
   interactive?: { button_reply?: { title: string }; list_reply?: { title: string } };
+  location?: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  };
+  contacts?: {
+    name?: { formatted_name?: string };
+    phones?: { phone?: string }[];
+  }[];
+  reaction?: { emoji?: string; message_id?: string };
+  order?: { catalog_id?: string; product_items?: unknown[] };
+  system?: { body?: string };
+  errors?: { code: number; title?: string; message?: string }[];
 };
 
 type WaStatus = {
@@ -67,32 +81,114 @@ type WaStatus = {
 
 const SUPPORTED_MEDIA = ["image", "video", "audio", "document", "sticker"] as const;
 
-function extractBody(msg: WaInboundMessage): { type: string; body: string | null; mediaId: string | null } {
-  if (msg.type === "text") return { type: "text", body: msg.text?.body ?? "", mediaId: null };
-  if (msg.type === "button") return { type: "text", body: msg.button?.text ?? "", mediaId: null };
+type Extracted = {
+  type: string;
+  body: string | null;
+  mediaId: string | null;
+  /** Short label for the conversation list — never the raw JSON of a payload. */
+  preview: string;
+};
+
+function extractBody(msg: WaInboundMessage): Extracted {
+  if (msg.type === "text") {
+    const body = msg.text?.body ?? "";
+    return { type: "text", body, mediaId: null, preview: body.slice(0, 120) };
+  }
+  if (msg.type === "button") {
+    const body = msg.button?.text ?? "";
+    return { type: "text", body, mediaId: null, preview: body.slice(0, 120) };
+  }
   if (msg.type === "interactive") {
-    const title = msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title ?? "";
-    return { type: "text", body: title, mediaId: null };
+    const body =
+      msg.interactive?.button_reply?.title ??
+      msg.interactive?.list_reply?.title ??
+      "";
+    return { type: "text", body, mediaId: null, preview: body.slice(0, 120) };
   }
   if ((SUPPORTED_MEDIA as readonly string[]).includes(msg.type)) {
     const media = msg[msg.type as (typeof SUPPORTED_MEDIA)[number]];
     const caption = (media as { caption?: string })?.caption ?? null;
-    return { type: msg.type, body: caption, mediaId: media?.id ?? null };
+    const labels: Record<string, string> = {
+      image: "📷 صورة",
+      video: "🎬 فيديو",
+      audio: "🎤 رسالة صوتية",
+      document: "📄 ملف",
+      sticker: "🩵 ملصق",
+    };
+    return {
+      type: msg.type,
+      body: caption,
+      mediaId: media?.id ?? null,
+      preview: caption ? caption.slice(0, 120) : (labels[msg.type] ?? "مرفق"),
+    };
   }
-  return { type: "unsupported", body: null, mediaId: null };
-}
 
-function previewText(type: string, body: string | null): string {
-  if (body) return body.slice(0, 120);
-  const labels: Record<string, string> = {
-    image: "📷 صورة",
-    video: "🎬 فيديو",
-    audio: "🎤 رسالة صوتية",
-    document: "📄 ملف",
-    sticker: "🩵 ملصق",
-    unsupported: "رسالة غير مدعومة",
+  // ── Types that used to fall through to "unsupported" ────────────────────
+  // Customers share their location for delivery and react to messages with
+  // emoji constantly, so these were by far the most common cause of the
+  // "رسالة غير مدعومة" placeholder.
+
+  if (msg.type === "location" && msg.location) {
+    const { latitude, longitude, name, address } = msg.location;
+    // Stored as JSON so the UI can render a real map link; `preview` keeps the
+    // conversation list readable.
+    return {
+      type: "location",
+      body: JSON.stringify({ latitude, longitude, name, address }),
+      mediaId: null,
+      preview: `📍 ${name || address || "موقع"}`.slice(0, 120),
+    };
+  }
+
+  if (msg.type === "contacts" && msg.contacts?.length) {
+    const names = msg.contacts
+      .map(
+        (c) => c.name?.formatted_name || c.phones?.[0]?.phone || "جهة اتصال",
+      )
+      .join("، ");
+    return {
+      type: "contacts",
+      body: names,
+      mediaId: null,
+      preview: `👤 ${names}`.slice(0, 120),
+    };
+  }
+
+  if (msg.type === "reaction" && msg.reaction) {
+    const emoji = msg.reaction.emoji ?? "";
+    // An empty emoji means the customer REMOVED their reaction.
+    return {
+      type: "reaction",
+      body: emoji,
+      mediaId: null,
+      preview: emoji ? `${emoji} تفاعل` : "أزال التفاعل",
+    };
+  }
+
+  if (msg.type === "order" && msg.order) {
+    const count = msg.order.product_items?.length ?? 0;
+    return {
+      type: "order",
+      body: `طلب من الكتالوج — ${count} صنف`,
+      mediaId: null,
+      preview: `🛒 طلب من الكتالوج (${count} صنف)`,
+    };
+  }
+
+  if (msg.type === "system") {
+    const body = msg.system?.body ?? "تحديث من واتساب";
+    return { type: "system", body, mediaId: null, preview: `ℹ️ ${body}`.slice(0, 120) };
+  }
+
+  // Genuinely unknown to us — keep the raw type so it can be diagnosed instead
+  // of silently collapsing to an opaque placeholder.
+  const detail = msg.errors?.[0]?.title || msg.type || "غير معروف";
+  return {
+    type: "unsupported",
+    body: detail,
+    mediaId: null,
+    preview: `رسالة غير مدعومة (${detail})`.slice(0, 120),
   };
-  return labels[type] ?? "رسالة";
 }
 
 async function handleInboundMessage(
@@ -100,7 +196,7 @@ async function handleInboundMessage(
   contactName: string | undefined,
 ) {
   const localPhone = toLocalPhone(msg.from);
-  const { type, body, mediaId } = extractBody(msg);
+  const { type, body, mediaId, preview } = extractBody(msg);
   const sentAt = msg.timestamp
     ? new Date(Number(msg.timestamp) * 1000)
     : new Date();
@@ -112,14 +208,14 @@ async function handleInboundMessage(
       phone: localPhone,
       customerName: contactName,
       lastMessageAt: sentAt,
-      lastMessagePreview: previewText(type, body),
+      lastMessagePreview: preview,
       unreadCount: 1,
       windowExpiresAt,
     },
     update: {
       ...(contactName ? { customerName: contactName } : {}),
       lastMessageAt: sentAt,
-      lastMessagePreview: previewText(type, body),
+      lastMessagePreview: preview,
       unreadCount: { increment: 1 },
       windowExpiresAt,
     },

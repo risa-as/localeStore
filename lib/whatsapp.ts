@@ -182,6 +182,60 @@ export async function sendOrderReturned(params: {
   });
 }
 
+/**
+ * رفع ملف إلى Meta وإرجاع معرّف الوسائط.
+ *
+ * نرفع الملف مباشرة إلى Meta بدلاً من استضافته على رابط عام، حتى لا تتسرّب صور
+ * المحادثات إلى الإنترنت. المعرّف الناتج يعمل أيضاً مع /api/whatsapp/media/[id]
+ * فتظهر الصورة المرسَلة في سجل المحادثة كما تظهر صور الزبون.
+ */
+export async function uploadWaMedia(file: File): Promise<string> {
+  const config = getWaConfig();
+  if (!config) throw new Error("WhatsApp غير مُهيأ — أضف متغيرات البيئة");
+
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", file.type);
+  form.append("file", file, file.name || "upload");
+
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${config.phoneNumberId}/media`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${config.token}` },
+      body: form,
+    },
+  );
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data?.id) {
+    throw new Error(
+      `WhatsApp media upload ${res.status}: ${JSON.stringify(data?.error ?? data)}`,
+    );
+  }
+  return data.id as string;
+}
+
+/** إرسال صورة (ضمن نافذة الـ 24 ساعة) — يعيد معرف الرسالة لدى Meta */
+export async function sendWaImage(params: {
+  phoneNumber: string;
+  mediaId: string;
+  caption?: string;
+}): Promise<string | undefined> {
+  const config = getWaConfig();
+  if (!config) throw new Error("WhatsApp غير مُهيأ — أضف متغيرات البيئة");
+
+  const data = await graphPost(config, {
+    messaging_product: "whatsapp",
+    to: toWaPhone(params.phoneNumber),
+    type: "image",
+    image: {
+      id: params.mediaId,
+      ...(params.caption ? { caption: params.caption } : {}),
+    },
+  });
+  return data.messages?.[0]?.id;
+}
+
 /** إرسال رد نصي حر (ضمن نافذة الـ 24 ساعة) — يعيد معرف الرسالة لدى Meta */
 export async function sendWaText(params: {
   phoneNumber: string; // محلية أو دولية

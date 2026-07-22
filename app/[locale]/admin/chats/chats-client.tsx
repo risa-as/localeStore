@@ -11,6 +11,7 @@ import {
   getWaConversations,
   getWaThread,
   sendWaReply,
+  sendWaImageReply,
 } from "@/lib/actions/whatsapp.actions";
 import {
   ArrowRight,
@@ -18,12 +19,16 @@ import {
   CheckCheck,
   Clock,
   FileText,
+  Image as ImageIcon,
   Loader2,
+  MapPin,
   MessageCircle,
   Package,
   Search,
   Send,
   TriangleAlert,
+  User,
+  X,
 } from "lucide-react";
 
 type Conversation = {
@@ -98,6 +103,37 @@ function StatusTicks({ status }: { status: string }) {
   return <Check className="w-3.5 h-3.5 opacity-70" />;
 }
 
+/** الموقع يُخزَّن كـ JSON من الويبهوك — نعرضه كرابط خرائط قابل للنقر. */
+function LocationBubble({ raw }: { raw: string | null }) {
+  if (!raw) return null;
+  let loc: {
+    latitude?: number;
+    longitude?: number;
+    name?: string;
+    address?: string;
+  } | null = null;
+  try {
+    loc = JSON.parse(raw);
+  } catch {
+    return <span className="italic opacity-70">📍 موقع</span>;
+  }
+  if (!loc?.latitude || !loc?.longitude) {
+    return <span className="italic opacity-70">📍 موقع</span>;
+  }
+  const label = loc.name || loc.address || "موقع الزبون";
+  return (
+    <a
+      href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center gap-1.5 underline"
+    >
+      <MapPin className="w-4 h-4 shrink-0" />
+      <span className="break-words">{label}</span>
+    </a>
+  );
+}
+
 function MessageBubble({ msg }: { msg: Message }) {
   const isOut = msg.direction === "out";
   return (
@@ -142,10 +178,35 @@ function MessageBubble({ msg }: { msg: Message }) {
             <FileText className="w-4 h-4" /> ملف مرفق
           </a>
         )}
-        {msg.type === "unsupported" && (
-          <span className="italic opacity-70">رسالة غير مدعومة</span>
+        {msg.type === "location" && <LocationBubble raw={msg.body} />}
+        {msg.type === "contacts" && msg.body && (
+          <span className="flex items-center gap-1.5">
+            <User className="w-4 h-4 shrink-0" /> {msg.body}
+          </span>
         )}
-        {msg.body && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
+        {msg.type === "reaction" && (
+          <span className="opacity-80">
+            {msg.body ? `تفاعل بـ ${msg.body}` : "أزال التفاعل"}
+          </span>
+        )}
+        {msg.type === "order" && msg.body && (
+          <span className="flex items-center gap-1.5">
+            <Package className="w-4 h-4 shrink-0" /> {msg.body}
+          </span>
+        )}
+        {msg.type === "system" && (
+          <span className="italic opacity-70">{msg.body}</span>
+        )}
+        {msg.type === "unsupported" && (
+          <span className="italic opacity-70">
+            رسالة غير مدعومة{msg.body ? ` (${msg.body})` : ""}
+          </span>
+        )}
+        {/* أنواع لها عرض خاص أعلاه — لا نكرر النص الخام تحتها */}
+        {msg.body &&
+          !["location", "contacts", "reaction", "order", "system", "unsupported"].includes(
+            msg.type,
+          ) && <p className="whitespace-pre-wrap break-words">{msg.body}</p>}
         <div
           className={`flex items-center gap-1 mt-0.5 text-[10px] ${
             isOut ? "text-white/80 justify-end" : "text-muted-foreground"
@@ -192,8 +253,12 @@ const ChatsClient = ({
   const [sending, setSending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastMessageCount = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // تحديث قائمة المحادثات دورياً
   const refreshList = useCallback(async () => {
@@ -264,8 +329,59 @@ const ChatsClient = ({
   );
   const windowOpen = remaining !== null;
 
+  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // يسمح بإعادة اختيار نفس الملف بعد الإزالة
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        variant: "destructive",
+        description: "حجم الصورة أكبر من 5 ميغابايت",
+      });
+      return;
+    }
+    setImageFile(file);
+    setImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return URL.createObjectURL(file);
+    });
+  };
+
+  const clearImage = () => {
+    setImagePreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setImageFile(null);
+  };
+
+  const handleSendImage = async () => {
+    if (!selectedId || !imageFile || sending) return;
+    const caption = replyText.trim();
+    const file = imageFile;
+    setSending(true);
+
+    const form = new FormData();
+    form.append("conversationId", selectedId);
+    form.append("caption", caption);
+    form.append("file", file);
+
+    const result = await sendWaImageReply(form);
+    setSending(false);
+    if (result.success) {
+      setReplyText("");
+      clearImage();
+    } else {
+      toast({ variant: "destructive", description: result.message });
+    }
+    await refreshThread();
+    refreshList();
+  };
+
   const handleSend = async () => {
-    if (!selectedId || !replyText.trim() || sending) return;
+    if (sending) return;
+    if (imageFile) return handleSendImage();
+    if (!selectedId || !replyText.trim()) return;
     const text = replyText.trim();
     setSending(true);
     setReplyText("");
@@ -465,30 +581,80 @@ const ChatsClient = ({
               <div className="border-t p-2">
                 {windowOpen ? (
                   <form
-                    className="flex items-center gap-2"
+                    className="space-y-2"
                     onSubmit={(e) => {
                       e.preventDefault();
                       handleSend();
                     }}
                   >
-                    <Input
-                      value={replyText}
-                      onChange={(e) => setReplyText(e.target.value)}
-                      placeholder="اكتب ردك هنا..."
-                      className="flex-1"
-                      autoComplete="off"
-                    />
-                    <Button
-                      type="submit"
-                      size="icon"
-                      disabled={sending || !replyText.trim()}
-                    >
-                      {sending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Send className="w-4 h-4 rtl:-scale-x-100" />
-                      )}
-                    </Button>
+                    {imageFile && (
+                      <div className="flex items-center gap-2 rounded-lg border p-2 bg-muted/40">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imagePreview ?? ""}
+                          alt=""
+                          className="w-12 h-12 rounded object-cover shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">
+                            {imageFile.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {(imageFile.size / 1024).toFixed(0)} كيلوبايت
+                            {replyText.trim() ? " · مع تعليق" : ""}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="shrink-0"
+                          onClick={clearImage}
+                          aria-label="إزالة الصورة"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        className="hidden"
+                        onChange={handleFilePick}
+                      />
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        disabled={sending}
+                        onClick={() => fileInputRef.current?.click()}
+                        aria-label="إرفاق صورة"
+                      >
+                        <ImageIcon className="w-4 h-4" />
+                      </Button>
+                      <Input
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder={
+                          imageFile ? "أضف تعليقاً (اختياري)..." : "اكتب ردك هنا..."
+                        }
+                        className="flex-1"
+                        autoComplete="off"
+                      />
+                      <Button
+                        type="submit"
+                        size="icon"
+                        disabled={sending || (!replyText.trim() && !imageFile)}
+                      >
+                        {sending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4 rtl:-scale-x-100" />
+                        )}
+                      </Button>
+                    </div>
                   </form>
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-1.5">

@@ -9,6 +9,7 @@ import { prisma } from "@/db/prisma";
 import { CartItem } from "@/types";
 import { revalidatePath } from "next/cache";
 import { PAGE_SIZE } from "../constants";
+import { REVENUE_STATUSES } from "../constants/order-statuses";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
@@ -677,6 +678,66 @@ export async function getAllOrders({
 
 // Get All Orders For Export (No Pagination)
 // Get All Orders For Export (No Pagination)
+/** Shared search/status filter so the summary always matches the listed rows. */
+function buildOrdersFilter(query: string, status?: string) {
+  const filter: Prisma.OrderWhereInput =
+    query && query !== "all"
+      ? {
+          OR: [
+            { fullName: { contains: query, mode: "insensitive" } },
+            { phoneNumber: { contains: query, mode: "insensitive" } },
+            { address: { contains: query, mode: "insensitive" } },
+            { governorate: { contains: query, mode: "insensitive" } },
+            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
+          ],
+        }
+      : {};
+
+  if (status && status !== "all") filter.status = status;
+  return filter;
+}
+
+/**
+ * Totals for the orders page header cards.
+ *
+ * Deliberately scoped to the SAME filter as the table below it (status tab +
+ * search), so the cards describe what is on screen rather than the whole table —
+ * otherwise the numbers contradict the rows the admin is looking at.
+ */
+export async function getOrdersSummaryStats({
+  query,
+  status,
+}: {
+  query: string;
+  status?: string;
+}) {
+  const result = await prisma.order.aggregate({
+    where: buildOrdersFilter(query, status),
+    _count: { _all: true },
+    _sum: {
+      totalPrice: true,
+      actualShippingCost: true,
+      shippingPrice: true,
+    },
+  });
+
+  const totalValue = Number(result._sum.totalPrice ?? 0);
+  const actualShippingCost = Number(result._sum.actualShippingCost ?? 0);
+  const chargedShipping = Number(result._sum.shippingPrice ?? 0);
+
+  return {
+    orderCount: result._count._all,
+    totalValue,
+    actualShippingCost,
+    chargedShipping,
+    // What actually reaches the business: the courier collects the full order
+    // amount from the customer and deducts its own fee before remitting, so the
+    // ACTUAL shipping cost is the right subtrahend — not the amount charged to
+    // the customer. This matches `orderNetRevenue` on the profit page.
+    netAfterShipping: totalValue - actualShippingCost,
+  };
+}
+
 export async function getAllOrdersForExport({
   query,
   status,
@@ -1409,7 +1470,9 @@ export async function getOrderProfitStats({
     prisma.order.findMany({
       where: {
         createdAt: { gte: startDate, lte: endDate },
-        status: { in: ["completed", "completedAccountant"] },
+        // Revenue only — `pending` is excluded here on purpose (goods shipped but
+        // cash not collected). Inventory consumption uses the wider list.
+        status: { in: REVENUE_STATUSES },
       },
       select: {
         id: true,
@@ -1486,10 +1549,35 @@ export async function getOrderProfitStats({
   let baghdadActualShippingCost = 0;
   let othersActualShippingCost = 0;
 
+  // Orders whose totalPrice disagrees with their own line items. The profit page
+  // treats totalPrice as the source of truth (it is what was actually collected)
+  // and spreads it across the items, so a mismatch silently distorts that
+  // product's per-unit selling price — and usually means the recorded quantity
+  // is wrong, which understates cost and leaves stock over-counted.
+  const inconsistentOrders: {
+    id: string;
+    date: string;
+    expected: number;
+    actual: number;
+    diff: number;
+    items: string;
+  }[] = [];
+
+  // Per-day buckets for the dashboard chart, keyed by Iraq-local calendar day.
+  const dailyMap = new Map<
+    string,
+    { revenue: number; profit: number; orders: number }
+  >();
+  const iraqDayKey = (d: Date) =>
+    new Date(new Date(d).getTime() + 3 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+
   for (const order of orders) {
     const orderItems = order.orderitems;
     const isBaghdad = order.governorate === "Baghdad";
     const actualShipping = Number(order.actualShippingCost);
+    let orderProfit = 0;
 
     if (isBaghdad) {
       baghdadOrderCount++;
@@ -1512,6 +1600,21 @@ export async function getOrderProfitStats({
       0,
     );
 
+    // Flag orders that do not add up. Tolerance is 1 IQD (values are stored in
+    // thousands), which is well below any real rounding.
+    const expectedTotal = rawItemsTotal + Number(order.shippingPrice);
+    const totalDiff = Number(order.totalPrice) - expectedTotal;
+    if (Math.abs(totalDiff) > 0.001) {
+      inconsistentOrders.push({
+        id: order.id,
+        date: iraqDayKey(order.createdAt),
+        expected: expectedTotal,
+        actual: Number(order.totalPrice),
+        diff: totalDiff,
+        items: orderItems.map((i) => `${i.name} × ${i.qty}`).join(" + "),
+      });
+    }
+
     for (const item of orderItems) {
       const rawRevenue = Number(item.price) * item.qty;
       const revenue =
@@ -1532,6 +1635,7 @@ export async function getOrderProfitStats({
       }
 
       const profit = revenue - cost;
+      orderProfit += profit;
 
       if (statsMap.has(item.productId)) {
         const stats = statsMap.get(item.productId)!;
@@ -1553,6 +1657,13 @@ export async function getOrderProfitStats({
         });
       }
     }
+
+    const dayKey = iraqDayKey(order.createdAt);
+    const bucket = dailyMap.get(dayKey) ?? { revenue: 0, profit: 0, orders: 0 };
+    bucket.revenue += orderNetRevenue;
+    bucket.profit += orderProfit;
+    bucket.orders += 1;
+    dailyMap.set(dayKey, bucket);
   }
 
   // Attach returned qty to each product stat
@@ -1583,8 +1694,33 @@ export async function getOrderProfitStats({
   const avgOrderValue =
     totalOrderCount > 0 ? totalGrossRevenue / totalOrderCount : 0;
 
+  // Walk every calendar day in the range so the chart has no gaps — days with no
+  // orders must render as zero, not be skipped (which would distort the x-axis).
+  const dailySeries: {
+    date: string;
+    revenue: number;
+    profit: number;
+    orders: number;
+  }[] = [];
+  const cursor = new Date(startDate.getTime() + 3 * 60 * 60 * 1000);
+  const lastDay = new Date(endDate.getTime() + 3 * 60 * 60 * 1000);
+  // Guard against a pathological range producing an unbounded loop.
+  for (let i = 0; i < 400 && cursor <= lastDay; i++) {
+    const key = cursor.toISOString().slice(0, 10);
+    const bucket = dailyMap.get(key);
+    dailySeries.push({
+      date: key,
+      revenue: bucket?.revenue ?? 0,
+      profit: bucket?.profit ?? 0,
+      orders: bucket?.orders ?? 0,
+    });
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
   return {
     productStats,
+    dailySeries,
+    inconsistentOrders,
     fefoActive,
     fefoFallbackQty,
     orderSummary: {

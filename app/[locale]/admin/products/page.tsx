@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import BatchForm from "@/components/admin/batch-form";
 import Image from "next/image";
 import { PAGE_SIZE } from "@/lib/constants";
+import { STOCK_CONSUMED_STATUSES } from "@/lib/constants/order-statuses";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -36,9 +37,7 @@ const AdminProductsPage = async (props: {
     getAllProducts({ query: searchText, page, category }),
     prisma.orderItem.findMany({
       where: {
-        order: {
-          status: { in: ["completed", "completedAccountant", "pending"] },
-        },
+        order: { status: { in: STOCK_CONSUMED_STATUSES } },
       },
       select: { productId: true, qty: true },
     }),
