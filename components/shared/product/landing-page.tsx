@@ -333,7 +333,10 @@ export default function LandingPage({
               <div className="relative rounded-[2.5rem] p-1 bg-gradient-to-br from-white/80 to-white/40 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] backdrop-blur-xl border border-white/50">
                 <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-br from-blue-50/50 to-purple-50/50 opacity-50" />
                 <div className="relative rounded-[2.3rem] bg-white/40 p-6 md:p-8 backdrop-blur-sm">
-                  <QuickOrderForm product={product} availableStock={availableStock} />
+                  <QuickOrderForm
+                    product={product}
+                    availableStock={availableStock}
+                  />
 
                   <div className="mt-6 flex items-center justify-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-widest">
                     <ShieldCheck className="w-3 h-3" />
@@ -357,7 +360,7 @@ export default function LandingPage({
       {/* WhatsApp Floating Button */}
       <div>
         <a
-          href="https://wa.me/9647764046663"
+          href="https://wa.me/9647775203786"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="تواصل معنا على واتساب"
