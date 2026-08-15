@@ -567,45 +567,25 @@ export default function ProfitDashboard({
           </div>
           <div className="pa-grid">
             <div className="pa-kpi">
-              <div className="pa-sub">مصاريف الإعلانات</div>
-              <div className="flex items-baseline gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  className="pa-expense-input"
-                  value={adsExpense}
-                  onChange={(e) =>
-                    setAdsExpense(
-                      e.target.value === "" ? 0 : Number(e.target.value),
-                    )
-                  }
-                  aria-label="مصاريف الإعلانات"
-                />
-              </div>
+              <div className="pa-kpi-label">مصاريف الإعلانات</div>
+              <ExpenseInput
+                value={adsExpense}
+                onChange={setAdsExpense}
+                label="مصاريف الإعلانات"
+              />
               <div className="pa-meta">
-                {formatCurrency(adsExpense)} ·{" "}
                 {expenses.adByProduct.length} منتج معلن
               </div>
             </div>
 
             <div className="pa-kpi">
-              <div className="pa-sub">المصاريف التشغيلية</div>
-              <div className="flex items-baseline gap-2">
-                <input
-                  type="number"
-                  min={0}
-                  className="pa-expense-input"
-                  value={opexExpense}
-                  onChange={(e) =>
-                    setOpexExpense(
-                      e.target.value === "" ? 0 : Number(e.target.value),
-                    )
-                  }
-                  aria-label="المصاريف التشغيلية"
-                />
-              </div>
+              <div className="pa-kpi-label">المصاريف التشغيلية</div>
+              <ExpenseInput
+                value={opexExpense}
+                onChange={setOpexExpense}
+                label="المصاريف التشغيلية"
+              />
               <div className="pa-meta">
-                {formatCurrency(opexExpense)} ·{" "}
                 {expenses.expenseByCategory.length} تصنيف
               </div>
             </div>
@@ -1282,6 +1262,56 @@ export default function ProfitDashboard({
 }
 
 // ── Small presentational helpers ───────────────────────────────────────────
+
+const GROUPED = new Intl.NumberFormat("en-US");
+
+/**
+ * Editable expense figure, presented like the read-only KPI values beside it:
+ * grouped digits followed by the currency. The value is held in thousands —
+ * the unit every amount on this page uses — but shown and typed in full dinars,
+ * so the tile no longer reads "3547" above "3,547,000 د.ع".
+ *
+ * Separators are dropped while the field has focus: editing a string the
+ * component keeps re-grouping fights the caret, and bare digits are what a
+ * numeric field is expected to accept.
+ */
+function ExpenseInput({
+  value,
+  onChange,
+  label,
+}: {
+  value: number;
+  onChange: (next: number) => void;
+  label: string;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const dinars = Math.round(value * 1000);
+  const text = draft ?? GROUPED.format(dinars);
+
+  return (
+    <div className="pa-expense-field">
+      <input
+        type="text"
+        inputMode="numeric"
+        dir="ltr"
+        className="pa-expense-input"
+        // Fallback for browsers without `field-sizing: content`, so the
+        // currency stays beside the number instead of across the tile.
+        size={Math.max(text.length, 1)}
+        value={text}
+        aria-label={label}
+        onFocus={() => setDraft(String(dinars))}
+        onBlur={() => setDraft(null)}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "");
+          setDraft(digits);
+          onChange(digits === "" ? 0 : Number(digits) / 1000);
+        }}
+      />
+      <span className="pa-expense-unit">د.ع</span>
+    </div>
+  );
+}
 
 function Kpi({
   label,

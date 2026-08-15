@@ -258,18 +258,33 @@
 
 /* ── Expense inputs ─────────────────────────────────────────────────────── */
 
-.pa-expense-input {
+.pa-expense-field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Matches .pa-kpi-value so an editable amount reads like a read-only one. */
+.pa-expense-input,
+.pa-expense-unit {
   font-family: inherit;
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
+  letter-spacing: -0.3px;
+  color: var(--pa-text-primary);
+}
+
+.pa-expense-input {
   background: transparent;
   border: none;
   outline: none;
-  color: var(--pa-text-primary);
-  width: 100%;
-  min-width: 0;
+  max-width: 100%;
+  /* Keeps a cleared field wide enough to click back into once
+     `field-sizing` has shrunk it to its content. */
+  min-width: 2ch;
   padding: 0;
-  -moz-appearance: textfield;
+  field-sizing: content;
 }
 
 .pa-expense-input:focus {

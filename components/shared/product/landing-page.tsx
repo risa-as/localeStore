@@ -23,7 +23,14 @@ import { v4 as uuidv4 } from "uuid";
 import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
 import FbPixel from "../facebook-pixel";
 // End Pixel Code
-export default function LandingPage({ product }: { product: Product }) {
+export default function LandingPage({
+  product,
+  availableStock,
+}: {
+  product: Product;
+  /** المتبقي فعلاً (stock ناقص ما خرج من المستودع) — وليس product.stock */
+  availableStock: number;
+}) {
   const t = useTranslations("LandingPage");
   const locale = useLocale();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -191,9 +198,9 @@ export default function LandingPage({ product }: { product: Product }) {
 
               {/* Floating Badges */}
               <div className="absolute top-6 left-6 flex flex-col gap-2">
-                {Number(product.stock) > 0 && Number(product.stock) < 10 && (
+                {availableStock > 0 && availableStock < 10 && (
                   <span className="px-4 py-2 bg-red-500/90 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-wider rounded-full shadow-lg border border-white/10">
-                    {t("onlyLeft", { count: product.stock })}
+                    {t("onlyLeft", { count: availableStock })}
                   </span>
                 )}
                 <span className="px-4 py-2 bg-slate-900/80 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-wider rounded-full shadow-lg border border-white/10">
@@ -273,6 +280,8 @@ export default function LandingPage({ product }: { product: Product }) {
                   <span className="text-3xl font-light text-slate-900">
                     {formatCurrency(Number(product.price))}
                   </span>
+                  {/* مؤشر التوفر يبقى على product.stock كما كان — المتبقي السالب
+                      يعني تأخّر إدخال دفعة، لا توقف البيع */}
                   {Number(product.stock) > 0 && (
                     <span className="text-sm font-medium text-green-600 flex items-center gap-1">
                       <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
@@ -324,7 +333,7 @@ export default function LandingPage({ product }: { product: Product }) {
               <div className="relative rounded-[2.5rem] p-1 bg-gradient-to-br from-white/80 to-white/40 shadow-[0_40px_80px_-20px_rgba(0,0,0,0.15)] backdrop-blur-xl border border-white/50">
                 <div className="absolute inset-0 rounded-[2.5rem] bg-gradient-to-br from-blue-50/50 to-purple-50/50 opacity-50" />
                 <div className="relative rounded-[2.3rem] bg-white/40 p-6 md:p-8 backdrop-blur-sm">
-                  <QuickOrderForm product={product} />
+                  <QuickOrderForm product={product} availableStock={availableStock} />
 
                   <div className="mt-6 flex items-center justify-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-widest">
                     <ShieldCheck className="w-3 h-3" />

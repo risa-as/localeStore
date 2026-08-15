@@ -29,8 +29,11 @@ const GROUND = "#07090c";
 
 export default function CinematicSytFathMfasl({
   product,
+  availableStock,
 }: {
   product: Product;
+  /** المتبقي فعلاً (stock ناقص ما خرج من المستودع) — وليس product.stock */
+  availableStock: number;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [eventId] = useState(() => uuidv4());
@@ -899,7 +902,7 @@ export default function CinematicSytFathMfasl({
             </div>
             <div className="form-shell reveal">
               <div className="form-card" dir="rtl">
-                <QuickOrderForm product={product} />
+                <QuickOrderForm product={product} availableStock={availableStock} />
               </div>
             </div>
             <div className="assure reveal">

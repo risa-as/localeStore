@@ -134,7 +134,14 @@ const ProfitPage = async (props: {
         </div>
       </div>
 
+      {/* Keyed on the period so a range change remounts the dashboard. Its
+          expense inputs seed from props via useState, and the date picker
+          navigates with router.push (a soft nav that keeps the component
+          mounted) — without the key the initialiser never re-runs and the
+          previous period's expense figures stay in the inputs while every
+          prop-driven number around them updates. */}
       <ProfitDashboard
+        key={`${fromLabel}:${toLabel}`}
         productStats={productStats}
         dailySeries={dailySeries}
         orderSummary={orderSummary}

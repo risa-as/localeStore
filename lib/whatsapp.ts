@@ -8,9 +8,37 @@ import { prisma } from "@/db/prisma";
  *   WHATSAPP_PHONE_NUMBER_ID  معرف رقم الهاتف في Meta (Phone Number ID)
  *   WHATSAPP_VERIFY_TOKEN     كلمة سرية من اختيارك للتحقق من Webhook
  *   WHATSAPP_APP_SECRET       App Secret للتحقق من توقيع Meta (اختياري لكنه مُوصى به)
+ *
+ * عند اشتراك أكثر من متجر في نفس WHATSAPP_PHONE_NUMBER_ID تُضاف (انظر
+ * lib/whatsapp-tenant.ts):
+ *
+ *   WHATSAPP_PRIMARY_INBOX    "true" في متجر واحد فقط — يستقبل الأرقام غير المعروفة
+ *   WHATSAPP_OWN_DOMAINS      نطاقات هذا المتجر مفصولة بفواصل (افتراضياً NEXT_PUBLIC_SERVER_URL)
  */
 
 const GRAPH_VERSION = "v25.0";
+
+/**
+ * أسماء «وهمية» يكتبها بعض الزبائن بدل اسمهم الحقيقي — لا نرسل لهم قالب تأكيد
+ * الطلب لأن الرسالة تظهر باسم بلا معنى. أضف أي صيغة أخرى هنا (مثل "الزبون").
+ */
+const SKIP_CONFIRMATION_NAMES = ["زبون"];
+
+/** توحيد الاسم قبل المقارنة: إزالة التطويل والتشكيل وتبسيط المسافات */
+function normalizeArabicName(name: string): string {
+  return (name || "")
+    .replace(/[ـً-ْ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** هل الاسم من الأسماء الوهمية التي نتخطى إرسال تأكيد الطلب لها؟ */
+export function shouldSkipOrderConfirmation(fullName: string): boolean {
+  const normalized = normalizeArabicName(fullName);
+  return SKIP_CONFIRMATION_NAMES.some(
+    (skipName) => normalized === normalizeArabicName(skipName),
+  );
+}
 
 export type WaConfig = {
   token: string;
@@ -112,8 +140,15 @@ export async function sendOrderConfirmation(params: {
   const config = getWaConfig();
   if (!config) return;
 
-  const newprice =
-    params.quantity > 1 ? params.price - 5 : params.price;
+  // اسم وهمي ⇒ لا رسالة تأكيد ولا تسجيل في المحادثة
+  if (shouldSkipOrderConfirmation(params.fullName)) {
+    console.log(
+      `⏭️ تخطّي تأكيد الطلب عبر واتساب — اسم الزبون "${params.fullName}"`,
+    );
+    return;
+  }
+
+  const newprice = params.quantity > 1 ? params.price - 5 : params.price;
 
   const data = await graphPost(config, {
     messaging_product: "whatsapp",

@@ -5,7 +5,7 @@ import { formatCurrency } from "@/lib/utils";
 import BatchForm from "@/components/admin/batch-form";
 import Image from "next/image";
 import { PAGE_SIZE } from "@/lib/constants";
-import { STOCK_CONSUMED_STATUSES } from "@/lib/constants/order-statuses";
+import { getSoldQuantities } from "@/lib/inventory";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -33,27 +33,17 @@ const AdminProductsPage = async (props: {
   const searchText = searchParams.query || "";
   const category = searchParams.category || "";
 
-  const [products, soldItems, allProductsForValue] = await Promise.all([
+  const [products, soldMap, allProductsForValue] = await Promise.all([
     getAllProducts({ query: searchText, page, category }),
-    prisma.orderItem.findMany({
-      where: {
-        order: { status: { in: STOCK_CONSUMED_STATUSES } },
-      },
-      select: { productId: true, qty: true },
-    }),
+    getSoldQuantities(),
     prisma.product.findMany({
       select: { id: true, stock: true, costPrice: true },
     }),
   ]);
 
-  const soldMap = soldItems.reduce<Record<string, number>>((acc, item) => {
-    acc[item.productId] = (acc[item.productId] ?? 0) + item.qty;
-    return acc;
-  }, {});
-
   // Total inventory value at cost — only products with remaining > 0
   const totalInventoryValue = allProductsForValue.reduce((sum, p) => {
-    const remaining = (p.stock ?? 0) - (soldMap[p.id] ?? 0);
+    const remaining = (p.stock ?? 0) - (soldMap.get(p.id) ?? 0);
     if (remaining <= 0) return sum;
     return sum + remaining * Number(p.costPrice);
   }, 0);
@@ -168,7 +158,7 @@ const AdminProductsPage = async (props: {
           </TableHeader>
           <TableBody>
             {products.data.map((product: any, index: number) => {
-              const sold = soldMap[product.id] ?? 0;
+              const sold = soldMap.get(product.id) ?? 0;
               const remaining = (product.stock ?? 0) - sold;
               const profit = Number(product.price) - Number(product.costPrice);
 

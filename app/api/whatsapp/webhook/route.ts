@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 import { prisma } from "@/db/prisma";
 import { getWaConfig, toLocalPhone } from "@/lib/whatsapp";
+import {
+  resolveInboundOwnership,
+  ownsStatusUpdate,
+} from "@/lib/whatsapp-tenant";
 
 /**
  * Webhook واتساب — يوجَّه إليه Callback URL في تطبيق Meta:
@@ -70,6 +74,13 @@ type WaInboundMessage = {
   order?: { catalog_id?: string; product_items?: unknown[] };
   system?: { body?: string };
   errors?: { code: number; title?: string; message?: string }[];
+  /** يصل مع أول رسالة من إعلان «انقر للمراسلة» — يحمل رابط الإعلان */
+  referral?: {
+    source_url?: string;
+    source_id?: string;
+    source_type?: string;
+    ctwa_clid?: string;
+  };
 };
 
 type WaStatus = {
@@ -196,6 +207,24 @@ async function handleInboundMessage(
   contactName: string | undefined,
 ) {
   const localPhone = toLocalPhone(msg.from);
+
+  // نسجّل رابط الإعلان عند وصوله حتى يمكن ضبط WHATSAPP_OWN/FOREIGN_DOMAINS عليه
+  if (msg.referral?.source_url) {
+    console.log(`📣 رسالة من إعلان — ${localPhone} ← ${msg.referral.source_url}`);
+  }
+
+  // متاجر تتشارك نفس رقم واتساب تستقبل نفس الأحداث — نخزّن زبائننا فقط
+  const ownership = await resolveInboundOwnership({
+    localPhone,
+    referralSourceUrl: msg.referral?.source_url,
+  });
+  if (!ownership.owned) {
+    console.log(
+      `⏭️ تجاهل رسالة واردة من ${localPhone} — ${ownership.reason === "foreign-ad" ? "إعلان متجر آخر" : "ليست من زبائن هذا المتجر"}`,
+    );
+    return;
+  }
+
   const { type, body, mediaId, preview } = extractBody(msg);
   const sentAt = msg.timestamp
     ? new Date(Number(msg.timestamp) * 1000)
@@ -257,6 +286,14 @@ async function handleStatus(status: WaStatus) {
     where: { waMessageId: status.id },
     select: { id: true, status: true },
   });
+
+  // حالة تسليم لرسالة أرسلها متجر آخر يتشارك نفس الرقم — لا تخصّنا
+  const owned = await ownsStatusUpdate({
+    messageExists: Boolean(existing),
+    localPhone,
+  });
+  if (!owned) return;
+
   if (existing) {
     const newRank = STATUS_RANK[status.status] ?? 0;
     const oldRank = STATUS_RANK[existing.status] ?? 0;

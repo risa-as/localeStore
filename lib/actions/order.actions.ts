@@ -134,6 +134,9 @@ export async function createQuickOrder(
       return { success: false, message: "Product not found" };
     }
 
+    // ملاحظة: المقارنة هنا مع مجموع الدفعات المستلمة وليس المتبقي فعلاً — قرار
+    // مقصود حتى لا تتوقف المبيعات على منتج تأخّر إدخال دفعته (انظر المتبقي
+    // السالب في /admin/products). العرض في صفحة الهبوط يستخدم المتبقي الحقيقي.
     if (product.stock < orderData.quantity) {
       return { success: false, message: "Not enough stock" };
     }

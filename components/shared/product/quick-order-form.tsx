@@ -32,9 +32,11 @@ import {
 
 interface QuickOrderFormProps {
     product: Product;
+    /** المتبقي فعلاً (stock ناقص ما خرج من المستودع) — وليس product.stock */
+    availableStock: number;
 }
 
-export function QuickOrderForm({ product }: QuickOrderFormProps) {
+export function QuickOrderForm({ product, availableStock }: QuickOrderFormProps) {
     const { toast } = useToast();
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
@@ -56,8 +58,12 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
 
     const quantity = form.watch("quantity") as number;
 
+    // عند نفاد المتبقي (صفر أو سالب بسبب تأخّر إدخال دفعة) نعود إلى مجموع
+    // الدفعات حتى لا يتعطّل اختيار الكمية على منتج ما زال يُباع فعلياً.
+    const maxQty = availableStock > 0 ? availableStock : Number(product.stock);
+
     const incrementQty = () => {
-        if (quantity < product.stock) {
+        if (quantity < maxQty) {
             form.setValue("quantity", quantity + 1);
         }
     };
@@ -229,7 +235,7 @@ export function QuickOrderForm({ product }: QuickOrderFormProps) {
                                             variant="ghost"
                                             size="icon"
                                             onClick={incrementQty}
-                                            disabled={quantity >= product.stock}
+                                            disabled={quantity >= maxQty}
                                             className="h-11 w-11 rounded-xl hover:bg-white text-slate-600"
                                         >
                                             <Plus className="w-5 h-5" />
