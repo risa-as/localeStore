@@ -19,7 +19,10 @@ import {
   Link2,
   Loader2,
   AlertTriangle,
+  Link as LinkIcon,
+  Send,
 } from "lucide-react";
+import PublishPanel, { type Feed, type AdMeta } from "./marketing-publish";
 
 type Status =
   | { configured: boolean; connected: false }
@@ -55,13 +58,20 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
 export default function MarketingClient({
   status,
   flash,
+  feed,
+  adMeta,
 }: {
   status: Status;
   flash: string | null;
+  feed: Feed | null;
+  adMeta: AdMeta | null;
 }) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [tab, setTab] = useState<"connection" | "publish">(
+    status.connected ? "publish" : "connection",
+  );
 
   useEffect(() => {
     if (flash && FLASH[flash]) {
@@ -94,39 +104,92 @@ export default function MarketingClient({
       ) : !status.connected ? (
         <NotConnected pending={pending} />
       ) : (
-        <Connected
-          status={status}
-          onSelectPage={(id) =>
-            startTransition(async () => {
-              const r = await selectMetaPage(id);
-              toast({
-                description: r.message,
-                variant: r.success ? undefined : "destructive",
-              });
-              router.refresh();
-            })
-          }
-          onSelectAd={(id) =>
-            startTransition(async () => {
-              const r = await selectMetaAdAccount(id);
-              toast({
-                description: r.message,
-                variant: r.success ? undefined : "destructive",
-              });
-              router.refresh();
-            })
-          }
-          onDisconnect={() =>
-            startTransition(async () => {
-              const r = await disconnectMeta();
-              toast({ description: r.message });
-              router.refresh();
-            })
-          }
-          pending={pending}
-        />
+        <>
+          {/* تبويبات */}
+          <div className="flex gap-1 border-b">
+            <TabButton
+              active={tab === "publish"}
+              onClick={() => setTab("publish")}
+              icon={<Send className="w-4 h-4" />}
+              label="النشر والإعلانات"
+            />
+            <TabButton
+              active={tab === "connection"}
+              onClick={() => setTab("connection")}
+              icon={<LinkIcon className="w-4 h-4" />}
+              label="الاتصال"
+            />
+          </div>
+
+          {tab === "publish" ? (
+            feed && adMeta ? (
+              <PublishPanel feed={feed} adMeta={adMeta} />
+            ) : (
+              <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
+            )
+          ) : (
+            <Connected
+              status={status}
+              onSelectPage={(id) =>
+                startTransition(async () => {
+                  const r = await selectMetaPage(id);
+                  toast({
+                    description: r.message,
+                    variant: r.success ? undefined : "destructive",
+                  });
+                  router.refresh();
+                })
+              }
+              onSelectAd={(id) =>
+                startTransition(async () => {
+                  const r = await selectMetaAdAccount(id);
+                  toast({
+                    description: r.message,
+                    variant: r.success ? undefined : "destructive",
+                  });
+                  router.refresh();
+                })
+              }
+              onDisconnect={() =>
+                startTransition(async () => {
+                  const r = await disconnectMeta();
+                  toast({ description: r.message });
+                  router.refresh();
+                })
+              }
+              pending={pending}
+            />
+          )}
+        </>
       )}
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+        active
+          ? "border-primary text-primary"
+          : "border-transparent text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 

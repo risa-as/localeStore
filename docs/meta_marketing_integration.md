@@ -24,36 +24,36 @@ owner's own accounts. Review is only needed to remove that restriction.
 ## Task list
 
 ### Phase 0 — Foundation
-- [ ] `lib/meta/config.ts` — env reader (`getMetaConfig`), Graph version, scope list, redirect URL. Mirrors `getWaConfig`.
-- [ ] `lib/meta/graph.ts` — thin Graph API GET/POST helpers with typed errors (raw `fetch`, NOT the SDK — the SDK stays for CAPI only; it has TS friction here).
-- [ ] Prisma: `MetaConnection` — add to `schema.prisma`. Schema is already ahead of `prisma/migrations`, so this is applied with **`npx prisma db push`, run by the store owner** against their own DB (this machine's `.env` points at production — never push from here).
-- [ ] `/admin/marketing` route + nav entry (admin-only) with a "not configured" state.
+- [x] `lib/meta/config.ts` — env reader (`getMetaConfig`), Graph version, scope list, redirect URL. Mirrors `getWaConfig`.
+- [x] `lib/meta/graph.ts` — thin Graph API GET/POST helpers with typed errors (raw `fetch`, NOT the SDK — the SDK stays for CAPI only; it has TS friction here).
+- [x] Prisma: `MetaConnection` — add to `schema.prisma`. Schema is already ahead of `prisma/migrations`, so this is applied with **`npx prisma db push`, run by the store owner** against their own DB (this machine's `.env` points at production — never push from here).
+- [x] `/admin/marketing` route + nav entry (admin-only) with a "not configured" state.
 
 ### Phase 1 — Connect accounts (OAuth)
-- [ ] `GET /api/meta/oauth` — build the Facebook login dialog URL with a signed `state`.
-- [ ] `GET /api/meta/oauth/callback` — exchange code → long-lived user token → list Pages, IG accounts, ad accounts → store.
-- [ ] Server actions: `getMetaConnection`, `selectPage`, `selectAdAccount`, `disconnectMeta`.
-- [ ] Connections panel UI: connect/disconnect, show connected assets + token expiry.
+- [x] `GET /api/meta/oauth` — build the Facebook login dialog URL with a signed `state`.
+- [x] `GET /api/meta/oauth/callback` — exchange code → long-lived user token → list Pages, IG accounts, ad accounts → store.
+- [x] Server actions: `getMetaConnection`, `selectPage`, `selectAdAccount`, `disconnectMeta`.
+- [x] Connections panel UI: connect/disconnect, show connected assets + token expiry.
 
 ### Phase 2 — Publish posts
-- [ ] Prisma: `SocialPost` (platform, productId?, caption, media, status, fbPostId, igPostId, error).
-- [ ] `publishToFacebook` — Page photo/feed post via page token.
-- [ ] `publishToInstagram` — 2-step media container → publish.
-- [ ] Reuse UploadThing for public image URLs (both APIs require a fetchable URL).
-- [ ] Composer UI: pick product (prefill images + caption), choose platform(s), publish; posts list.
+- [x] Prisma: `SocialPost` (platform, productId?, caption, media, status, fbPostId, igPostId, error).
+- [x] `publishToFacebook` — Page photo/feed post via page token.
+- [x] `publishToInstagram` — 2-step media container → publish.
+- [x] Reuse UploadThing for public image URLs (both APIs require a fetchable URL).
+- [x] Composer UI: pick product (prefill images + caption), choose platform(s), publish; posts list.
 
 ### Phase 3 — Launch ads from a post
-- [ ] Prisma: `MetaAdLaunch` (postId, adAccountId, campaign/adset/ad/creative ids, budget, status).
-- [ ] `launchAd` — Campaign → Ad Set (geo=Iraq, budget, dates) → Creative → Ad, created **PAUSED** for safety.
+- [x] Prisma: `MetaAdLaunch` (postId, adAccountId, campaign/adset/ad/creative ids, budget, status).
+- [x] `launchAd` — Campaign → Ad Set (geo=Iraq, budget, dates) → Creative → Ad, created **PAUSED** for safety.
   - FB Page post: creative via `object_story_id` = `{pageId}_{postId}`.
-  - IG post: **different** creative path (`instagram_actor_id` / source media), not `object_story_id` — handle separately.
-- [ ] Launch dialog UI: pick ad account, objective, budget, dates, basic targeting; then activate.
-- [ ] Do **NOT** write the ad budget into `AdCampaign`. That table is manual *actual spend* and `getExpenseStatsForPeriod` pro-rates it into real profit; a budget is planned, not spent. Real spend later comes from the Insights API (`/act_{id}/insights`, `spend`), reconciled after the fact — a separate feature.
+  - Implemented: boost the **FB Page post** via `object_story_id`; ad placements can include Instagram automatically. Instagram-only posts (no fbPostId) can't be boosted yet — the UI disables the button with a hint to publish to Facebook too.
+- [x] Launch dialog UI: objective, daily budget, days; shows the minor-unit amount being sent; ad created PAUSED, activated by the user in Meta Ads Manager.
+- [x] Do **NOT** write the ad budget into `AdCampaign`. That table is manual *actual spend* and `getExpenseStatsForPeriod` pro-rates it into real profit; a budget is planned, not spent. Real spend later comes from the Insights API (`/act_{id}/insights`, `spend`), reconciled after the fact — a separate feature.
 
 ### Cross-cutting
-- [ ] OAuth `state` CSRF protection; tokens never sent to the client.
-- [ ] Token-expiry surfacing + guidance to reconnect.
-- [ ] English/Arabic strings for the new UI.
+- [x] OAuth `state` CSRF protection; tokens never sent to the client.
+- [x] Token-expiry surfacing + guidance to reconnect.
+- [x] English/Arabic strings for the new UI.
 
 ## Env vars to add (later, once app is created in Meta)
 ```
