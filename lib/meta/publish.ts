@@ -31,6 +31,9 @@ export async function publishToFacebook(params: {
       pageToken,
       { url: imageUrls[0], caption, published: true },
     );
+    // نُعيد post_id (معرّف المنشور {pageId}_{postId}) لأنه ما يعمل مع
+    // object_story_id عند تعزيز المنشور. res.id هنا معرّف الصورة لا المنشور،
+    // فإن غاب post_id لن يصلح للإعلان — نعتمد post_id عند توفّره.
     return res.post_id ?? res.id;
   }
 

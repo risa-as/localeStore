@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache";
 import { publishToFacebook, publishToInstagram } from "@/lib/meta/publish";
 import {
   launchAdFromPagePost,
-  currencyOffset,
   AD_OBJECTIVES,
   type AdObjective,
 } from "@/lib/meta/ads";
@@ -203,7 +202,6 @@ export async function launchAd(input: {
   postId: string;
   objective: AdObjective;
   dailyBudget: number; // بوحدة العملة الكاملة
-  days?: number; // عدد أيام التشغيل (اختياري)
 }) {
   await requireAdmin();
 
@@ -230,11 +228,9 @@ export async function launchAd(input: {
         "الإعلان يُطلق من منشور فيسبوك — انشر هذا المنتج على فيسبوك أولاً (مواضع الإعلان قد تشمل إنستغرام تلقائياً)",
     };
 
-  const startTime = new Date(Date.now() + 5 * 60 * 1000); // بعد 5 دقائق
-  const endTime = input.days
-    ? new Date(startTime.getTime() + input.days * 24 * 3600 * 1000)
-    : undefined;
-
+  // بلا جدولة زمنية مطلقة: الإعلان يُنشأ موقوفاً وقد يُفعَّل بعد أيام. تحديد
+  // start_time/end_time الآن قد يجعل الإعلان منتهياً قبل التفعيل. نتركها مفتوحة،
+  // ويضبط المستخدم المدّة في مدير الإعلانات عند التفعيل.
   try {
     const result = await launchAdFromPagePost({
       adAccountId: conn.selectedAdAccountId,
@@ -243,8 +239,6 @@ export async function launchAd(input: {
       postId: post.fbPostId,
       objective: input.objective,
       dailyBudgetWhole: input.dailyBudget,
-      startTime,
-      endTime,
       campaignName: `${post.caption?.slice(0, 30) || "إعلان"} — ${new Date().toISOString().slice(0, 10)}`,
     });
 
@@ -259,8 +253,6 @@ export async function launchAd(input: {
         objective: input.objective,
         dailyBudget: input.dailyBudget,
         currency: result.currency,
-        startTime,
-        endTime,
         status: "PAUSED",
       },
     });
@@ -290,7 +282,7 @@ export async function launchAd(input: {
   }
 }
 
-/** ثابت يُستهلك في الواجهة لعرض قائمة الأهداف مع تحويل الميزانية. */
+/** قائمة الأهداف الإعلانية للواجهة. */
 export async function getAdMeta() {
   await requireAdmin();
   return {
@@ -298,7 +290,5 @@ export async function getAdMeta() {
       key,
       label: v.label,
     })),
-    // نعرض للمستخدم كم وحدة صغرى ستُرسل (شفافية تجنّب خطأ ×1000/×100).
-    iqdOffset: currencyOffset("IQD"),
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import {
   deleteSocialPost,
   launchAd,
 } from "@/lib/actions/social.actions";
-import { formatCurrency } from "@/lib/utils";
 import {
   Facebook,
   Instagram,
@@ -60,8 +59,16 @@ export type Feed = {
 
 export type AdMeta = {
   objectives: { key: string; label: string }[];
-  iqdOffset: number;
 };
+
+/**
+ * ميزانية الإعلان تُخزَّن بوحدة العملة الكاملة (د.ع)، بينما formatCurrency يضرب
+ * ×1000 لأن أسعار المنتجات تُخزَّن بالآلاف. لذا نُنسّق مبالغ الإعلانات هنا بشكل
+ * مباشر ولا نمرّرها عبر formatCurrency.
+ */
+function fmtAdMoney(amount: number, currency = "د.ع") {
+  return `${amount.toLocaleString("en-US")} ${currency}`;
+}
 
 export default function PublishPanel({
   feed,
@@ -444,8 +451,8 @@ function PostRow({
                 ) : (
                   <CheckCircle2 className="w-3 h-3 text-green-600" />
                 )}
-                إعلان · {formatCurrency(l.dailyBudget)}/يوم ·{" "}
-                {l.status === "failed" ? "فشل" : "موقوف"}
+                إعلان · {fmtAdMoney(l.dailyBudget, l.currency)}/يوم ·{" "}
+                {l.status === "failed" ? "فشل" : "أُنشئ موقوفاً"}
               </span>
             ))}
           </div>
@@ -499,13 +506,8 @@ function BoostDialog({
     adMeta.objectives[0]?.key ?? "OUTCOME_TRAFFIC",
   );
   const [budget, setBudget] = useState("");
-  const [days, setDays] = useState("");
 
   const budgetNum = Number(budget) || 0;
-  const minor = useMemo(
-    () => budgetNum * adMeta.iqdOffset,
-    [budgetNum, adMeta.iqdOffset],
-  );
 
   const onLaunch = () =>
     startTransition(async () => {
@@ -513,7 +515,6 @@ function BoostDialog({
         postId,
         objective: objective as never,
         dailyBudget: budgetNum,
-        days: days ? Number(days) : undefined,
       });
       toast({
         description: r.message,
@@ -557,33 +558,23 @@ function BoostDialog({
           </select>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs text-muted-foreground">
-              الميزانية اليومية (د.ع)
-            </label>
-            <Input
-              type="number"
-              min={0}
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              placeholder="مثلاً 10000"
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <label className="text-xs text-muted-foreground">
-              عدد الأيام (اختياري)
-            </label>
-            <Input
-              type="number"
-              min={1}
-              value={days}
-              onChange={(e) => setDays(e.target.value)}
-              placeholder="مفتوح"
-              className="mt-1"
-            />
-          </div>
+        <div>
+          <label className="text-xs text-muted-foreground">
+            الميزانية اليومية (د.ع)
+          </label>
+          <Input
+            type="number"
+            min={0}
+            value={budget}
+            onChange={(e) => setBudget(e.target.value)}
+            placeholder="مثلاً 10000"
+            className="mt-1"
+          />
+          {budgetNum > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              الميزانية اليومية: {fmtAdMoney(budgetNum)}
+            </p>
+          )}
         </div>
 
         <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 p-3 text-xs text-amber-800 dark:text-amber-300 space-y-1">
@@ -592,14 +583,9 @@ function BoostDialog({
           </p>
           <p>
             لن يُصرف أي مبلغ تلقائياً. راجع الإعلان في مدير إعلانات Meta وتأكّد من
-            الميزانية ثم فعّله من هناك.
+            الميزانية والعملة ومدّة التشغيل، ثم فعّله من هناك. تبدأ مدّة التشغيل
+            من وقت التفعيل في مدير الإعلانات.
           </p>
-          {budgetNum > 0 && (
-            <p className="opacity-80">
-              (سيُرسل إلى Meta {minor.toLocaleString()} وحدة صغرى — تحقّق أن هذا
-              يعادل {formatCurrency(budgetNum)} في مدير الإعلانات)
-            </p>
-          )}
         </div>
 
         <Button
