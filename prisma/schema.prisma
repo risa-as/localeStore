@@ -257,3 +257,27 @@ model WaMessage {
 
   @@index([conversationId, timestamp])
 }
+
+/// اتصال Meta (فيسبوك/إنستغرام/إعلانات) — صف واحد لكل نشر (متجر واحد لكل نشر).
+/// التوكنات تُخزَّن هنا وتبقى في السيرفر فقط؛ الإجراءات تُرجع بيانات بلا توكنات.
+model MetaConnection {
+  id               String    @id @default("default")
+  fbUserId         String?
+  fbUserName       String?
+  userAccessToken  String? // توكن مستخدم طويل العمر (~60 يوماً)
+  userTokenExpires DateTime? @db.Timestamp(6)
+  scopes           String[]  @default([])
+  // القوائم المكتشَفة من Graph — تُخزَّن كما تعود لاختيار الأصول لاحقاً.
+  pages            Json? // [{ id, name, access_token, instagram_business_account? }]
+  adAccounts       Json? // [{ id, account_id, name }]
+  // الأصول المختارة حالياً للنشر والإعلان.
+  selectedPageId        String?
+  selectedPageName      String?
+  selectedPageToken     String?
+  selectedIgId          String?
+  selectedIgUsername    String?
+  selectedAdAccountId   String?
+  selectedAdAccountName String?
+  createdAt        DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime  @updatedAt
+}

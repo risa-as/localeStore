@@ -1,0 +1,348 @@
+"use client";
+
+import { useEffect, useState, useTransition } from "react";
+// useState is used for the one-time "now" snapshot in Connected.
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import {
+  selectMetaPage,
+  selectMetaAdAccount,
+  disconnectMeta,
+} from "@/lib/actions/meta.actions";
+import {
+  Megaphone,
+  Facebook,
+  Instagram,
+  Target,
+  CheckCircle2,
+  Link2,
+  Loader2,
+  AlertTriangle,
+} from "lucide-react";
+
+type Status =
+  | { configured: boolean; connected: false }
+  | {
+      configured: boolean;
+      connected: true;
+      fbUserName: string | null;
+      tokenExpires: string | null;
+      pages: {
+        id: string;
+        name: string;
+        igId: string | null;
+        igUsername: string | null;
+      }[];
+      adAccounts: { id: string; accountId: string; name: string }[];
+      selected: {
+        pageId: string | null;
+        pageName: string | null;
+        igId: string | null;
+        igUsername: string | null;
+        adAccountId: string | null;
+        adAccountName: string | null;
+      };
+    };
+
+const FLASH: Record<string, { text: string; ok: boolean }> = {
+  connected: { text: "تم ربط حساب Meta بنجاح", ok: true },
+  cancelled: { text: "أُلغيت عملية الربط", ok: false },
+  invalid: { text: "طلب ربط غير صالح — حاول من جديد", ok: false },
+  failed: { text: "فشل الربط — تحقق من إعدادات التطبيق في Meta", ok: false },
+};
+
+export default function MarketingClient({
+  status,
+  flash,
+}: {
+  status: Status;
+  flash: string | null;
+}) {
+  const { toast } = useToast();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (flash && FLASH[flash]) {
+      toast({
+        description: FLASH[flash].text,
+        variant: FLASH[flash].ok ? undefined : "destructive",
+      });
+      // نظّف المعامل من الرابط
+      router.replace("/admin/marketing");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flash]);
+
+  return (
+    <div className="space-y-6 max-w-4xl">
+      <div className="flex items-center gap-3">
+        <div className="p-2 rounded-lg bg-primary/10">
+          <Megaphone className="w-6 h-6 text-primary" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold">التسويق</h1>
+          <p className="text-sm text-muted-foreground">
+            النشر على فيسبوك وإنستغرام وإطلاق الإعلانات من مكان واحد
+          </p>
+        </div>
+      </div>
+
+      {!status.configured ? (
+        <NotConfigured />
+      ) : !status.connected ? (
+        <NotConnected pending={pending} />
+      ) : (
+        <Connected
+          status={status}
+          onSelectPage={(id) =>
+            startTransition(async () => {
+              const r = await selectMetaPage(id);
+              toast({
+                description: r.message,
+                variant: r.success ? undefined : "destructive",
+              });
+              router.refresh();
+            })
+          }
+          onSelectAd={(id) =>
+            startTransition(async () => {
+              const r = await selectMetaAdAccount(id);
+              toast({
+                description: r.message,
+                variant: r.success ? undefined : "destructive",
+              });
+              router.refresh();
+            })
+          }
+          onDisconnect={() =>
+            startTransition(async () => {
+              const r = await disconnectMeta();
+              toast({ description: r.message });
+              router.refresh();
+            })
+          }
+          pending={pending}
+        />
+      )}
+    </div>
+  );
+}
+
+function NotConfigured() {
+  return (
+    <div className="rounded-xl border bg-card p-6 space-y-3">
+      <div className="flex items-center gap-2 text-amber-600">
+        <AlertTriangle className="w-5 h-5" />
+        <h2 className="font-bold">Meta غير مُهيأ لهذه النسخة</h2>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        أضِف متغيرات البيئة التالية في إعدادات Vercel ثم أعد النشر:
+      </p>
+      <pre
+        dir="ltr"
+        className="text-xs bg-muted rounded-lg p-3 overflow-x-auto"
+      >
+        {`META_APP_ID=...
+META_APP_SECRET=...
+META_OAUTH_REDIRECT=https://<domain>/api/meta/oauth/callback`}
+      </pre>
+      <p className="text-xs text-muted-foreground">
+        الصلاحيات المطلوبة تحتاج مراجعة تطبيق من Meta قبل الإنتاج، لكنها تعمل في
+        وضع التطوير مع حسابات المالك نفسه بلا مراجعة.
+      </p>
+    </div>
+  );
+}
+
+function NotConnected({ pending }: { pending: boolean }) {
+  return (
+    <div className="rounded-xl border bg-card p-6 flex flex-col items-center gap-4 text-center py-12">
+      <div className="p-3 rounded-full bg-muted">
+        <Link2 className="w-7 h-7 text-muted-foreground" />
+      </div>
+      <div>
+        <h2 className="font-bold text-lg">اربط حساب Meta</h2>
+        <p className="text-sm text-muted-foreground max-w-sm mt-1">
+          سجّل الدخول بفيسبوك للسماح للنظام بالنشر على صفحتك وحساب إنستغرام
+          وإطلاق الإعلانات من حسابك الإعلاني.
+        </p>
+      </div>
+      {/* تنقّل كامل للنافذة (وليس تنقّل client) لأن المسار يحوّل إلى فيسبوك */}
+      <Button
+        disabled={pending}
+        onClick={() => {
+          window.location.href = "/api/meta/oauth";
+        }}
+      >
+        <Facebook className="w-4 h-4 ml-1.5" />
+        ربط حساب فيسبوك
+      </Button>
+    </div>
+  );
+}
+
+function AssetRow({
+  active,
+  title,
+  subtitle,
+  onSelect,
+  pending,
+  icon,
+}: {
+  active: boolean;
+  title: string;
+  subtitle?: string | null;
+  onSelect: () => void;
+  pending: boolean;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={pending || active}
+      onClick={onSelect}
+      className={`w-full flex items-center gap-3 rounded-lg border p-3 text-right transition-colors ${
+        active
+          ? "border-primary bg-primary/5"
+          : "hover:bg-muted disabled:opacity-60"
+      }`}
+    >
+      <span className="shrink-0 text-muted-foreground">{icon}</span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-medium truncate">{title}</span>
+        {subtitle && (
+          <span className="block text-xs text-muted-foreground truncate">
+            {subtitle}
+          </span>
+        )}
+      </span>
+      {active && <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />}
+    </button>
+  );
+}
+
+function Connected({
+  status,
+  onSelectPage,
+  onSelectAd,
+  onDisconnect,
+  pending,
+}: {
+  status: Extract<Status, { connected: true }>;
+  onSelectPage: (id: string) => void;
+  onSelectAd: (id: string) => void;
+  onDisconnect: () => void;
+  pending: boolean;
+}) {
+  // لقطة زمنية مرة واحدة — لا نستدعي Date.now() أثناء الرسم (دالة غير نقية).
+  const [now] = useState(() => Date.now());
+  const expires = status.tokenExpires ? new Date(status.tokenExpires) : null;
+  const daysLeft = expires
+    ? Math.round((expires.getTime() - now) / (24 * 3600 * 1000))
+    : null;
+
+  return (
+    <div className="space-y-5">
+      {/* شريط الحالة */}
+      <div className="rounded-xl border bg-card p-4 flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div>
+            <p className="font-semibold text-sm">
+              متصل{status.fbUserName ? ` — ${status.fbUserName}` : ""}
+            </p>
+            {daysLeft !== null && (
+              <p
+                className={`text-xs ${daysLeft <= 7 ? "text-red-600" : "text-muted-foreground"}`}
+              >
+                صلاحية التوكن تنتهي خلال {daysLeft} يوم
+                {daysLeft <= 7 ? " — أعِد الربط قريباً" : ""}
+              </p>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDisconnect}
+          disabled={pending}
+        >
+          {pending ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            "قطع الاتصال"
+          )}
+        </Button>
+      </div>
+
+      {/* الصفحات */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold flex items-center gap-1.5">
+          <Facebook className="w-4 h-4" /> صفحة فيسبوك للنشر
+        </h3>
+        {status.pages.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            لا توجد صفحات — تأكد أن لديك دوراً على صفحة فيسبوك.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {status.pages.map((p) => (
+              <AssetRow
+                key={p.id}
+                active={status.selected.pageId === p.id}
+                title={p.name}
+                subtitle={
+                  p.igUsername
+                    ? `إنستغرام: @${p.igUsername}`
+                    : "لا يوجد إنستغرام مرتبط بهذه الصفحة"
+                }
+                onSelect={() => onSelectPage(p.id)}
+                pending={pending}
+                icon={
+                  p.igUsername ? (
+                    <Instagram className="w-4 h-4" />
+                  ) : (
+                    <Facebook className="w-4 h-4" />
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* الحسابات الإعلانية */}
+      <section className="space-y-2">
+        <h3 className="text-sm font-semibold flex items-center gap-1.5">
+          <Target className="w-4 h-4" /> الحساب الإعلاني
+        </h3>
+        {status.adAccounts.length === 0 ? (
+          <p className="text-xs text-muted-foreground">
+            لا توجد حسابات إعلانية على هذا الحساب.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {status.adAccounts.map((a) => (
+              <AssetRow
+                key={a.id}
+                active={status.selected.adAccountId === a.id}
+                title={a.name}
+                subtitle={`رقم الحساب: ${a.accountId}`}
+                onSelect={() => onSelectAd(a.id)}
+                pending={pending}
+                icon={<Target className="w-4 h-4" />}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <p className="text-xs text-muted-foreground border-t pt-3">
+        النشر وإطلاق الإعلانات (المرحلتان التاليتان) سيستخدمان الصفحة والحساب
+        المختارَين أعلاه.
+      </p>
+    </div>
+  );
+}

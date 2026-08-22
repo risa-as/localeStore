@@ -230,7 +230,7 @@
         "banned": "تم حظرهم",
         "rescheduled": "م: مؤجل",
         "failed": "م: فشل التوصيل",
-        "delete":"حذف"
+        "delete": "حذف"
       },
       "selected": "محدد",
       "moveTo": "نقل إلى",
@@ -321,7 +321,8 @@
     "quantity": "الكمية",
     "noItems": "لا يوجد عناصر",
     "expenses": "المصاريف",
-    "chats": "المحادثات"
+    "chats": "المحادثات",
+    "marketing": "التسويق"
   },
   "Categories": {
     "selectCategory": "اختر فئة",

@@ -230,7 +230,7 @@
         "rescheduled": "M: Rescheduled",
         "failed": "M: Failed",
         "returnReceived": "M: Return Received",
-        "delete":"Delete"
+        "delete": "Delete"
       },
       "selected": "selected",
       "moveTo": "Move to",
@@ -321,7 +321,8 @@
     "quantity": "Qty",
     "noItems": "No items",
     "expenses": "Expenses",
-    "chats": "Chats"
+    "chats": "Chats",
+    "marketing": "Marketing"
   },
   "Categories": {
     "selectCategory": "Select a Category",
