@@ -1,30 +1,16 @@
-/* تأثيرات رفع الوسائط لصفحة التسويق — بنر شرائح تدور + معاينة تظهر بلطف. */
+/* مؤشّر رفع صغير: دائرة 15 بكسل من خطوط شعاعية تظهر مكان الوسيط ثم تختفي. */
 
-/* بنر الرفع: شرائح قطرية متحركة (barber-pole) */
-@keyframes mk-stripes {
-  to {
-    background-position: 56px 0;
-  }
-}
-
-/* حلقة قوس دوّارة */
-@keyframes mk-spin {
-  to {
-    transform: rotate(1turn);
-  }
-}
-
-/* لمعان يمرّ أفقياً */
-@keyframes mk-sheen {
+/* دوران تدريجي لبهتان الخطوط حول الدائرة */
+@keyframes mk-spoke-fade {
   0% {
-    transform: translateX(-120%);
+    opacity: 1;
   }
   100% {
-    transform: translateX(120%);
+    opacity: 0.15;
   }
 }
 
-/* ظهور المعاينة: تكبير + شفافية */
+/* ظهور المعاينة بلطف */
 @keyframes mk-pop {
   from {
     opacity: 0;
@@ -36,124 +22,61 @@
   }
 }
 
-.mk-upload-banner {
+/* حلقة تتّسع للعدّاد في المنتصف — تستخدم اللون الرئيسي للنظام */
+.mk-spinner {
   position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
-  border-radius: 14px;
-  color: #fff;
-  /* شرائح قطرية بلونين من الأخضر (لون العلامة) */
-  background-image: repeating-linear-gradient(
-    45deg,
-    oklch(0.72 0.15 155) 0,
-    oklch(0.72 0.15 155) 14px,
-    oklch(0.66 0.14 155) 14px,
-    oklch(0.66 0.14 155) 28px
-  );
-  background-size: 56px 56px;
-  animation: mk-stripes 0.8s linear infinite;
-  box-shadow: 0 8px 24px oklch(0.72 0.15 155 / 0.25);
-}
-
-/* اللمعان المارّ فوق البنر */
-.mk-upload-banner::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 20%,
-    rgba(255, 255, 255, 0.35) 50%,
-    transparent 80%
-  );
-  animation: mk-sheen 1.4s ease-in-out infinite;
-  pointer-events: none;
-}
-
-.mk-ring {
-  position: relative;
-  width: 44px;
-  height: 44px;
+  width: 56px;
+  height: 56px;
+  display: inline-block;
+  color: hsl(var(--primary));
   flex-shrink: 0;
-  border-radius: 50%;
-  background: conic-gradient(
-    from 0deg,
-    rgba(255, 255, 255, 0.15),
-    #fff,
-    rgba(255, 255, 255, 0.15)
-  );
-  animation: mk-spin 0.9s linear infinite;
-  /* نحوّلها لحلقة عبر قناع دائري */
-  -webkit-mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 5px),
-    #000 calc(100% - 5px)
-  );
-  mask: radial-gradient(
-    farthest-side,
-    transparent calc(100% - 5px),
-    #000 calc(100% - 5px)
-  );
 }
 
-/* النسبة داخل الحلقة */
-.mk-ring-pct {
+/* كل خط شعاعي: يُوضع أعلى المنتصف ثم يُدوَّر حول مركز الدائرة (نصف قطر 28px) */
+/* :not يستثني عنصر العدّاد في المنتصف من تنسيق الخطوط */
+.mk-spinner > span:not(.mk-spinner-pct) {
   position: absolute;
-  inset: 0;
+  top: 2px;
+  left: 26.75px; /* 28 − عرض الخط/2 */
+  width: 2.5px;
+  height: 9px;
+  border-radius: 2px;
+  background: currentColor;
+  transform-origin: 1.25px 26px; /* حتى مركز الحلقة */
+  animation: mk-spoke-fade 0.8s linear infinite;
+}
+
+/* العدّاد في منتصف الحلقة — بلون النظام الرئيسي مع مساحة عن الحافة */
+.mk-spinner-pct {
+  position: absolute;
+  inset: 12px; /* يُبعِد الرقم عن الخطوط الداخلية */
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 800;
-  color: #fff;
-  /* لا يتأثر بقناع الحلقة لأنه عنصر منفصل فوقها */
-}
-
-.mk-banner-body {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-width: 0;
-}
-
-.mk-banner-title {
-  font-weight: 800;
-  font-size: 14px;
-}
-
-.mk-banner-sub {
   font-size: 12px;
-  opacity: 0.9;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: hsl(var(--primary));
 }
 
-/* شريط تقدّم رفيع أسفل البنر */
-.mk-progress {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 4px;
-  background: #fff;
-  border-radius: 0 4px 4px 0;
-  transition: width 0.25s ease;
-  z-index: 2;
+/* بلاطة مكان الوسيط أثناء الرفع */
+.mk-upload-tile {
+  width: 76px;
+  height: 76px;
+  border-radius: 10px;
+  border: 1px dashed hsl(var(--primary) / 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: hsl(var(--primary) / 0.06);
 }
 
-/* ظهور المعاينات */
 .mk-pop {
   animation: mk-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* احترام تفضيل تقليل الحركة */
 @media (prefers-reduced-motion: reduce) {
-  .mk-upload-banner,
-  .mk-upload-banner::after,
-  .mk-ring {
+  .mk-spinner > span:not(.mk-spinner-pct) {
     animation: none;
   }
   .mk-pop {

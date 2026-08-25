@@ -100,10 +100,9 @@ export default function PublishPanel({
   );
   const [boostFor, setBoostFor] = useState<string | null>(null);
 
-  // حالة الرفع لعرض بنر متحرك مع نسبة التقدّم.
+  // حالة الرفع لعرض مؤشّر صغير مع عدّاد مكان الوسيط.
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
-  const [uploadName, setUploadName] = useState("");
 
   const hasVideo = videos.length > 0;
 
@@ -296,19 +295,12 @@ export default function PublishPanel({
           </div>
         )}
 
-        {/* بنر الرفع المتحرك — شرائح تدور + نسبة التقدّم */}
+        {/* مؤشّر الرفع: بلاطة صغيرة مكان الوسيط تختفي عند الاكتمال */}
         {uploading && (
-          <div className="mk-upload-banner">
-            <div className="mk-ring" aria-hidden />
-            <span className="mk-ring-pct">{uploadPct}%</span>
-            <div className="mk-banner-body">
-              <div className="mk-banner-title">جارٍ الرفع…</div>
-              <div className="mk-banner-sub">{uploadName || "ملف الوسائط"}</div>
+          <div className="flex flex-wrap gap-2">
+            <div className="mk-upload-tile" role="status" aria-label="جارٍ الرفع">
+              <UploadSpinner pct={uploadPct} />
             </div>
-            <div
-              className="mk-progress"
-              style={{ width: `${Math.max(6, uploadPct)}%` }}
-            />
           </div>
         )}
 
@@ -322,17 +314,15 @@ export default function PublishPanel({
               allowedContent: "text-xs text-muted-foreground",
             }}
             content={{ button: "رفع صورة/فيديو" }}
-            onUploadBegin={(name: string) => {
+            onUploadBegin={() => {
               setUploading(true);
               setUploadPct(0);
-              setUploadName(name || "");
             }}
             onUploadProgress={(p: number) => setUploadPct(Math.round(p))}
             onClientUploadComplete={(
               res: { url: string; type?: string; name?: string }[],
             ) => {
               setUploading(false);
-              setUploadPct(100);
               const isVid = (r: { type?: string; name?: string; url: string }) =>
                 (r.type?.startsWith("video")) ||
                 /\.(mp4|mov|webm|m4v)($|\?)/i.test(r.name || r.url);
@@ -441,6 +431,25 @@ export default function PublishPanel({
         />
       )}
     </div>
+  );
+}
+
+/** حلقة من 8 خطوط شعاعية تبهت بالتتابع، مع عدّاد النسبة في المنتصف. */
+function UploadSpinner({ pct }: { pct: number }) {
+  return (
+    <span className="mk-spinner">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <span
+          key={i}
+          aria-hidden
+          style={{
+            transform: `rotate(${i * 45}deg)`,
+            animationDelay: `${-0.1 * (8 - i)}s`,
+          }}
+        />
+      ))}
+      <span className="mk-spinner-pct">{pct}%</span>
+    </span>
   );
 }
 
