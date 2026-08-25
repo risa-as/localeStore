@@ -307,10 +307,16 @@ export async function finishInstagramVideo(postId: string) {
     revalidatePath("/admin/marketing");
     return { success: true, message: "تم نشر فيديو إنستغرام" };
   } catch (err) {
-    return {
-      success: false,
-      message: `فشل إنهاء إنستغرام: ${(err as Error).message}`,
-    };
+    const msg = (err as Error).message;
+    // نُثبّت الخطأ على المنشور حتى يظهر بدل أن يختفي مع التوست.
+    await prisma.socialPost
+      .update({
+        where: { id: postId },
+        data: { error: `إنهاء إنستغرام: ${msg}` },
+      })
+      .catch(() => null);
+    revalidatePath("/admin/marketing");
+    return { success: false, message: `فشل إنهاء إنستغرام: ${msg}` };
   }
 }
 

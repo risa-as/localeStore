@@ -576,7 +576,13 @@ function PostRow({
           <span>· {new Date(post.createdAt).toLocaleDateString("ar-IQ")}</span>
         </div>
         {post.error && (
-          <p className="text-xs text-red-600 line-clamp-1">{post.error}</p>
+          <p className="text-xs text-red-600 line-clamp-2">{post.error}</p>
+        )}
+        {post.needsIgFinish && !post.error && (
+          <p className="text-xs text-blue-600">
+            فيديو إنستغرام يُعالَج على خوادم إنستغرام. انتظر دقيقة ثم اضغط «إنهاء
+            إنستغرام» لإتمام النشر (كرّر إن قال «قيد المعالجة»).
+          </p>
         )}
         {post.launches.length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-0.5">
