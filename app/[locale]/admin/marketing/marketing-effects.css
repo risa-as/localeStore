@@ -1,0 +1,162 @@
+/* تأثيرات رفع الوسائط لصفحة التسويق — بنر شرائح تدور + معاينة تظهر بلطف. */
+
+/* بنر الرفع: شرائح قطرية متحركة (barber-pole) */
+@keyframes mk-stripes {
+  to {
+    background-position: 56px 0;
+  }
+}
+
+/* حلقة قوس دوّارة */
+@keyframes mk-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* لمعان يمرّ أفقياً */
+@keyframes mk-sheen {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+/* ظهور المعاينة: تكبير + شفافية */
+@keyframes mk-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.mk-upload-banner {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  color: #fff;
+  /* شرائح قطرية بلونين من الأخضر (لون العلامة) */
+  background-image: repeating-linear-gradient(
+    45deg,
+    oklch(0.72 0.15 155) 0,
+    oklch(0.72 0.15 155) 14px,
+    oklch(0.66 0.14 155) 14px,
+    oklch(0.66 0.14 155) 28px
+  );
+  background-size: 56px 56px;
+  animation: mk-stripes 0.8s linear infinite;
+  box-shadow: 0 8px 24px oklch(0.72 0.15 155 / 0.25);
+}
+
+/* اللمعان المارّ فوق البنر */
+.mk-upload-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.35) 50%,
+    transparent 80%
+  );
+  animation: mk-sheen 1.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.mk-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.15),
+    #fff,
+    rgba(255, 255, 255, 0.15)
+  );
+  animation: mk-spin 0.9s linear infinite;
+  /* نحوّلها لحلقة عبر قناع دائري */
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 5px),
+    #000 calc(100% - 5px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - 5px),
+    #000 calc(100% - 5px)
+  );
+}
+
+/* النسبة داخل الحلقة */
+.mk-ring-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+  /* لا يتأثر بقناع الحلقة لأنه عنصر منفصل فوقها */
+}
+
+.mk-banner-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+.mk-banner-title {
+  font-weight: 800;
+  font-size: 14px;
+}
+
+.mk-banner-sub {
+  font-size: 12px;
+  opacity: 0.9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* شريط تقدّم رفيع أسفل البنر */
+.mk-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 4px;
+  background: #fff;
+  border-radius: 0 4px 4px 0;
+  transition: width 0.25s ease;
+  z-index: 2;
+}
+
+/* ظهور المعاينات */
+.mk-pop {
+  animation: mk-pop 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  .mk-upload-banner,
+  .mk-upload-banner::after,
+  .mk-ring {
+    animation: none;
+  }
+  .mk-pop {
+    animation: none;
+  }
+}

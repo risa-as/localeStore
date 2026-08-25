@@ -14,6 +14,7 @@ import {
   finishInstagramVideo,
 } from "@/lib/actions/social.actions";
 import { UploadButton } from "@/lib/uploadthing";
+import "./marketing-effects.css";
 import {
   Facebook,
   Instagram,
@@ -98,6 +99,11 @@ export default function PublishPanel({
     feed.ready.facebook ? ["facebook"] : [],
   );
   const [boostFor, setBoostFor] = useState<string | null>(null);
+
+  // حالة الرفع لعرض بنر متحرك مع نسبة التقدّم.
+  const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadName, setUploadName] = useState("");
 
   const hasVideo = videos.length > 0;
 
@@ -241,7 +247,7 @@ export default function PublishPanel({
         {images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {images.map((url, i) => (
-              <div key={`${url}-${i}`} className="relative">
+              <div key={`${url}-${i}`} className="relative mk-pop">
                 <Image
                   src={url}
                   alt=""
@@ -269,7 +275,7 @@ export default function PublishPanel({
         {videos.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {videos.map((url, i) => (
-              <div key={`${url}-${i}`} className="relative">
+              <div key={`${url}-${i}`} className="relative mk-pop">
                 <video
                   src={url}
                   className="w-28 h-28 rounded-md object-cover border bg-black"
@@ -290,7 +296,23 @@ export default function PublishPanel({
           </div>
         )}
 
-        {/* الرفع من الكمبيوتر + رابط صورة */}
+        {/* بنر الرفع المتحرك — شرائح تدور + نسبة التقدّم */}
+        {uploading && (
+          <div className="mk-upload-banner">
+            <div className="mk-ring" aria-hidden />
+            <span className="mk-ring-pct">{uploadPct}%</span>
+            <div className="mk-banner-body">
+              <div className="mk-banner-title">جارٍ الرفع…</div>
+              <div className="mk-banner-sub">{uploadName || "ملف الوسائط"}</div>
+            </div>
+            <div
+              className="mk-progress"
+              style={{ width: `${Math.max(6, uploadPct)}%` }}
+            />
+          </div>
+        )}
+
+        {/* الرفع من الكمبيوتر */}
         <div className="flex flex-wrap items-center gap-2">
           <UploadButton
             endpoint="mediaUploader"
@@ -300,9 +322,17 @@ export default function PublishPanel({
               allowedContent: "text-xs text-muted-foreground",
             }}
             content={{ button: "رفع صورة/فيديو" }}
+            onUploadBegin={(name: string) => {
+              setUploading(true);
+              setUploadPct(0);
+              setUploadName(name || "");
+            }}
+            onUploadProgress={(p: number) => setUploadPct(Math.round(p))}
             onClientUploadComplete={(
               res: { url: string; type?: string; name?: string }[],
             ) => {
+              setUploading(false);
+              setUploadPct(100);
               const isVid = (r: { type?: string; name?: string; url: string }) =>
                 (r.type?.startsWith("video")) ||
                 /\.(mp4|mov|webm|m4v)($|\?)/i.test(r.name || r.url);
@@ -328,6 +358,7 @@ export default function PublishPanel({
               }
             }}
             onUploadError={(error: Error) => {
+              setUploading(false);
               toast({ variant: "destructive", description: error.message });
             }}
           />
