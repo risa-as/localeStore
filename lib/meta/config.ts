@@ -17,10 +17,18 @@ import crypto from "crypto";
 export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v25.0";
 
 /**
- * الصلاحيات المطلوبة. كلها تتطلب مراجعة تطبيق Meta قبل أن تعمل لحسابات ليست
- * مشرفة على التطبيق — لكنها تعمل في وضع التطوير مع حسابات المالك نفسه بلا مراجعة.
+ * الصلاحيات المطلوبة.
+ *
+ * قابلة للضبط من البيئة عبر META_SCOPES (مفصولة بفواصل) حتى تُعدَّل بسهولة دون
+ * تغيير الكود — مفيد لأن Meta ترفض أي صلاحية لم يُضَف منتجها/حالة استخدامها في
+ * لوحة التطبيق («Invalid Scopes»)، وأسماء صلاحيات إنستغرام في مرحلة انتقال
+ * (instagram_basic ← instagram_business_basic).
+ *
+ * للاتصال فوراً بأقل مجموعة تعمل عادةً بلا إعداد إضافي، ضع في .env:
+ *   META_SCOPES=pages_show_list,pages_read_engagement,business_management,ads_management,ads_read
+ * ثم أضِف صلاحيات النشر/إنستغرام تدريجياً بعد إضافة منتجاتها في لوحة Meta.
  */
-export const META_SCOPES = [
+const DEFAULT_META_SCOPES = [
   "pages_show_list",
   "pages_read_engagement",
   "pages_manage_posts",
@@ -30,6 +38,12 @@ export const META_SCOPES = [
   "ads_management",
   "ads_read",
 ];
+
+export const META_SCOPES = process.env.META_SCOPES
+  ? process.env.META_SCOPES.split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : DEFAULT_META_SCOPES;
 
 export type MetaConfig = {
   appId: string;

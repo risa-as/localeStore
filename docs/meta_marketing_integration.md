@@ -59,9 +59,37 @@ owner's own accounts. Review is only needed to remove that restriction.
 ```
 META_APP_ID=
 META_APP_SECRET=
+META_SCOPES=...          # optional; comma-separated. Overrides the default list.
 META_OAUTH_REDIRECT=https://<domain>/api/meta/oauth/callback
 META_GRAPH_VERSION=v25.0   # optional; defaults in code
 ```
+
+## Troubleshooting: "Invalid Scopes" on connect
+
+Meta returns `Invalid Scopes: <names>` for any permission whose **product/use
+case has not been added to the app** — it is a dashboard-config issue, not an
+app-review one (review-gated permissions still appear in the dialog; invalid
+ones are rejected outright). Observed: `pages_show_list, pages_read_engagement,
+business_management, ads_management, ads_read` are accepted on a fresh Business
+app, while `pages_manage_posts, instagram_basic, instagram_content_publish` are
+rejected until their products are added.
+
+Because the scope list is now env-driven (`META_SCOPES`), iterate without code
+changes:
+1. Connect now with the minimal set (ads + page reading) to prove the OAuth pipe
+   and select the Page + ad account.
+2. In the Meta app dashboard, add the products/use cases that own the missing
+   permissions:
+   - **Page posting** (`pages_manage_posts`): add the Facebook Login use case
+     that manages Page content, or add the permission under a customized use case.
+   - **Instagram** (`instagram_basic` + `instagram_content_publish`): add the
+     Instagram product. Note Meta is migrating these names to
+     `instagram_business_basic` / `instagram_business_content_publish`; if the
+     legacy names stay invalid, switch `META_SCOPES` to the new names (the
+     publish flow in `lib/meta/publish.ts` is the IG-Graph-via-FB-Login flow and
+     needs a Business/Creator IG account linked to the Page).
+3. Expand `META_SCOPES` to include the posting/IG scopes once their products are
+   added, and reconnect.
 
 ## What I can and cannot do
 - **Can:** build the full flow to spec, type-checked and building, matching Meta's documented API.
