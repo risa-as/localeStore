@@ -3,7 +3,8 @@
 import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import { getMetaConfig } from "@/lib/meta/config";
+import { getMetaConfig, META_SCOPES } from "@/lib/meta/config";
+import { graphGet } from "@/lib/meta/graph";
 
 async function requireAdmin() {
   const session = await auth();
@@ -112,6 +113,43 @@ export async function selectMetaAdAccount(adAccountId: string) {
   });
   revalidatePath("/admin/marketing");
   return { success: true, message: "تم اختيار الحساب الإعلاني" };
+}
+
+/**
+ * يفحص الصلاحيات الممنوحة فعلياً للتوكن عبر /me/permissions، ويقارنها بالمطلوبة.
+ * يشخّص أخطاء مثل «(#200) Permissions error» عند النشر: غالباً pages_manage_posts
+ * لم تُمنح لأن الاتصال تم قبل إضافة الصلاحية، أو لم تُختر الصفحة أثناء الدخول.
+ */
+export async function checkMetaPermissions() {
+  await requireAdmin();
+  const conn = await prisma.metaConnection.findUnique({
+    where: { id: "default" },
+  });
+  if (!conn?.userAccessToken)
+    return { ok: false as const, message: "لا يوجد اتصال" };
+
+  try {
+    const res = await graphGet<{
+      data: { permission: string; status: string }[];
+    }>("me/permissions", conn.userAccessToken);
+    const rows = res.data ?? [];
+    const granted = new Set(
+      rows.filter((r) => r.status === "granted").map((r) => r.permission),
+    );
+    const declined = rows
+      .filter((r) => r.status === "declined")
+      .map((r) => r.permission);
+    // الصلاحيات المطلوبة غير الممنوحة (المفقودة أو المرفوضة).
+    const missing = META_SCOPES.filter((s) => !granted.has(s));
+    return {
+      ok: true as const,
+      granted: Array.from(granted),
+      declined,
+      missing,
+    };
+  } catch (err) {
+    return { ok: false as const, message: (err as Error).message };
+  }
 }
 
 /** قطع الاتصال — يمسح الصف بالكامل بما فيه التوكنات. */

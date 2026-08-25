@@ -9,6 +9,7 @@ import {
   selectMetaPage,
   selectMetaAdAccount,
   disconnectMeta,
+  checkMetaPermissions,
 } from "@/lib/actions/meta.actions";
 import {
   Megaphone,
@@ -193,6 +194,84 @@ function TabButton({
   );
 }
 
+function PermissionsCheck() {
+  const [pending, startTransition] = useTransition();
+  const [result, setResult] = useState<{
+    ok: boolean;
+    granted?: string[];
+    missing?: string[];
+    message?: string;
+  } | null>(null);
+
+  const KEY_PERMS: Record<string, string> = {
+    pages_manage_posts: "النشر على صفحة فيسبوك",
+    instagram_content_publish: "النشر على إنستغرام",
+    ads_management: "إدارة الإعلانات",
+  };
+
+  const run = () =>
+    startTransition(async () => {
+      const r = await checkMetaPermissions();
+      setResult(r);
+    });
+
+  const missing = result?.missing ?? [];
+  const missingKey = missing.filter((m) => KEY_PERMS[m]);
+
+  return (
+    <div className="rounded-xl border bg-card p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold">صلاحيات الحساب</h3>
+          <p className="text-xs text-muted-foreground">
+            إن فشل النشر بخطأ «Permissions»، افحص الصلاحيات الممنوحة فعلاً.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={run}
+          disabled={pending}
+        >
+          {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : "فحص"}
+        </Button>
+      </div>
+
+      {result &&
+        (!result.ok ? (
+          <p className="text-xs text-red-600">{result.message}</p>
+        ) : missingKey.length === 0 ? (
+          <p className="text-xs text-green-600 flex items-center gap-1">
+            <CheckCircle2 className="w-4 h-4" /> كل صلاحيات النشر والإعلان ممنوحة.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-red-600 flex items-center gap-1">
+              <AlertTriangle className="w-4 h-4" /> صلاحيات ناقصة — النشر عبرها
+              سيفشل:
+            </p>
+            <ul className="text-xs space-y-1">
+              {missingKey.map((m) => (
+                <li key={m} className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                  {KEY_PERMS[m]}{" "}
+                  <span className="text-muted-foreground" dir="ltr">
+                    ({m})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              الحل: اضغط «قطع الاتصال» ثم أعد الربط، وفي شاشة فيسبوك امنح هذه
+              الصلاحيات واختر صفحتك. إن لم تظهر الصلاحية أصلاً، أضِف منتجها في
+              لوحة تطبيق Meta أولاً.
+            </p>
+          </div>
+        ))}
+    </div>
+  );
+}
+
 function NotConfigured() {
   return (
     <div className="rounded-xl border bg-card p-6 space-y-3">
@@ -339,6 +418,9 @@ function Connected({
           )}
         </Button>
       </div>
+
+      {/* فحص الصلاحيات */}
+      <PermissionsCheck />
 
       {/* الصفحات */}
       <section className="space-y-2">
