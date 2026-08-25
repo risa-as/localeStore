@@ -94,7 +94,6 @@ export default function PublishPanel({
   const [caption, setCaption] = useState("");
   const [images, setImages] = useState<string[]>([]);
   const [videos, setVideos] = useState<string[]>([]);
-  const [imageInput, setImageInput] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(
     feed.ready.facebook ? ["facebook"] : [],
   );
@@ -118,17 +117,6 @@ export default function PublishPanel({
     setPlatforms((prev) =>
       prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p],
     );
-
-  const addImageUrl = () => {
-    const url = imageInput.trim();
-    if (!url) return;
-    if (!/^https?:\/\//i.test(url)) {
-      toast({ variant: "destructive", description: "أدخل رابط صورة صحيحاً" });
-      return;
-    }
-    setImages((prev) => [...prev, url]);
-    setImageInput("");
-  };
 
   // إنستغرام يقبل JPEG فقط للصور.
   const nonJpegForIg =
@@ -343,21 +331,6 @@ export default function PublishPanel({
               toast({ variant: "destructive", description: error.message });
             }}
           />
-
-          {!hasVideo && (
-            <div className="flex gap-2 flex-1 min-w-[200px]">
-              <Input
-                value={imageInput}
-                onChange={(e) => setImageInput(e.target.value)}
-                placeholder="أو أضف رابط صورة (https://...)"
-                className="flex-1"
-                dir="ltr"
-              />
-              <Button type="button" variant="outline" onClick={addImageUrl}>
-                إضافة
-              </Button>
-            </div>
-          )}
         </div>
 
         {hasVideo && (
