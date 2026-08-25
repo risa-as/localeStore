@@ -36,6 +36,9 @@ export async function GET(req: Request) {
   dialog.searchParams.set("state", state);
   dialog.searchParams.set("response_type", "code");
   dialog.searchParams.set("scope", META_SCOPES.join(","));
+  // يُجبر فيسبوك على إعادة عرض شاشة الموافقة وطلب الصلاحيات غير الممنوحة —
+  // بدونه، إن كان التطبيق مُصرّحاً سابقاً يعيد توكناً دون منح الصلاحيات الجديدة.
+  dialog.searchParams.set("auth_type", "rerequest");
 
   return Response.redirect(dialog.toString(), 302);
 }
