@@ -11,7 +11,9 @@ import {
   publishPost,
   deleteSocialPost,
   launchAd,
+  finishInstagramVideo,
 } from "@/lib/actions/social.actions";
+import { UploadButton } from "@/lib/uploadthing";
 import {
   Facebook,
   Instagram,
@@ -37,11 +39,13 @@ export type Feed = {
     id: string;
     caption: string | null;
     imageUrls: string[];
+    videoUrls: string[];
     platforms: string[];
     status: string;
     fbPostId: string | null;
     igPostId: string | null;
     error: string | null;
+    needsIgFinish: boolean;
     createdAt: string;
     launches: {
       id: string;
@@ -54,7 +58,12 @@ export type Feed = {
       createdAt: string;
     }[];
   }[];
-  products: { id: string; name: string; images: string[]; offers: string | null }[];
+  products: {
+    id: string;
+    name: string;
+    images: string[];
+    description: string | null;
+  }[];
 };
 
 export type AdMeta = {
@@ -84,20 +93,24 @@ export default function PublishPanel({
   const [productId, setProductId] = useState<string>("");
   const [caption, setCaption] = useState("");
   const [images, setImages] = useState<string[]>([]);
+  const [videos, setVideos] = useState<string[]>([]);
   const [imageInput, setImageInput] = useState("");
   const [platforms, setPlatforms] = useState<string[]>(
     feed.ready.facebook ? ["facebook"] : [],
   );
   const [boostFor, setBoostFor] = useState<string | null>(null);
 
+  const hasVideo = videos.length > 0;
+
   const onPickProduct = (id: string) => {
     setProductId(id);
     const p = feed.products.find((x) => x.id === id);
     if (p) {
-      setImages(p.images.slice(0, 10));
+      // يملأ الوصف من رابط المنتج (وليس العروض) والصور — إن لم يكن هناك فيديو.
       setCaption(
-        [p.name, p.offers].filter(Boolean).join("\n\n").trim() || caption,
+        [p.name, p.description].filter(Boolean).join("\n\n").trim() || caption,
       );
+      if (!hasVideo) setImages(p.images.slice(0, 10));
     }
   };
 
@@ -117,26 +130,37 @@ export default function PublishPanel({
     setImageInput("");
   };
 
+  // إنستغرام يقبل JPEG فقط للصور.
+  const nonJpegForIg =
+    platforms.includes("instagram") &&
+    !hasVideo &&
+    images.some((u) => !/\.jpe?g($|\?)/i.test(u));
+
   const canPublish =
     platforms.length > 0 &&
-    (caption.trim().length > 0 || images.length > 0) &&
-    !(platforms.includes("instagram") && images.length === 0);
+    (caption.trim().length > 0 || images.length > 0 || hasVideo) &&
+    !(platforms.includes("instagram") && images.length === 0 && !hasVideo) &&
+    !nonJpegForIg &&
+    !pending;
 
   const onPublish = () =>
     startTransition(async () => {
       const r = await publishPost({
         caption,
         imageUrls: images,
+        videoUrls: videos,
         platforms,
         productId: productId || null,
       });
       toast({
         description: r.message,
         variant: r.success ? undefined : "destructive",
+        duration: r.success ? 7000 : 5000,
       });
       if (r.success) {
         setCaption("");
         setImages([]);
+        setVideos([]);
         setProductId("");
       }
       router.refresh();
@@ -225,7 +249,7 @@ export default function PublishPanel({
           rows={4}
         />
 
-        {/* الصور */}
+        {/* معاينة الصور */}
         {images.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {images.map((url, i) => (
@@ -244,7 +268,7 @@ export default function PublishPanel({
                     setImages((prev) => prev.filter((_, idx) => idx !== i))
                   }
                   className="absolute -top-1.5 -right-1.5 bg-background border rounded-full p-0.5"
-                  aria-label="إزالة"
+                  aria-label="إزالة الصورة"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -252,27 +276,110 @@ export default function PublishPanel({
             ))}
           </div>
         )}
-        <div className="flex gap-2">
-          <Input
-            value={imageInput}
-            onChange={(e) => setImageInput(e.target.value)}
-            placeholder="أضف رابط صورة (https://...)"
-            className="flex-1"
-            dir="ltr"
+
+        {/* معاينة الفيديو */}
+        {videos.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {videos.map((url, i) => (
+              <div key={`${url}-${i}`} className="relative">
+                <video
+                  src={url}
+                  className="w-28 h-28 rounded-md object-cover border bg-black"
+                  controls
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    setVideos((prev) => prev.filter((_, idx) => idx !== i))
+                  }
+                  className="absolute -top-1.5 -right-1.5 bg-background border rounded-full p-0.5"
+                  aria-label="إزالة الفيديو"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* الرفع من الكمبيوتر + رابط صورة */}
+        <div className="flex flex-wrap items-center gap-2">
+          <UploadButton
+            endpoint="mediaUploader"
+            appearance={{
+              button:
+                "ut-ready:bg-primary ut-uploading:cursor-not-allowed bg-primary text-primary-foreground text-sm rounded-md px-3 h-9",
+              allowedContent: "text-xs text-muted-foreground",
+            }}
+            content={{ button: "رفع صورة/فيديو" }}
+            onClientUploadComplete={(
+              res: { url: string; type?: string; name?: string }[],
+            ) => {
+              const isVid = (r: { type?: string; name?: string; url: string }) =>
+                (r.type?.startsWith("video")) ||
+                /\.(mp4|mov|webm|m4v)($|\?)/i.test(r.name || r.url);
+              const vids = res.filter(isVid).map((r) => r.url);
+              const imgs = res.filter((r) => !isVid(r)).map((r) => r.url);
+              if (vids.length) {
+                // فيديو واحد فقط، ولا يُدمج مع صور.
+                setVideos([vids[0]]);
+                setImages([]);
+                if (imgs.length)
+                  toast({
+                    description: "لا يمكن دمج فيديو وصور — تم اعتماد الفيديو",
+                  });
+              } else if (imgs.length) {
+                if (hasVideo) {
+                  toast({
+                    variant: "destructive",
+                    description: "أزِل الفيديو أولاً لإضافة صور",
+                  });
+                } else {
+                  setImages((prev) => [...prev, ...imgs]);
+                }
+              }
+            }}
+            onUploadError={(error: Error) => {
+              toast({ variant: "destructive", description: error.message });
+            }}
           />
-          <Button type="button" variant="outline" onClick={addImageUrl}>
-            إضافة
-          </Button>
+
+          {!hasVideo && (
+            <div className="flex gap-2 flex-1 min-w-[200px]">
+              <Input
+                value={imageInput}
+                onChange={(e) => setImageInput(e.target.value)}
+                placeholder="أو أضف رابط صورة (https://...)"
+                className="flex-1"
+                dir="ltr"
+              />
+              <Button type="button" variant="outline" onClick={addImageUrl}>
+                إضافة
+              </Button>
+            </div>
+          )}
         </div>
 
-        {platforms.includes("instagram") && images.length === 0 && (
+        {hasVideo && (
+          <p className="text-xs text-muted-foreground">
+            منشور فيديو — لا يمكن إضافة صور معه. تعزيز الإعلان غير متاح لمنشورات
+            الفيديو.
+          </p>
+        )}
+        {platforms.includes("instagram") && images.length === 0 && !hasVideo && (
           <p className="text-xs text-amber-600 flex items-center gap-1">
-            <AlertTriangle className="w-3.5 h-3.5" /> إنستغرام يتطلب صورة واحدة
-            على الأقل
+            <AlertTriangle className="w-3.5 h-3.5" /> إنستغرام يتطلب صورة أو
+            فيديو
+          </p>
+        )}
+        {nonJpegForIg && (
+          <p className="text-xs text-amber-600 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" /> إنستغرام يقبل JPEG فقط —
+            أزِل صور PNG/WEBP أو ألغِ اختيار إنستغرام
           </p>
         )}
 
-        <Button onClick={onPublish} disabled={!canPublish || pending}>
+        <Button onClick={onPublish} disabled={!canPublish}>
           {pending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
@@ -299,6 +406,16 @@ export default function PublishPanel({
                 startTransition(async () => {
                   const r = await deleteSocialPost(post.id);
                   toast({ description: r.message });
+                  router.refresh();
+                })
+              }
+              onFinishIg={() =>
+                startTransition(async () => {
+                  const r = await finishInstagramVideo(post.id);
+                  toast({
+                    description: r.message,
+                    variant: r.success ? undefined : "destructive",
+                  });
                   router.refresh();
                 })
               }
@@ -382,6 +499,7 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   partial: { text: "جزئي", cls: "text-amber-600" },
   failed: { text: "فشل", cls: "text-red-600" },
   draft: { text: "مسودة", cls: "text-muted-foreground" },
+  pending_ig: { text: "فيديو إنستغرام قيد المعالجة", cls: "text-blue-600" },
 };
 
 function PostRow({
@@ -389,18 +507,27 @@ function PostRow({
   canLaunch,
   onBoost,
   onDelete,
+  onFinishIg,
   pending,
 }: {
   post: Feed["posts"][number];
   canLaunch: boolean;
   onBoost: () => void;
   onDelete: () => void;
+  onFinishIg: () => void;
   pending: boolean;
 }) {
   const st = STATUS_LABEL[post.status] ?? STATUS_LABEL.draft;
+  const isVideo = post.videoUrls.length > 0;
   return (
     <div className="rounded-lg border bg-card p-3 flex gap-3">
-      {post.imageUrls[0] ? (
+      {isVideo ? (
+        <video
+          src={post.videoUrls[0]}
+          className="w-14 h-14 rounded object-cover border shrink-0 bg-black"
+          muted
+        />
+      ) : post.imageUrls[0] ? (
         <Image
           src={post.imageUrls[0]}
           alt=""
@@ -460,17 +587,30 @@ function PostRow({
       </div>
 
       <div className="flex flex-col gap-1.5 shrink-0">
+        {post.needsIgFinish && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onFinishIg}
+            disabled={pending}
+            title="أكمل نشر فيديو إنستغرام بعد انتهاء المعالجة"
+          >
+            <Instagram className="w-3.5 h-3.5 ml-1" /> إنهاء إنستغرام
+          </Button>
+        )}
         <Button
           size="sm"
           variant="outline"
-          disabled={!canLaunch || !post.fbPostId || pending}
+          disabled={!canLaunch || !post.fbPostId || isVideo || pending}
           onClick={onBoost}
           title={
-            !post.fbPostId
-              ? "انشر على فيسبوك أولاً لإطلاق إعلان"
-              : !canLaunch
-                ? "اختر حساباً إعلانياً أولاً"
-                : undefined
+            isVideo
+              ? "تعزيز منشورات الفيديو غير مدعوم بعد"
+              : !post.fbPostId
+                ? "انشر على فيسبوك أولاً لإطلاق إعلان"
+                : !canLaunch
+                  ? "اختر حساباً إعلانياً أولاً"
+                  : undefined
           }
         >
           <Rocket className="w-3.5 h-3.5 ml-1" /> إعلان

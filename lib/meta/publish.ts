@@ -54,32 +54,40 @@ export async function publishToFacebook(params: {
 }
 
 /**
- * نشر إنستغرام (خطوتان): إنشاء حاوية الوسائط ثم نشرها.
- * يتطلب حساب أعمال/منشئ مرتبطاً بالصفحة، ورابط JPEG عام.
- * الصورة الأولى تُنشر؛ (الكاروسيل متعدد الصور مرحلة لاحقة).
+ * فيديو صفحة فيسبوك من رابط عام. يعيد معرّف الفيديو.
+ * ملاحظة: هذا معرّف فيديو وليس منشوراً قابلاً للتعزيز عبر object_story_id.
  */
-export async function publishToInstagram(params: {
-  igUserId: string;
-  pageToken: string; // توكن الصفحة المرتبطة يعمل لنشر إنستغرام
+export async function publishFacebookVideo(params: {
+  pageId: string;
+  pageToken: string;
   caption: string;
-  imageUrls: string[];
+  videoUrl: string;
 }): Promise<string> {
-  const { igUserId, pageToken, caption, imageUrls } = params;
-  if (imageUrls.length === 0) {
-    throw new Error("إنستغرام يتطلب صورة واحدة على الأقل");
-  }
+  const { pageId, pageToken, caption, videoUrl } = params;
+  // Meta تعالج الفيديو خادمياً وترجع فوراً — لا حاجة لاستطلاع.
+  const res = await graphPost<{ id: string; video_id?: string }>(
+    `${pageId}/videos`,
+    pageToken,
+    { file_url: videoUrl, description: caption },
+  );
+  return res.video_id ?? res.id;
+}
 
-  // 1) إنشاء الحاوية
+/** نشر صورة إنستغرام (خطوتان). يتطلب رابط JPEG عام وحساب أعمال مرتبطاً بالصفحة. */
+export async function publishInstagramImage(params: {
+  igUserId: string;
+  pageToken: string;
+  caption: string;
+  imageUrl: string;
+}): Promise<string> {
+  const { igUserId, pageToken, caption, imageUrl } = params;
   const container = await graphPost<{ id: string }>(
     `${igUserId}/media`,
     pageToken,
-    { image_url: imageUrls[0], caption },
+    { image_url: imageUrl, caption },
   );
-
-  // 2) بعض الحاويات تحتاج لحظات لتجهز — نتحقق من الحالة قبل النشر.
-  await waitForContainer(container.id, pageToken);
-
-  // 3) النشر
+  // الصور تجهز بسرعة — استطلاع قصير آمن ضمن مهلة الدالة الخادمية.
+  await waitForContainer(container.id, pageToken, 4, 2000);
   const published = await graphPost<{ id: string }>(
     `${igUserId}/media_publish`,
     pageToken,
@@ -88,24 +96,86 @@ export async function publishToInstagram(params: {
   return published.id;
 }
 
-/** ينتظر جهوز حاوية إنستغرام (FINISHED) قبل النشر — مهلة قصيرة للصور. */
+/**
+ * ينشئ حاوية فيديو (Reel) لإنستغرام ويحاول نشرها ضمن نافذة قصيرة.
+ * الفيديو يُعالَج غير متزامن وقد يستغرق دقائق، ولا يمكن الانتظار الطويل داخل
+ * دالة خادمية. فإن لم يجهز سريعاً نعيد الحاوية لإنهائها لاحقاً عبر إجراء منفصل.
+ */
+export async function startInstagramVideo(params: {
+  igUserId: string;
+  pageToken: string;
+  caption: string;
+  videoUrl: string;
+}): Promise<{ published: true; mediaId: string } | { published: false; containerId: string }> {
+  const { igUserId, pageToken, caption, videoUrl } = params;
+  const container = await graphPost<{ id: string }>(
+    `${igUserId}/media`,
+    pageToken,
+    { media_type: "REELS", video_url: videoUrl, caption },
+  );
+
+  // استطلاع قصير (بضع ثوانٍ فقط) — لا نتجاوز مهلة الدالة.
+  const ready = await isContainerFinished(container.id, pageToken, 3, 2500);
+  if (!ready) return { published: false, containerId: container.id };
+
+  const mediaId = await publishInstagramContainer(igUserId, pageToken, container.id);
+  return { published: true, mediaId };
+}
+
+/** ينشر حاوية جاهزة — يُستخدم من إجراء الإنهاء بعد اكتمال معالجة الفيديو. */
+export async function publishInstagramContainer(
+  igUserId: string,
+  pageToken: string,
+  containerId: string,
+): Promise<string> {
+  const published = await graphPost<{ id: string }>(
+    `${igUserId}/media_publish`,
+    pageToken,
+    { creation_id: containerId },
+  );
+  return published.id;
+}
+
+/** يستعلم حالة حاوية: FINISHED جاهزة، ERROR/EXPIRED فشل، غيرها قيد المعالجة. */
+export async function getContainerStatus(
+  containerId: string,
+  token: string,
+): Promise<"FINISHED" | "IN_PROGRESS" | "ERROR" | "EXPIRED" | "PUBLISHED"> {
+  const res = await graphGet<{ status_code?: string }>(containerId, token, {
+    fields: "status_code",
+  });
+  return (res.status_code as never) ?? "IN_PROGRESS";
+}
+
+async function isContainerFinished(
+  containerId: string,
+  token: string,
+  attempts: number,
+  delayMs: number,
+): Promise<boolean> {
+  for (let i = 0; i < attempts; i++) {
+    const code = await getContainerStatus(containerId, token);
+    if (code === "FINISHED") return true;
+    if (code === "ERROR" || code === "EXPIRED")
+      throw new Error(`تعذّرت معالجة فيديو إنستغرام (${code})`);
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs));
+  }
+  return false;
+}
+
+/** استطلاع قصير لحاويات الصور قبل النشر. */
 async function waitForContainer(
   containerId: string,
   token: string,
-  attempts = 5,
+  attempts: number,
+  delayMs: number,
 ): Promise<void> {
   for (let i = 0; i < attempts; i++) {
-    const res = await graphGet<{ status_code?: string }>(
-      containerId,
-      token,
-      { fields: "status_code" },
-    );
-    const code = res.status_code;
+    const code = await getContainerStatus(containerId, token);
     if (code === "FINISHED") return;
-    if (code === "ERROR" || code === "EXPIRED") {
+    if (code === "ERROR" || code === "EXPIRED")
       throw new Error(`تعذّر تجهيز صورة إنستغرام (${code})`);
-    }
-    await new Promise((r) => setTimeout(r, 2000));
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, delayMs));
   }
-  // لم تصل FINISHED خلال المهلة — نحاول النشر على أي حال (الصور غالباً جاهزة).
+  // لم تصل FINISHED — نحاول النشر (الصور غالباً جاهزة).
 }

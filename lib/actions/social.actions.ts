@@ -3,7 +3,14 @@
 import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
-import { publishToFacebook, publishToInstagram } from "@/lib/meta/publish";
+import {
+  publishToFacebook,
+  publishFacebookVideo,
+  publishInstagramImage,
+  startInstagramVideo,
+  publishInstagramContainer,
+  getContainerStatus,
+} from "@/lib/meta/publish";
 import {
   launchAdFromPagePost,
   AD_OBJECTIVES,
@@ -54,7 +61,7 @@ export async function getSocialFeed() {
       },
     }),
     prisma.product.findMany({
-      select: { id: true, name: true, images: true, offers: true },
+      select: { id: true, name: true, images: true, description: true },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -74,11 +81,14 @@ export async function getSocialFeed() {
       id: p.id,
       caption: p.caption,
       imageUrls: p.imageUrls,
+      videoUrls: p.videoUrls,
       platforms: p.platforms,
       status: p.status,
       fbPostId: p.fbPostId,
       igPostId: p.igPostId,
       error: p.error,
+      // فيديو إنستغرام قيد المعالجة: حاوية موجودة بلا نشر بعد.
+      needsIgFinish: !!p.igContainerId && !p.igPostId,
       createdAt: p.createdAt.toISOString(),
       launches: p.adLaunches.map((a) => ({
         id: a.id,
@@ -95,16 +105,19 @@ export async function getSocialFeed() {
       id: p.id,
       name: p.name,
       images: p.images,
-      offers: p.offers,
+      description: p.description,
     })),
   };
 }
 
 // ─── نشر منشور ───────────────────────────────────────────────────────────────
 
+const JPEG_RE = /\.jpe?g($|\?)/i;
+
 export async function publishPost(input: {
   caption: string;
   imageUrls: string[];
+  videoUrls: string[];
   platforms: string[]; // ["facebook","instagram"]
   productId?: string | null;
 }) {
@@ -112,14 +125,22 @@ export async function publishPost(input: {
 
   const caption = (input.caption ?? "").trim();
   const imageUrls = (input.imageUrls ?? []).filter(Boolean);
+  const videoUrls = (input.videoUrls ?? []).filter(Boolean);
   const platforms = (input.platforms ?? []).filter((p) =>
     ["facebook", "instagram"].includes(p),
   );
+  const hasVideo = videoUrls.length > 0;
 
   if (platforms.length === 0)
     return { success: false, message: "اختر منصة واحدة على الأقل" };
-  if (!caption && imageUrls.length === 0)
-    return { success: false, message: "أضِف نصاً أو صورة على الأقل" };
+  if (!caption && imageUrls.length === 0 && !hasVideo)
+    return { success: false, message: "أضِف نصاً أو صورة أو فيديو" };
+  // منع دمج فيديو وصور — لا يُدعم في منشور واحد.
+  if (hasVideo && imageUrls.length > 0)
+    return {
+      success: false,
+      message: "لا يمكن دمج فيديو وصور في منشور واحد — اختر أحدهما",
+    };
 
   const conn = await loadConnection();
   if (!conn) return { success: false, message: "لا يوجد اتصال بـ Meta" };
@@ -129,22 +150,40 @@ export async function publishPost(input: {
   if (platforms.includes("instagram")) {
     if (!conn.selectedIgId)
       return { success: false, message: "لا يوجد حساب إنستغرام مرتبط بالصفحة" };
-    if (imageUrls.length === 0)
-      return { success: false, message: "إنستغرام يتطلب صورة واحدة على الأقل" };
+    if (imageUrls.length === 0 && !hasVideo)
+      return { success: false, message: "إنستغرام يتطلب صورة أو فيديو" };
+    // إنستغرام يقبل JPEG فقط للصور.
+    if (!hasVideo && !imageUrls.every((u) => JPEG_RE.test(u)))
+      return {
+        success: false,
+        message: "إنستغرام يقبل صور JPEG فقط — أزِل صور PNG/WEBP أو انشر على فيسبوك فقط",
+      };
   }
 
   let fbPostId: string | null = null;
+  let fbVideoId: string | null = null;
   let igPostId: string | null = null;
+  let igContainerId: string | null = null;
+  let igPending = false;
   const errors: string[] = [];
 
   if (platforms.includes("facebook")) {
     try {
-      fbPostId = await publishToFacebook({
-        pageId: conn.selectedPageId!,
-        pageToken: conn.selectedPageToken!,
-        caption,
-        imageUrls,
-      });
+      if (hasVideo) {
+        fbVideoId = await publishFacebookVideo({
+          pageId: conn.selectedPageId!,
+          pageToken: conn.selectedPageToken!,
+          caption,
+          videoUrl: videoUrls[0],
+        });
+      } else {
+        fbPostId = await publishToFacebook({
+          pageId: conn.selectedPageId!,
+          pageToken: conn.selectedPageToken!,
+          caption,
+          imageUrls,
+        });
+      }
     } catch (err) {
       errors.push(`فيسبوك: ${(err as Error).message}`);
     }
@@ -152,29 +191,53 @@ export async function publishPost(input: {
 
   if (platforms.includes("instagram")) {
     try {
-      igPostId = await publishToInstagram({
-        igUserId: conn.selectedIgId!,
-        pageToken: conn.selectedPageToken!,
-        caption,
-        imageUrls,
-      });
+      if (hasVideo) {
+        const r = await startInstagramVideo({
+          igUserId: conn.selectedIgId!,
+          pageToken: conn.selectedPageToken!,
+          caption,
+          videoUrl: videoUrls[0],
+        });
+        if (r.published) igPostId = r.mediaId;
+        else {
+          igContainerId = r.containerId;
+          igPending = true;
+        }
+      } else {
+        igPostId = await publishInstagramImage({
+          igUserId: conn.selectedIgId!,
+          pageToken: conn.selectedPageToken!,
+          caption,
+          imageUrl: imageUrls[0],
+        });
+      }
     } catch (err) {
       errors.push(`إنستغرام: ${(err as Error).message}`);
     }
   }
 
-  const anyOk = !!fbPostId || !!igPostId;
-  const status = errors.length === 0 ? "published" : anyOk ? "partial" : "failed";
+  const anyOk = !!fbPostId || !!fbVideoId || !!igPostId;
+  const status =
+    igPending && errors.length === 0
+      ? "pending_ig"
+      : errors.length === 0
+        ? "published"
+        : anyOk || igPending
+          ? "partial"
+          : "failed";
 
   await prisma.socialPost.create({
     data: {
       productId: input.productId || null,
       caption: caption || null,
       imageUrls,
+      videoUrls,
       platforms,
       status,
       fbPostId,
+      fbVideoId,
       igPostId,
+      igContainerId,
       error: errors.length ? errors.join(" | ") : null,
       publishedAt: anyOk ? new Date() : null,
     },
@@ -182,10 +245,73 @@ export async function publishPost(input: {
 
   revalidatePath("/admin/marketing");
 
+  if (status === "pending_ig")
+    return {
+      success: true,
+      message:
+        "نُشر على فيسبوك؛ فيديو إنستغرام قيد المعالجة — اضغط «إنهاء نشر إنستغرام» بعد دقيقة.",
+    };
   if (status === "published") return { success: true, message: "تم النشر" };
   if (status === "partial")
     return { success: true, message: `نُشر جزئياً — ${errors.join(" | ")}` };
   return { success: false, message: errors.join(" | ") || "فشل النشر" };
+}
+
+/** يُنهي نشر فيديو إنستغرام بعد اكتمال معالجته (استُدعي من زر «إنهاء»). */
+export async function finishInstagramVideo(postId: string) {
+  await requireAdmin();
+  const post = await prisma.socialPost.findUnique({ where: { id: postId } });
+  if (!post) return { success: false, message: "المنشور غير موجود" };
+  if (post.igPostId)
+    return { success: true, message: "سبق نشره على إنستغرام" };
+  if (!post.igContainerId)
+    return { success: false, message: "لا توجد حاوية إنستغرام لإنهائها" };
+
+  const conn = await loadConnection();
+  if (!conn?.selectedIgId || !conn.selectedPageToken)
+    return { success: false, message: "لا يوجد اتصال بإنستغرام" };
+
+  try {
+    const code = await getContainerStatus(
+      post.igContainerId,
+      conn.selectedPageToken,
+    );
+    if (code === "IN_PROGRESS")
+      return {
+        success: false,
+        message: "الفيديو لا يزال قيد المعالجة — أعد المحاولة بعد قليل",
+      };
+    if (code === "ERROR" || code === "EXPIRED") {
+      await prisma.socialPost.update({
+        where: { id: postId },
+        data: { status: "failed", error: `فيديو إنستغرام: ${code}` },
+      });
+      revalidatePath("/admin/marketing");
+      return { success: false, message: `تعذّرت معالجة الفيديو (${code})` };
+    }
+
+    const mediaId = await publishInstagramContainer(
+      conn.selectedIgId,
+      conn.selectedPageToken,
+      post.igContainerId,
+    );
+    await prisma.socialPost.update({
+      where: { id: postId },
+      data: {
+        igPostId: mediaId,
+        igContainerId: null,
+        status: post.error ? "partial" : "published",
+        publishedAt: post.publishedAt ?? new Date(),
+      },
+    });
+    revalidatePath("/admin/marketing");
+    return { success: true, message: "تم نشر فيديو إنستغرام" };
+  } catch (err) {
+    return {
+      success: false,
+      message: `فشل إنهاء إنستغرام: ${(err as Error).message}`,
+    };
+  }
 }
 
 export async function deleteSocialPost(id: string) {
@@ -221,6 +347,13 @@ export async function launchAd(input: {
     where: { id: input.postId },
   });
   if (!post) return { success: false, message: "المنشور غير موجود" };
+  // تعزيز الفيديو غير مدعوم: fbVideoId معرّف فيديو لا منشور قابل للتعزيز عبر
+  // object_story_id — نمنعه هنا خادمياً لا في الواجهة فقط.
+  if (!post.fbPostId && (post.videoUrls.length > 0 || post.fbVideoId))
+    return {
+      success: false,
+      message: "تعزيز منشورات الفيديو غير مدعوم بعد — استخدم منشور صور/نص",
+    };
   if (!post.fbPostId)
     return {
       success: false,

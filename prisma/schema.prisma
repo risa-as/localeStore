@@ -289,10 +289,14 @@ model SocialPost {
   productId   String?        @db.Uuid
   caption     String?
   imageUrls   String[]       @default([])
+  videoUrls   String[]       @default([]) // فيديو واحد كحد أقصى حالياً
   platforms   String[]       @default([]) // ["facebook","instagram"]
-  status      String         @default("draft") // draft|published|partial|failed
-  fbPostId    String? // معرّف منشور الصفحة {pageId}_{postId}
+  // draft|published|partial|failed|pending_ig (فيديو إنستغرام قيد المعالجة)
+  status      String         @default("draft")
+  fbPostId    String? // معرّف منشور صفحة قابل للتعزيز {pageId}_{postId}
+  fbVideoId   String? // معرّف فيديو الصفحة (ليس منشوراً قابلاً للتعزيز)
   igPostId    String?
+  igContainerId String? // حاوية إنستغرام بانتظار الإنهاء (فيديو قيد المعالجة)
   error       String?
   publishedAt DateTime?      @db.Timestamp(6)
   createdAt   DateTime       @default(now()) @db.Timestamp(6)
