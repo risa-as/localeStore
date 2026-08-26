@@ -214,6 +214,7 @@ export async function launchVideoAd(params: {
   dailyBudgetWhole: number;
   targeting: VideoAdTargeting;
   campaignName: string;
+  currency?: string; // إن مُرِّرت نتجنّب استعلاماً إضافياً
 }): Promise<LaunchResult> {
   const {
     adAccountId,
@@ -228,7 +229,8 @@ export async function launchVideoAd(params: {
     campaignName,
   } = params;
 
-  const currency = await getAdAccountCurrency(adAccountId, token);
+  const currency =
+    params.currency ?? (await getAdAccountCurrency(adAccountId, token));
   const minorBudget = Math.round(dailyBudgetWhole * currencyOffset(currency));
   const thumbnail = await getVideoThumbnail(videoId, token);
 

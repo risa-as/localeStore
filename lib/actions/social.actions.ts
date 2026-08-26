@@ -576,6 +576,12 @@ export async function launchVideoSalesAd(input: {
     placements: input.placements,
   };
 
+  // عملة الحساب — تُستخدم للسجل عند النجاح والفشل معاً (لا نخمّنها د.ع).
+  const currency = await getAdAccountCurrency(
+    conn.selectedAdAccountId,
+    conn.userAccessToken!,
+  ).catch(() => "USD");
+
   try {
     const result = await launchVideoAd({
       adAccountId: conn.selectedAdAccountId,
@@ -587,6 +593,7 @@ export async function launchVideoSalesAd(input: {
       cta: input.cta,
       dailyBudgetWhole: input.dailyBudget,
       targeting,
+      currency,
       campaignName: `${post.caption?.slice(0, 30) || "إعلان فيديو"} — ${new Date().toISOString().slice(0, 10)}`,
     });
 
@@ -622,7 +629,7 @@ export async function launchVideoSalesAd(input: {
           adAccountId: conn.selectedAdAccountId,
           objective: "OUTCOME_TRAFFIC",
           dailyBudget: input.dailyBudget,
-          currency: "IQD",
+          currency,
           adType: "video",
           destinationUrl: url,
           cta: input.cta,

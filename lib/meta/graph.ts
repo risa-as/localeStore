@@ -25,11 +25,15 @@ async function parse(res: Response) {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const err = data?.error;
-    throw new GraphError(
-      res.status,
-      err?.message || `Graph API ${res.status}`,
-      err?.code,
-    );
+    // نجمع تفاصيل Meta الكاملة — «Invalid parameter» وحده لا يكفي؛ blame_field_specs
+    // يذكر الحقل المرفوض، وerror_user_msg رسالة مقروءة.
+    const parts: string[] = [err?.message || `Graph API ${res.status}`];
+    const userMsg = err?.error_user_msg || err?.error_user_title;
+    if (userMsg && userMsg !== err?.message) parts.push(userMsg);
+    const blame = err?.error_data?.blame_field_specs;
+    if (blame) parts.push(`الحقل: ${JSON.stringify(blame)}`);
+    if (err?.error_subcode) parts.push(`subcode ${err.error_subcode}`);
+    throw new GraphError(res.status, parts.join(" — "), err?.code);
   }
   return data;
 }
