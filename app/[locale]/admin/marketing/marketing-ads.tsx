@@ -26,6 +26,7 @@ export type AdsData = {
   adsBaseUrl: string | null;
   ctas: { key: string; label: string }[];
   objectives: { key: string; label: string }[];
+  pixels: { id: string; name: string }[];
   placementOptions: { key: string; label: string }[];
   videos: {
     id: string;
@@ -69,6 +70,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [objective, setObjective] = useState<string>(
     data.objectives[0]?.key ?? "OUTCOME_SALES",
   );
+  const [pixelId, setPixelId] = useState<string>(data.pixels[0]?.id ?? "");
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
@@ -116,6 +118,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     budgetNum > 0 &&
     destOk &&
     selectedPlacements.length > 0 &&
+    !(objective === "OUTCOME_SALES" && data.pixels.length === 0) &&
     !pending;
 
   const onLaunch = () =>
@@ -123,6 +126,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
       const r = await launchVideoSalesAd({
         postId,
         objective: objective as never,
+        pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
         cta: cta as never,
         dailyBudget: budgetNum,
@@ -200,6 +204,33 @@ export default function AdsPanel({ data }: { data: AdsData }) {
             ? "يحسّن Meta لعرض الإعلان لمن يُرجّح أن يشتري (عبر بكسل حسابك) — يحتاج زر ورابط الهبوط."
             : "يحسّن للتفاعل (مشاهدات وتعليقات) — أرخص للوصول، أقل استهدافاً للشراء."}
         </p>
+
+        {objective === "OUTCOME_SALES" && (
+          <div className="mt-3">
+            <label className="text-xs text-muted-foreground">
+              البكسل (حدث الشراء)
+            </label>
+            {data.pixels.length === 0 ? (
+              <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                لا يوجد بكسل على هذا الحساب — أنشئ بكسلاً في مدير الأحداث أو اختر
+                هدف «تفاعل».
+              </p>
+            ) : (
+              <select
+                value={pixelId}
+                onChange={(e) => setPixelId(e.target.value)}
+                className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                {data.pixels.map((px) => (
+                  <option key={px.id} value={px.id}>
+                    {px.name} ({px.id})
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
       </Section>
 
       {/* ── الوسائط ── */}

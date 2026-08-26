@@ -15,7 +15,7 @@ import {
   launchAdFromPagePost,
   launchVideoAd,
   getAdAccountCurrency,
-  getAdAccountPixel,
+  getAdAccountPixels,
   AD_OBJECTIVES,
   AD_CTAS,
   VIDEO_AD_OBJECTIVES,
@@ -471,13 +471,16 @@ export async function getAdsTabData() {
     }),
   ]);
 
-  // عملة الحساب الإعلاني الحقيقية (غالباً USD في العراق) — لعرض صحيح للميزانية.
+  // عملة الحساب الإعلاني الحقيقية + كل البكسلات (لاختيار بكسل هدف المبيعات).
   let currency = "USD";
+  let pixels: { id: string; name: string }[] = [];
   if (conn?.selectedAdAccountId && conn.userAccessToken) {
-    currency = await getAdAccountCurrency(
-      conn.selectedAdAccountId,
-      conn.userAccessToken,
-    ).catch(() => "USD");
+    [currency, pixels] = await Promise.all([
+      getAdAccountCurrency(conn.selectedAdAccountId, conn.userAccessToken).catch(
+        () => "USD",
+      ),
+      getAdAccountPixels(conn.selectedAdAccountId, conn.userAccessToken),
+    ]);
   }
 
   const launches = await prisma.metaAdLaunch.findMany({
@@ -509,6 +512,7 @@ export async function getAdsTabData() {
       key,
       label: v.label,
     })),
+    pixels,
     placementOptions: [
       { key: "facebook", label: "فيسبوك" },
       { key: "instagram", label: "إنستغرام" },
@@ -540,6 +544,7 @@ export async function getAdsTabData() {
 export async function launchVideoSalesAd(input: {
   postId: string;
   objective: CampaignObjective;
+  pixelId?: string; // البكسل المختار لهدف «مبيعات»
   destinationUrl: string;
   cta: AdCta;
   dailyBudget: number;
@@ -599,20 +604,23 @@ export async function launchVideoSalesAd(input: {
     conn.userAccessToken!,
   ).catch(() => "USD");
 
-  // «مبيعات» تحتاج بكسل الحساب — نجلبه ونرفض بوضوح إن غاب.
+  // «مبيعات» تحتاج بكسل الحساب — نستخدم المختار (إن كان من بكسلات الحساب) أو الأول.
   let pixelId: string | undefined;
   if (VIDEO_AD_OBJECTIVES[input.objective].needsPixel) {
-    const pixel = await getAdAccountPixel(
+    const pixels = await getAdAccountPixels(
       conn.selectedAdAccountId,
       conn.userAccessToken!,
     );
-    if (!pixel)
+    if (pixels.length === 0)
       return {
         success: false,
         message:
           "هدف «مبيعات» يحتاج بكسل مرتبطاً بالحساب الإعلاني. أنشئ/اربط بكسلاً في مدير الأحداث، أو اختر هدف «تفاعل».",
       };
-    pixelId = pixel.id;
+    // نقبل المختار فقط إن كان فعلاً من بكسلات هذا الحساب؛ وإلا الأول.
+    pixelId =
+      (input.pixelId && pixels.find((p) => p.id === input.pixelId)?.id) ||
+      pixels[0].id;
   }
 
   try {

@@ -80,20 +80,20 @@ export async function getAdAccountCurrency(
   return res.currency ?? "IQD";
 }
 
-/** بكسل الحساب الإعلاني (مطلوب لهدف «مبيعات»). يعيد أول بكسل أو null. */
-export async function getAdAccountPixel(
+/** كل بكسلات الحساب الإعلاني (لاختيار البكسل عند هدف «مبيعات»). */
+export async function getAdAccountPixels(
   adAccountId: string,
   token: string,
-): Promise<{ id: string; name: string } | null> {
+): Promise<{ id: string; name: string }[]> {
   try {
     const res = await graphGet<{ data: { id: string; name: string }[] }>(
       `${adAccountId}/adspixels`,
       token,
-      { fields: "id,name" },
+      { fields: "id,name", limit: "50" },
     );
-    return res.data?.[0] ?? null;
+    return res.data ?? [];
   } catch {
-    return null;
+    return [];
   }
 }
 
