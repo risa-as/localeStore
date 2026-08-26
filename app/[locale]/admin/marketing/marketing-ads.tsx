@@ -22,6 +22,7 @@ export type AdsData = {
   ready: boolean;
   adAccountName: string | null;
   pageName: string | null;
+  currency: string;
   adsBaseUrl: string | null;
   ctas: { key: string; label: string }[];
   videos: {
@@ -45,8 +46,16 @@ export type AdsData = {
   }[];
 };
 
-function fmtAdMoney(amount: number, currency = "د.ع") {
-  return `${amount.toLocaleString("en-US")} ${currency}`;
+/** رمز/اسم العملة للعرض (USD → $، IQD → د.ع، غيرها كودها). */
+function currencyLabel(code: string) {
+  const c = (code || "").toUpperCase();
+  if (c === "USD") return "$";
+  if (c === "IQD") return "د.ع";
+  return c;
+}
+
+function fmtAdMoney(amount: number, currency: string) {
+  return `${amount.toLocaleString("en-US")} ${currencyLabel(currency)}`;
 }
 
 export default function AdsPanel({ data }: { data: AdsData }) {
@@ -323,19 +332,19 @@ export default function AdsPanel({ data }: { data: AdsData }) {
       {/* ── الميزانية ── */}
       <Section icon={<Wallet className="w-4 h-4" />} title="الميزانية">
         <label className="text-xs text-muted-foreground">
-          الميزانية اليومية (د.ع)
+          الميزانية اليومية ({currencyLabel(data.currency)}) — عملة حسابك الإعلاني
         </label>
         <Input
           type="number"
           min={0}
           value={budget}
           onChange={(e) => setBudget(e.target.value)}
-          placeholder="مثلاً 10000"
+          placeholder={data.currency === "USD" ? "مثلاً 5" : "مثلاً 10000"}
           className="mt-1 max-w-xs"
         />
         {budgetNum > 0 && (
           <p className="mt-1 text-xs text-muted-foreground">
-            الميزانية اليومية: {fmtAdMoney(budgetNum)}
+            الميزانية اليومية: {fmtAdMoney(budgetNum, data.currency)}
           </p>
         )}
       </Section>

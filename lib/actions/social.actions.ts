@@ -14,6 +14,7 @@ import {
 import {
   launchAdFromPagePost,
   launchVideoAd,
+  getAdAccountCurrency,
   AD_OBJECTIVES,
   AD_CTAS,
   type AdObjective,
@@ -466,6 +467,15 @@ export async function getAdsTabData() {
     }),
   ]);
 
+  // عملة الحساب الإعلاني الحقيقية (غالباً USD في العراق) — لعرض صحيح للميزانية.
+  let currency = "USD";
+  if (conn?.selectedAdAccountId && conn.userAccessToken) {
+    currency = await getAdAccountCurrency(
+      conn.selectedAdAccountId,
+      conn.userAccessToken,
+    ).catch(() => "USD");
+  }
+
   const launches = await prisma.metaAdLaunch.findMany({
     where: { adType: "video" },
     orderBy: { createdAt: "desc" },
@@ -488,6 +498,7 @@ export async function getAdsTabData() {
     ready: !!conn?.selectedAdAccountId && !!conn?.selectedPageId,
     adAccountName: conn?.selectedAdAccountName ?? null,
     pageName: conn?.selectedPageName ?? null,
+    currency,
     adsBaseUrl: getAdsBaseUrl(),
     ctas: Object.entries(AD_CTAS).map(([key, label]) => ({ key, label })),
     videos: posts.map((p) => ({
