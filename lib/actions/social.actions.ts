@@ -544,6 +544,7 @@ export async function getAdsTabData() {
 export async function launchVideoSalesAd(input: {
   postId: string;
   objective: CampaignObjective;
+  useExistingPost: boolean;
   pixelId?: string; // البكسل المختار لهدف «مبيعات»
   destinationUrl: string;
   cta: AdCta;
@@ -557,19 +558,21 @@ export async function launchVideoSalesAd(input: {
 
   if (!VIDEO_AD_OBJECTIVES[input.objective])
     return { success: false, message: "هدف حملة غير صالح" };
-  if (!AD_CTAS[input.cta])
-    return { success: false, message: "زر حث غير صالح" };
   if (!(input.dailyBudget > 0))
     return { success: false, message: "أدخل ميزانية يومية صحيحة" };
 
-  // الوجهة يجب أن تكون رابطاً عاماً تصله فيسبوك (لا localhost/شبكة خاصة).
+  // في وضع «إنشاء إعلان» فقط نحتاج زراً ورابط وجهة عاماً (فيسبوك تصله).
   const url = input.destinationUrl.trim();
-  if (!isPublicHttpUrl(url))
-    return {
-      success: false,
-      message:
-        "رابط الوجهة يجب أن يكون رابطاً عاماً (https) — ليس localhost. اضبط META_ADS_BASE_URL في .env أو أدخل رابط الإنتاج.",
-    };
+  if (!input.useExistingPost) {
+    if (!AD_CTAS[input.cta])
+      return { success: false, message: "زر حث غير صالح" };
+    if (!isPublicHttpUrl(url))
+      return {
+        success: false,
+        message:
+          "رابط الوجهة يجب أن يكون رابطاً عاماً (https) — ليس localhost. اضبط META_ADS_BASE_URL في .env أو أدخل رابط الإنتاج.",
+      };
+  }
 
   const ageMin = Math.max(13, Math.min(65, Math.round(input.ageMin)));
   const ageMax = Math.max(ageMin, Math.min(65, Math.round(input.ageMax)));
@@ -633,6 +636,7 @@ export async function launchVideoSalesAd(input: {
       destinationUrl: url,
       cta: input.cta,
       objective: input.objective,
+      useExistingPost: input.useExistingPost,
       pixelId,
       dailyBudgetWhole: input.dailyBudget,
       targeting,

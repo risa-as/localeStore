@@ -34,11 +34,13 @@ export type AdObjective = keyof typeof AD_OBJECTIVES;
 
 /**
  * زر الحث على الإجراء (CTA). النص ثابت من Meta ويُعرض مترجَماً تلقائياً —
- * لا يمكن كتابة نص حر. BOOK_NOW يُعرض «حجز الآن» ويطابق زر صفحة الهبوط.
- * (BOOK_TRAVEL مختلف — خاص بالسفر — لذا لا نستخدمه.)
+ * لا يمكن كتابة نص حر. هذه القيم مدعومة لإعلانات الفيديو الموجّهة لموقع.
+ * (BOOK_NOW يظهر «غير معروف» لهذا النوع، لذا لا نستخدمه هنا.)
  */
 export const AD_CTAS = {
-  BOOK_NOW: "حجز الآن",
+  ORDER_NOW: "اطلب الآن",
+  SHOP_NOW: "تسوّق الآن",
+  LEARN_MORE: "اعرف المزيد",
 } as const;
 
 export type AdCta = keyof typeof AD_CTAS;
@@ -214,6 +216,21 @@ export async function launchAdFromPagePost(params: {
   };
 }
 
+/** معرّف منشور الصفحة المقابل لفيديو (لاستخدام المنشور الحالي كإعلان). */
+export async function getVideoPostId(
+  videoId: string,
+  token: string,
+): Promise<string | null> {
+  try {
+    const res = await graphGet<{ post_id?: string }>(videoId, token, {
+      fields: "post_id",
+    });
+    return res.post_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** صورة مصغّرة للفيديو (مطلوبة كخيار في مبدع الفيديو). تفشل بهدوء إن تعذّرت. */
 export async function getVideoThumbnail(
   videoId: string,
@@ -259,6 +276,7 @@ export async function launchVideoAd(params: {
   destinationUrl: string;
   cta: AdCta;
   objective: CampaignObjective;
+  useExistingPost: boolean; // تعزيز المنشور الحالي بدل إنشاء مبدع جديد
   pixelId?: string; // مطلوب لهدف «مبيعات»
   dailyBudgetWhole: number;
   targeting: VideoAdTargeting;
@@ -274,6 +292,7 @@ export async function launchVideoAd(params: {
     destinationUrl,
     cta,
     objective,
+    useExistingPost,
     pixelId,
     dailyBudgetWhole,
     targeting,
@@ -335,22 +354,36 @@ export async function launchVideoAd(params: {
     },
   );
 
-  // 3) مبدع فيديو بزر يوجّه لصفحة الهبوط.
-  const videoData: Record<string, unknown> = {
-    video_id: videoId,
-    message,
-    call_to_action: { type: cta, value: { link: destinationUrl } },
-    link_description: destinationUrl,
-  };
-  if (thumbnail) videoData.image_url = thumbnail;
+  // 3) المبدع — إما تعزيز المنشور الحالي (object_story_id) أو إنشاء مبدع جديد.
+  let creativeSpec: Record<string, unknown>;
+  if (useExistingPost) {
+    // نعزّز المنشور المنشور فعلاً (بتفاعله). زر/رابط الهبوط لا يُضافان — يأتيان
+    // من المنشور نفسه. صيغة المعرّف {pageId}_{postId} (مؤكَّدة).
+    const postId = await getVideoPostId(videoId, token);
+    if (!postId) throw new Error("تعذّر جلب معرّف المنشور للفيديو");
+    const storyId = postId.includes("_") ? postId : `${pageId}_${postId}`;
+    creativeSpec = {
+      name: `${campaignName} — مبدع`,
+      object_story_id: storyId,
+    };
+  } else {
+    const videoData: Record<string, unknown> = {
+      video_id: videoId,
+      message,
+      call_to_action: { type: cta, value: { link: destinationUrl } },
+      link_description: destinationUrl,
+    };
+    if (thumbnail) videoData.image_url = thumbnail;
+    creativeSpec = {
+      name: `${campaignName} — مبدع`,
+      object_story_spec: { page_id: pageId, video_data: videoData },
+    };
+  }
 
   const creative = await graphPost<{ id: string }>(
     `${adAccountId}/adcreatives`,
     token,
-    {
-      name: `${campaignName} — مبدع`,
-      object_story_spec: { page_id: pageId, video_data: videoData },
-    },
+    creativeSpec,
   );
 
   // 4) الإعلان — PAUSED.

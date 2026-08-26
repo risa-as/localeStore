@@ -71,6 +71,8 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     data.objectives[0]?.key ?? "OUTCOME_SALES",
   );
   const [pixelId, setPixelId] = useState<string>(data.pixels[0]?.id ?? "");
+  // افتراضياً «استخدام منشور حالي» — يعزّز المنشور الفعلي بتفاعله.
+  const [useExistingPost, setUseExistingPost] = useState(true);
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
@@ -116,7 +118,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     data.ready &&
     !!postId &&
     budgetNum > 0 &&
-    destOk &&
+    (useExistingPost || destOk) &&
     selectedPlacements.length > 0 &&
     !(objective === "OUTCOME_SALES" && data.pixels.length === 0) &&
     !pending;
@@ -126,6 +128,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
       const r = await launchVideoSalesAd({
         postId,
         objective: objective as never,
+        useExistingPost,
         pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
         cta: cta as never,
@@ -262,7 +265,41 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
       </Section>
 
-      {/* ── الوجهة ── */}
+      {/* ── إعداد الإعلان ── */}
+      <Section icon={<Film className="w-4 h-4" />} title="إعداد الإعلان">
+        <div className="flex gap-1 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setUseExistingPost(true)}
+            className={`h-9 px-4 rounded-md border text-sm transition-colors ${
+              useExistingPost
+                ? "border-primary bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            استخدام منشور حالي
+          </button>
+          <button
+            type="button"
+            onClick={() => setUseExistingPost(false)}
+            className={`h-9 px-4 rounded-md border text-sm transition-colors ${
+              !useExistingPost
+                ? "border-primary bg-primary/10 text-primary"
+                : "text-muted-foreground hover:bg-muted"
+            }`}
+          >
+            إنشاء إعلان بزر ورابط
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {useExistingPost
+            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته). لا يُضاف زر أو رابط هبوط — الأنسب لهدف «تفاعل»."
+            : "يُنشئ إعلاناً جديداً من الفيديو مع زر ورابط صفحة الهبوط — الأنسب لهدف «مبيعات»."}
+        </p>
+      </Section>
+
+      {/* ── الوجهة (فقط في وضع إنشاء إعلان) ── */}
+      {!useExistingPost && (
       <Section icon={<Link2 className="w-4 h-4" />} title="وجهة الزر (صفحة الهبوط)">
         {!data.adsBaseUrl && (
           <p className="text-xs text-amber-600 flex items-center gap-1 mb-2">
@@ -319,6 +356,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
           )}
         </div>
       </Section>
+      )}
 
       {/* ── الجمهور ── */}
       <Section icon={<Users className="w-4 h-4" />} title="الجمهور">
