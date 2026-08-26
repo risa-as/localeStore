@@ -321,6 +321,9 @@ model MetaAdLaunch {
   objective   String
   dailyBudget Decimal    @db.Decimal(12, 2) // بوحدة العملة الكاملة (مثلاً د.ع)
   currency    String     @default("IQD")
+  adType      String     @default("boost") // boost (منشور صور) | video (إعلان فيديو)
+  destinationUrl String? // رابط زر الإعلان (صفحة هبوط المنتج)
+  cta         String? // نوع زر الحث (ORDER_NOW…)
   startTime   DateTime?  @db.Timestamp(6)
   endTime     DateTime?  @db.Timestamp(6)
   status      String     @default("PAUSED")

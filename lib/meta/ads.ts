@@ -33,6 +33,20 @@ export const AD_OBJECTIVES = {
 export type AdObjective = keyof typeof AD_OBJECTIVES;
 
 /**
+ * أزرار الحث على الإجراء (CTA). النص ثابت من Meta ويُعرض مترجَماً تلقائياً —
+ * لا يمكن كتابة نص حر. المفتاح هو ما يُرسل، والقيمة تلميح للأدمن فقط.
+ */
+export const AD_CTAS = {
+  ORDER_NOW: "اطلب الآن",
+  SHOP_NOW: "تسوّق الآن",
+  LEARN_MORE: "اعرف المزيد",
+  GET_OFFER: "احصل على العرض",
+  MESSAGE_PAGE: "راسلنا",
+} as const;
+
+export type AdCta = keyof typeof AD_CTAS;
+
+/**
  * عدد الوحدات الصغرى لكل وحدة عملة كاملة (currency offset).
  * الدنانير الخليجية ثلاثية الكسور (IQD وأخواتها) تستخدم 1000 في Meta،
  * العملات عديمة الكسور تستخدم 1، والباقي 100. نتحقق أيضاً من الحساب وقت الإطلاق.
@@ -141,6 +155,139 @@ export async function launchAdFromPagePost(params: {
     {
       name: `${campaignName} — مبدع`,
       object_story_id: postId.includes("_") ? postId : `${pageId}_${postId}`,
+    },
+  );
+
+  // 4) الإعلان — PAUSED.
+  const ad = await graphPost<{ id: string }>(`${adAccountId}/ads`, token, {
+    name: `${campaignName} — إعلان`,
+    adset_id: adSet.id,
+    creative: { creative_id: creative.id },
+    status: "PAUSED",
+  });
+
+  return {
+    campaignId: campaign.id,
+    adSetId: adSet.id,
+    creativeId: creative.id,
+    adId: ad.id,
+    currency,
+    minorBudget,
+  };
+}
+
+/** صورة مصغّرة للفيديو (مطلوبة كخيار في مبدع الفيديو). تفشل بهدوء إن تعذّرت. */
+export async function getVideoThumbnail(
+  videoId: string,
+  token: string,
+): Promise<string | undefined> {
+  try {
+    const res = await graphGet<{
+      thumbnails?: { data: { uri: string; is_preferred?: boolean }[] };
+    }>(videoId, token, { fields: "thumbnails" });
+    const thumbs = res.thumbnails?.data ?? [];
+    const preferred = thumbs.find((t) => t.is_preferred) ?? thumbs[0];
+    return preferred?.uri;
+  } catch {
+    return undefined;
+  }
+}
+
+export type VideoAdTargeting = {
+  ageMin: number;
+  ageMax: number;
+  gender?: "all" | "male" | "female";
+  /** فارغة/غير محددة = مواضع تلقائية (فيسبوك + إنستغرام). */
+  placements?: ("facebook" | "instagram")[];
+};
+
+/**
+ * إعلان فيديو مبيعات: يوجّه لزر (CTA) إلى صفحة هبوط المنتج.
+ * الهدف OUTCOME_TRAFFIC مع تحسين نقرات الرابط — الأنسب لسَوق الزائر إلى الهبوط.
+ * كل شيء PAUSED؛ يفعّله المستخدم في مدير الإعلانات بعد المراجعة.
+ */
+export async function launchVideoAd(params: {
+  adAccountId: string;
+  token: string;
+  pageId: string;
+  videoId: string;
+  message: string;
+  destinationUrl: string;
+  cta: AdCta;
+  dailyBudgetWhole: number;
+  targeting: VideoAdTargeting;
+  campaignName: string;
+}): Promise<LaunchResult> {
+  const {
+    adAccountId,
+    token,
+    pageId,
+    videoId,
+    message,
+    destinationUrl,
+    cta,
+    dailyBudgetWhole,
+    targeting,
+    campaignName,
+  } = params;
+
+  const currency = await getAdAccountCurrency(adAccountId, token);
+  const minorBudget = Math.round(dailyBudgetWhole * currencyOffset(currency));
+  const thumbnail = await getVideoThumbnail(videoId, token);
+
+  // 1) حملة — زيارات (سوق للهبوط)، PAUSED.
+  const campaign = await graphPost<{ id: string }>(
+    `${adAccountId}/campaigns`,
+    token,
+    {
+      name: campaignName,
+      objective: "OUTCOME_TRAFFIC",
+      status: "PAUSED",
+      special_ad_categories: [],
+    },
+  );
+
+  // 2) مجموعة إعلانية — الاستهداف + الميزانية، PAUSED.
+  const t: Record<string, unknown> = {
+    geo_locations: { countries: ["IQ"] },
+    age_min: targeting.ageMin,
+    age_max: targeting.ageMax,
+  };
+  if (targeting.gender === "male") t.genders = [1];
+  else if (targeting.gender === "female") t.genders = [2];
+  // مواضع محددة فقط عند طلبها؛ الافتراضي تلقائي (نتركها بلا publisher_platforms).
+  if (targeting.placements && targeting.placements.length > 0)
+    t.publisher_platforms = targeting.placements;
+
+  const adSet = await graphPost<{ id: string }>(
+    `${adAccountId}/adsets`,
+    token,
+    {
+      name: `${campaignName} — مجموعة`,
+      campaign_id: campaign.id,
+      daily_budget: minorBudget,
+      billing_event: "IMPRESSIONS",
+      optimization_goal: "LINK_CLICKS",
+      targeting: t,
+      status: "PAUSED",
+    },
+  );
+
+  // 3) مبدع فيديو بزر يوجّه لصفحة الهبوط.
+  const videoData: Record<string, unknown> = {
+    video_id: videoId,
+    message,
+    call_to_action: { type: cta, value: { link: destinationUrl } },
+    link_description: destinationUrl,
+  };
+  if (thumbnail) videoData.image_url = thumbnail;
+
+  const creative = await graphPost<{ id: string }>(
+    `${adAccountId}/adcreatives`,
+    token,
+    {
+      name: `${campaignName} — مبدع`,
+      object_story_spec: { page_id: pageId, video_data: videoData },
     },
   );
 

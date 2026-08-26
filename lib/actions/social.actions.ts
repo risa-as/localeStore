@@ -13,9 +13,14 @@ import {
 } from "@/lib/meta/publish";
 import {
   launchAdFromPagePost,
+  launchVideoAd,
   AD_OBJECTIVES,
+  AD_CTAS,
   type AdObjective,
+  type AdCta,
+  type VideoAdTargeting,
 } from "@/lib/meta/ads";
+import { getAdsBaseUrl, isPublicHttpUrl } from "@/lib/meta/config";
 
 async function requireAdmin() {
   const session = await auth();
@@ -430,4 +435,195 @@ export async function getAdMeta() {
       label: v.label,
     })),
   };
+}
+
+// ─── تبويب الإعلانات (إعلانات فيديو المبيعات) ────────────────────────────────
+
+/** بيانات تبويب الإعلانات: فيديوهات قابلة للإعلان + منتجات (وجهة) + إطلاقات. */
+export async function getAdsTabData() {
+  await requireAdmin();
+  const conn = await prisma.metaConnection.findUnique({
+    where: { id: "default" },
+  });
+
+  const [posts, products] = await Promise.all([
+    // منشورات فيديو نُشرت على فيسبوك (لها fbVideoId) — القابلة لإعلان الفيديو.
+    prisma.socialPost.findMany({
+      where: { fbVideoId: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        caption: true,
+        videoUrls: true,
+        fbVideoId: true,
+        createdAt: true,
+      },
+    }),
+    prisma.product.findMany({
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
+
+  const launches = await prisma.metaAdLaunch.findMany({
+    where: { adType: "video" },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+    select: {
+      id: true,
+      postId: true,
+      status: true,
+      dailyBudget: true,
+      currency: true,
+      destinationUrl: true,
+      cta: true,
+      adId: true,
+      error: true,
+      createdAt: true,
+    },
+  });
+
+  return {
+    ready: !!conn?.selectedAdAccountId && !!conn?.selectedPageId,
+    adAccountName: conn?.selectedAdAccountName ?? null,
+    pageName: conn?.selectedPageName ?? null,
+    adsBaseUrl: getAdsBaseUrl(),
+    ctas: Object.entries(AD_CTAS).map(([key, label]) => ({ key, label })),
+    videos: posts.map((p) => ({
+      id: p.id,
+      caption: p.caption,
+      videoUrl: p.videoUrls[0] ?? null,
+      createdAt: p.createdAt.toISOString(),
+    })),
+    products: products.map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
+    launches: launches.map((l) => ({
+      id: l.id,
+      postId: l.postId,
+      status: l.status,
+      dailyBudget: Number(l.dailyBudget),
+      currency: l.currency,
+      destinationUrl: l.destinationUrl,
+      cta: l.cta,
+      adId: l.adId,
+      error: l.error,
+      createdAt: l.createdAt.toISOString(),
+    })),
+  };
+}
+
+export async function launchVideoSalesAd(input: {
+  postId: string;
+  destinationUrl: string;
+  cta: AdCta;
+  dailyBudget: number;
+  ageMin: number;
+  ageMax: number;
+  gender: "all" | "male" | "female";
+  placements: ("facebook" | "instagram")[];
+}) {
+  await requireAdmin();
+
+  if (!AD_CTAS[input.cta])
+    return { success: false, message: "زر حث غير صالح" };
+  if (!(input.dailyBudget > 0))
+    return { success: false, message: "أدخل ميزانية يومية صحيحة" };
+
+  // الوجهة يجب أن تكون رابطاً عاماً تصله فيسبوك (لا localhost/شبكة خاصة).
+  const url = input.destinationUrl.trim();
+  if (!isPublicHttpUrl(url))
+    return {
+      success: false,
+      message:
+        "رابط الوجهة يجب أن يكون رابطاً عاماً (https) — ليس localhost. اضبط META_ADS_BASE_URL في .env أو أدخل رابط الإنتاج.",
+    };
+
+  const ageMin = Math.max(13, Math.min(65, Math.round(input.ageMin)));
+  const ageMax = Math.max(ageMin, Math.min(65, Math.round(input.ageMax)));
+
+  const conn = await loadConnection();
+  if (!conn) return { success: false, message: "لا يوجد اتصال بـ Meta" };
+  if (!conn.selectedAdAccountId)
+    return { success: false, message: "لم يتم اختيار حساب إعلاني" };
+  if (!conn.selectedPageId)
+    return { success: false, message: "لم يتم اختيار صفحة" };
+
+  const post = await prisma.socialPost.findUnique({
+    where: { id: input.postId },
+  });
+  if (!post) return { success: false, message: "المنشور غير موجود" };
+  if (!post.fbVideoId)
+    return {
+      success: false,
+      message: "هذا المنشور بلا فيديو فيسبوك — انشر الفيديو على فيسبوك أولاً",
+    };
+
+  const targeting: VideoAdTargeting = {
+    ageMin,
+    ageMax,
+    gender: input.gender,
+    placements: input.placements,
+  };
+
+  try {
+    const result = await launchVideoAd({
+      adAccountId: conn.selectedAdAccountId,
+      token: conn.userAccessToken!,
+      pageId: conn.selectedPageId,
+      videoId: post.fbVideoId,
+      message: post.caption ?? "",
+      destinationUrl: url,
+      cta: input.cta,
+      dailyBudgetWhole: input.dailyBudget,
+      targeting,
+      campaignName: `${post.caption?.slice(0, 30) || "إعلان فيديو"} — ${new Date().toISOString().slice(0, 10)}`,
+    });
+
+    await prisma.metaAdLaunch.create({
+      data: {
+        postId: post.id,
+        adAccountId: conn.selectedAdAccountId,
+        campaignId: result.campaignId,
+        adSetId: result.adSetId,
+        creativeId: result.creativeId,
+        adId: result.adId,
+        objective: "OUTCOME_TRAFFIC",
+        dailyBudget: input.dailyBudget,
+        currency: result.currency,
+        adType: "video",
+        destinationUrl: url,
+        cta: input.cta,
+        status: "PAUSED",
+      },
+    });
+
+    revalidatePath("/admin/marketing");
+    return {
+      success: true,
+      message:
+        "أُنشئ إعلان الفيديو بحالة (موقوف). راجعه في مدير إعلانات Meta وتأكّد من الميزانية والاستهداف ثم فعّله.",
+    };
+  } catch (err) {
+    await prisma.metaAdLaunch
+      .create({
+        data: {
+          postId: post.id,
+          adAccountId: conn.selectedAdAccountId,
+          objective: "OUTCOME_TRAFFIC",
+          dailyBudget: input.dailyBudget,
+          currency: "IQD",
+          adType: "video",
+          destinationUrl: url,
+          cta: input.cta,
+          status: "failed",
+          error: (err as Error).message,
+        },
+      })
+      .catch(() => null);
+    revalidatePath("/admin/marketing");
+    return {
+      success: false,
+      message: `فشل إطلاق إعلان الفيديو: ${(err as Error).message}`,
+    };
+  }
 }

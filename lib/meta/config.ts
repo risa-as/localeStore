@@ -70,6 +70,41 @@ export function getRedirectUri(requestOrigin: string): string {
   );
 }
 
+/**
+ * القاعدة العامة لروابط صفحات الهبوط في الإعلانات (الإنتاج، وليس localhost).
+ * يجب أن تكون رابطاً عاماً تصله فيسبوك — لذا لا نشتقّها من أصل الطلب (قد يكون
+ * localhost أثناء التطوير). تُضبط في .env: META_ADS_BASE_URL=https://<domain>
+ */
+export function getAdsBaseUrl(): string | null {
+  const u = process.env.META_ADS_BASE_URL?.trim();
+  return u ? u.replace(/\/+$/, "") : null;
+}
+
+/** يرفض روابط localhost/الشبكة الخاصة — فيسبوك لا تصلها. */
+export function isPublicHttpUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  const h = url.hostname.toLowerCase();
+  if (
+    h === "localhost" ||
+    h === "127.0.0.1" ||
+    h === "0.0.0.0" ||
+    h === "::1" ||
+    h.endsWith(".local") ||
+    /^10\./.test(h) ||
+    /^192\.168\./.test(h) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h)
+  ) {
+    return false;
+  }
+  return true;
+}
+
 // ─── حماية OAuth: قيمة state موقّعة ومربوطة بالجلسة ──────────────────────────
 //
 // state ليست قيمة عشوائية فحسب، بل توقيع HMAC على معرّف المستخدم + طابع زمني.

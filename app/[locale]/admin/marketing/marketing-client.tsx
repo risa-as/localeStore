@@ -24,6 +24,7 @@ import {
   Send,
 } from "lucide-react";
 import PublishPanel, { type Feed, type AdMeta } from "./marketing-publish";
+import AdsPanel, { type AdsData } from "./marketing-ads";
 
 type Status =
   | { configured: boolean; connected: false }
@@ -61,16 +62,18 @@ export default function MarketingClient({
   flash,
   feed,
   adMeta,
+  adsData,
 }: {
   status: Status;
   flash: string | null;
   feed: Feed | null;
   adMeta: AdMeta | null;
+  adsData: AdsData | null;
 }) {
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState<"connection" | "publish">(
+  const [tab, setTab] = useState<"connection" | "publish" | "ads">(
     status.connected ? "publish" : "connection",
   );
 
@@ -112,7 +115,13 @@ export default function MarketingClient({
               active={tab === "publish"}
               onClick={() => setTab("publish")}
               icon={<Send className="w-4 h-4" />}
-              label="النشر والإعلانات"
+              label="النشر"
+            />
+            <TabButton
+              active={tab === "ads"}
+              onClick={() => setTab("ads")}
+              icon={<Megaphone className="w-4 h-4" />}
+              label="الإعلانات"
             />
             <TabButton
               active={tab === "connection"}
@@ -125,6 +134,12 @@ export default function MarketingClient({
           {tab === "publish" ? (
             feed && adMeta ? (
               <PublishPanel feed={feed} adMeta={adMeta} />
+            ) : (
+              <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
+            )
+          ) : tab === "ads" ? (
+            adsData ? (
+              <AdsPanel data={adsData} />
             ) : (
               <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
             )
