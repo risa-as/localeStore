@@ -68,8 +68,8 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [destination, setDestination] = useState<string>("");
   const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
   const [budget, setBudget] = useState<string>("");
-  const [ageMin, setAgeMin] = useState<string>("18");
-  const [ageMax, setAgeMax] = useState<string>("65");
+  const [ageMin, setAgeMin] = useState<string>("24");
+  const [ageMax, setAgeMax] = useState<string>("60");
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
   const [fbPlace, setFbPlace] = useState(true);
   const [igPlace, setIgPlace] = useState(true);
