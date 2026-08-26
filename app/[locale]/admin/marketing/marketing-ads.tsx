@@ -25,6 +25,8 @@ export type AdsData = {
   currency: string;
   adsBaseUrl: string | null;
   ctas: { key: string; label: string }[];
+  objectives: { key: string; label: string }[];
+  placementOptions: { key: string; label: string }[];
   videos: {
     id: string;
     caption: string | null;
@@ -64,6 +66,9 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [pending, startTransition] = useTransition();
 
   const [postId, setPostId] = useState<string>(data.videos[0]?.id ?? "");
+  const [objective, setObjective] = useState<string>(
+    data.objectives[0]?.key ?? "OUTCOME_SALES",
+  );
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
@@ -71,8 +76,15 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [ageMin, setAgeMin] = useState<string>("24");
   const [ageMax, setAgeMax] = useState<string>("60");
   const [gender, setGender] = useState<"all" | "male" | "female">("all");
-  const [fbPlace, setFbPlace] = useState(true);
-  const [igPlace, setIgPlace] = useState(true);
+  // كل المواضع مختارة افتراضياً = مواضع تلقائية (Advantage+).
+  const [selectedPlacements, setSelectedPlacements] = useState<string[]>(
+    data.placementOptions.map((p) => p.key),
+  );
+
+  const togglePlacement = (key: string) =>
+    setSelectedPlacements((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
 
   const selectedVideo = data.videos.find((v) => v.id === postId);
   const budgetNum = Number(budget) || 0;
@@ -86,13 +98,14 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     }
   };
 
-  // مواضع: كلاهما أو لا شيء = تلقائي (نرسل قائمة فارغة).
-  const placements = useMemo(() => {
-    const list: ("facebook" | "instagram")[] = [];
-    if (fbPlace) list.push("facebook");
-    if (igPlace) list.push("instagram");
-    return list.length === 2 ? [] : list;
-  }, [fbPlace, igPlace]);
+  // كل المواضع مختارة = تلقائي (نرسل قائمة فارغة)؛ غير ذلك = المختارة فقط.
+  const placements = useMemo(
+    () =>
+      selectedPlacements.length === data.placementOptions.length
+        ? []
+        : selectedPlacements,
+    [selectedPlacements, data.placementOptions.length],
+  );
 
   const destOk = /^https?:\/\//i.test(destination) &&
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
@@ -102,20 +115,21 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     !!postId &&
     budgetNum > 0 &&
     destOk &&
-    !(fbPlace === false && igPlace === false) &&
+    selectedPlacements.length > 0 &&
     !pending;
 
   const onLaunch = () =>
     startTransition(async () => {
       const r = await launchVideoSalesAd({
         postId,
+        objective: objective as never,
         destinationUrl: destination.trim(),
         cta: cta as never,
         dailyBudget: budgetNum,
         ageMin: Number(ageMin) || 18,
         ageMax: Number(ageMax) || 65,
         gender,
-        placements,
+        placements: placements as never,
       });
       toast({
         description: r.message,
@@ -162,6 +176,31 @@ export default function AdsPanel({ data }: { data: AdsData }) {
           صفحة: {data.pageName}
         </span>
       </div>
+
+      {/* ── هدف الحملة ── */}
+      <Section icon={<Target className="w-4 h-4" />} title="هدف الحملة">
+        <div className="flex gap-1 flex-wrap">
+          {data.objectives.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => setObjective(o.key)}
+              className={`h-9 px-4 rounded-md border text-sm transition-colors ${
+                objective === o.key
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          {objective === "OUTCOME_SALES"
+            ? "يحسّن Meta لعرض الإعلان لمن يُرجّح أن يشتري (عبر بكسل حسابك) — يحتاج زر ورابط الهبوط."
+            : "يحسّن للتفاعل (مشاهدات وتعليقات) — أرخص للوصول، أقل استهدافاً للشراء."}
+        </p>
+      </Section>
 
       {/* ── الوسائط ── */}
       <Section icon={<Film className="w-4 h-4" />} title="فيديو الإعلان">
@@ -309,21 +348,19 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
         <div className="mt-3">
           <label className="text-xs text-muted-foreground">
-            المنصّات (الافتراضي: كلاهما = مواضع تلقائية)
+            المنصّات (كلها مختارة = مواضع تلقائية Advantage+)
           </label>
-          <div className="mt-1 flex gap-2">
-            <PlaceToggle
-              active={fbPlace}
-              onClick={() => setFbPlace((v) => !v)}
-              label="فيسبوك"
-            />
-            <PlaceToggle
-              active={igPlace}
-              onClick={() => setIgPlace((v) => !v)}
-              label="إنستغرام"
-            />
+          <div className="mt-1 flex gap-2 flex-wrap">
+            {data.placementOptions.map((p) => (
+              <PlaceToggle
+                key={p.key}
+                active={selectedPlacements.includes(p.key)}
+                onClick={() => togglePlacement(p.key)}
+                label={p.label}
+              />
+            ))}
           </div>
-          {!fbPlace && !igPlace && (
+          {selectedPlacements.length === 0 && (
             <p className="text-xs text-red-600 mt-1">اختر منصّة واحدة على الأقل.</p>
           )}
         </div>

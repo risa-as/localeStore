@@ -15,10 +15,14 @@ import {
   launchAdFromPagePost,
   launchVideoAd,
   getAdAccountCurrency,
+  getAdAccountPixel,
   AD_OBJECTIVES,
   AD_CTAS,
+  VIDEO_AD_OBJECTIVES,
   type AdObjective,
   type AdCta,
+  type CampaignObjective,
+  type AdPlacement,
   type VideoAdTargeting,
 } from "@/lib/meta/ads";
 import { getAdsBaseUrl, isPublicHttpUrl } from "@/lib/meta/config";
@@ -501,6 +505,16 @@ export async function getAdsTabData() {
     currency,
     adsBaseUrl: getAdsBaseUrl(),
     ctas: Object.entries(AD_CTAS).map(([key, label]) => ({ key, label })),
+    objectives: Object.entries(VIDEO_AD_OBJECTIVES).map(([key, v]) => ({
+      key,
+      label: v.label,
+    })),
+    placementOptions: [
+      { key: "facebook", label: "فيسبوك" },
+      { key: "instagram", label: "إنستغرام" },
+      { key: "audience_network", label: "Audience Network" },
+      { key: "messenger", label: "Messenger" },
+    ],
     videos: posts.map((p) => ({
       id: p.id,
       caption: p.caption,
@@ -525,16 +539,19 @@ export async function getAdsTabData() {
 
 export async function launchVideoSalesAd(input: {
   postId: string;
+  objective: CampaignObjective;
   destinationUrl: string;
   cta: AdCta;
   dailyBudget: number;
   ageMin: number;
   ageMax: number;
   gender: "all" | "male" | "female";
-  placements: ("facebook" | "instagram")[];
+  placements: AdPlacement[];
 }) {
   await requireAdmin();
 
+  if (!VIDEO_AD_OBJECTIVES[input.objective])
+    return { success: false, message: "هدف حملة غير صالح" };
   if (!AD_CTAS[input.cta])
     return { success: false, message: "زر حث غير صالح" };
   if (!(input.dailyBudget > 0))
@@ -582,6 +599,22 @@ export async function launchVideoSalesAd(input: {
     conn.userAccessToken!,
   ).catch(() => "USD");
 
+  // «مبيعات» تحتاج بكسل الحساب — نجلبه ونرفض بوضوح إن غاب.
+  let pixelId: string | undefined;
+  if (VIDEO_AD_OBJECTIVES[input.objective].needsPixel) {
+    const pixel = await getAdAccountPixel(
+      conn.selectedAdAccountId,
+      conn.userAccessToken!,
+    );
+    if (!pixel)
+      return {
+        success: false,
+        message:
+          "هدف «مبيعات» يحتاج بكسل مرتبطاً بالحساب الإعلاني. أنشئ/اربط بكسلاً في مدير الأحداث، أو اختر هدف «تفاعل».",
+      };
+    pixelId = pixel.id;
+  }
+
   try {
     const result = await launchVideoAd({
       adAccountId: conn.selectedAdAccountId,
@@ -591,6 +624,8 @@ export async function launchVideoSalesAd(input: {
       message: post.caption ?? "",
       destinationUrl: url,
       cta: input.cta,
+      objective: input.objective,
+      pixelId,
       dailyBudgetWhole: input.dailyBudget,
       targeting,
       currency,
@@ -605,7 +640,7 @@ export async function launchVideoSalesAd(input: {
         adSetId: result.adSetId,
         creativeId: result.creativeId,
         adId: result.adId,
-        objective: "OUTCOME_TRAFFIC",
+        objective: input.objective,
         dailyBudget: input.dailyBudget,
         currency: result.currency,
         adType: "video",
@@ -627,7 +662,7 @@ export async function launchVideoSalesAd(input: {
         data: {
           postId: post.id,
           adAccountId: conn.selectedAdAccountId,
-          objective: "OUTCOME_TRAFFIC",
+          objective: input.objective,
           dailyBudget: input.dailyBudget,
           currency,
           adType: "video",

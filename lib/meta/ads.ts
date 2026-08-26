@@ -80,6 +80,39 @@ export async function getAdAccountCurrency(
   return res.currency ?? "IQD";
 }
 
+/** بكسل الحساب الإعلاني (مطلوب لهدف «مبيعات»). يعيد أول بكسل أو null. */
+export async function getAdAccountPixel(
+  adAccountId: string,
+  token: string,
+): Promise<{ id: string; name: string } | null> {
+  try {
+    const res = await graphGet<{ data: { id: string; name: string }[] }>(
+      `${adAccountId}/adspixels`,
+      token,
+      { fields: "id,name" },
+    );
+    return res.data?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export type CampaignObjective = "OUTCOME_SALES" | "OUTCOME_ENGAGEMENT";
+
+/** أهداف حملة إعلان الفيديو المتاحة للأدمن. */
+export const VIDEO_AD_OBJECTIVES = {
+  OUTCOME_SALES: {
+    label: "مبيعات (تحويلات)",
+    optimization_goal: "OFFSITE_CONVERSIONS",
+    needsPixel: true,
+  },
+  OUTCOME_ENGAGEMENT: {
+    label: "تفاعل",
+    optimization_goal: "POST_ENGAGEMENT",
+    needsPixel: false,
+  },
+} as const;
+
 export type LaunchResult = {
   campaignId: string;
   adSetId: string;
@@ -198,12 +231,18 @@ export async function getVideoThumbnail(
   }
 }
 
+export type AdPlacement =
+  | "facebook"
+  | "instagram"
+  | "audience_network"
+  | "messenger";
+
 export type VideoAdTargeting = {
   ageMin: number;
   ageMax: number;
   gender?: "all" | "male" | "female";
-  /** فارغة/غير محددة = مواضع تلقائية (فيسبوك + إنستغرام). */
-  placements?: ("facebook" | "instagram")[];
+  /** فارغة/غير محددة = مواضع تلقائية (Advantage+). */
+  placements?: AdPlacement[];
 };
 
 /**
@@ -219,6 +258,8 @@ export async function launchVideoAd(params: {
   message: string;
   destinationUrl: string;
   cta: AdCta;
+  objective: CampaignObjective;
+  pixelId?: string; // مطلوب لهدف «مبيعات»
   dailyBudgetWhole: number;
   targeting: VideoAdTargeting;
   campaignName: string;
@@ -232,23 +273,26 @@ export async function launchVideoAd(params: {
     message,
     destinationUrl,
     cta,
+    objective,
+    pixelId,
     dailyBudgetWhole,
     targeting,
     campaignName,
   } = params;
 
+  const objSpec = VIDEO_AD_OBJECTIVES[objective];
   const currency =
     params.currency ?? (await getAdAccountCurrency(adAccountId, token));
   const minorBudget = Math.round(dailyBudgetWhole * currencyOffset(currency));
   const thumbnail = await getVideoThumbnail(videoId, token);
 
-  // 1) حملة — زيارات (سوق للهبوط)، PAUSED.
+  // 1) حملة — بالهدف المختار (مبيعات/تفاعل)، PAUSED.
   const campaign = await graphPost<{ id: string }>(
     `${adAccountId}/campaigns`,
     token,
     {
       name: campaignName,
-      objective: "OUTCOME_TRAFFIC",
+      objective,
       status: "PAUSED",
       special_ad_categories: [],
       // مطلوب عند الميزانية على مستوى المجموعة (لا ميزانية حملة).
@@ -279,7 +323,11 @@ export async function launchVideoAd(params: {
       campaign_id: campaign.id,
       daily_budget: minorBudget,
       billing_event: "IMPRESSIONS",
-      optimization_goal: "LINK_CLICKS",
+      optimization_goal: objSpec.optimization_goal,
+      // «مبيعات» تتطلب هدف تحويل عبر بكسل الحساب (حدث الشراء).
+      ...(objSpec.needsPixel && pixelId
+        ? { promoted_object: { pixel_id: pixelId, custom_event_type: "PURCHASE" } }
+        : {}),
       // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       targeting: t,
