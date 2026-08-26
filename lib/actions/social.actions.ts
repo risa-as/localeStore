@@ -561,9 +561,9 @@ export async function launchVideoSalesAd(input: {
   if (!(input.dailyBudget > 0))
     return { success: false, message: "أدخل ميزانية يومية صحيحة" };
 
-  // في وضع «إنشاء إعلان» فقط نحتاج زراً ورابط وجهة عاماً (فيسبوك تصله).
+  // «مبيعات» تحتاج زر رابط ووجهة عامة؛ «تفاعل» يستخدم زر «إرسال رسالة» بلا رابط.
   const url = input.destinationUrl.trim();
-  if (!input.useExistingPost) {
+  if (input.objective === "OUTCOME_SALES") {
     if (!AD_CTAS[input.cta])
       return { success: false, message: "زر حث غير صالح" };
     if (!isPublicHttpUrl(url))

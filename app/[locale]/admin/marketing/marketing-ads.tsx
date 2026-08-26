@@ -114,13 +114,14 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const destOk = /^https?:\/\//i.test(destination) &&
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
 
+  const isSales = objective === "OUTCOME_SALES";
   const canLaunch =
     data.ready &&
     !!postId &&
     budgetNum > 0 &&
-    (useExistingPost || destOk) &&
+    (!isSales || destOk) &&
     selectedPlacements.length > 0 &&
-    !(objective === "OUTCOME_SALES" && data.pixels.length === 0) &&
+    !(isSales && data.pixels.length === 0) &&
     !pending;
 
   const onLaunch = () =>
@@ -293,13 +294,17 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {useExistingPost
-            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته). لا يُضاف زر أو رابط هبوط — الأنسب لهدف «تفاعل»."
-            : "يُنشئ إعلاناً جديداً من الفيديو مع زر ورابط صفحة الهبوط — الأنسب لهدف «مبيعات»."}
+            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته)، مع إضافة الزر داخل الإعلان — لا يتغيّر المنشور الأصلي."
+            : "يُنشئ إعلاناً جديداً من الفيديو (بلا تفاعل المنشور الأصلي)."}
+          {" "}
+          {isSales
+            ? "زر «اطلب الآن» يوجّه لصفحة هبوط المنتج."
+            : "زر «إرسال رسالة» يفتح محادثة مع صفحتك."}
         </p>
       </Section>
 
-      {/* ── الوجهة (فقط في وضع إنشاء إعلان) ── */}
-      {!useExistingPost && (
+      {/* ── الوجهة (لهدف «مبيعات» فقط) ── */}
+      {isSales && (
       <Section icon={<Link2 className="w-4 h-4" />} title="وجهة الزر (صفحة الهبوط)">
         {!data.adsBaseUrl && (
           <p className="text-xs text-amber-600 flex items-center gap-1 mb-2">

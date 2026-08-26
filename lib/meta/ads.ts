@@ -354,24 +354,33 @@ export async function launchVideoAd(params: {
     },
   );
 
-  // 3) المبدع — إما تعزيز المنشور الحالي (object_story_id) أو إنشاء مبدع جديد.
+  // الزر (CTA) يُحدَّد بالهدف — أُثبِت عملياً أن كلا وضعَي المبدع يقبلانه:
+  //   مبيعات  → زر رابط (اطلب الآن/تسوّق…) يوجّه لصفحة الهبوط.
+  //   تفاعل   → زر «إرسال رسالة» (MESSAGE_PAGE) بلا رابط هبوط.
+  const isEngagement = objective === "OUTCOME_ENGAGEMENT";
+  const callToAction = isEngagement
+    ? { type: "MESSAGE_PAGE" }
+    : { type: cta, value: { link: destinationUrl } };
+
+  // 3) المبدع — تعزيز المنشور الحالي (object_story_id) أو مبدع جديد؛ كلاهما بزر.
   let creativeSpec: Record<string, unknown>;
   if (useExistingPost) {
-    // نعزّز المنشور المنشور فعلاً (بتفاعله). زر/رابط الهبوط لا يُضافان — يأتيان
-    // من المنشور نفسه. صيغة المعرّف {pageId}_{postId} (مؤكَّدة).
+    // يعزّز المنشور المنشور فعلاً (بتفاعله) مع إضافة الزر على مستوى الإعلان —
+    // الزر يظهر في الإعلان فقط ولا يُغيّر المنشور الأصلي. صيغة {pageId}_{postId}.
     const postId = await getVideoPostId(videoId, token);
     if (!postId) throw new Error("تعذّر جلب معرّف المنشور للفيديو");
     const storyId = postId.includes("_") ? postId : `${pageId}_${postId}`;
     creativeSpec = {
       name: `${campaignName} — مبدع`,
       object_story_id: storyId,
+      call_to_action: callToAction,
     };
   } else {
     const videoData: Record<string, unknown> = {
       video_id: videoId,
       message,
-      call_to_action: { type: cta, value: { link: destinationUrl } },
-      link_description: destinationUrl,
+      call_to_action: callToAction,
+      ...(isEngagement ? {} : { link_description: destinationUrl }),
     };
     if (thumbnail) videoData.image_url = thumbnail;
     creativeSpec = {
