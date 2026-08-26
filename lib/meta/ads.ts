@@ -143,7 +143,10 @@ export async function launchAdFromPagePost(params: {
       optimization_goal: spec.optimization_goal,
       // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
-      targeting: { geo_locations: { countries: ["IQ"] } },
+      targeting: {
+        geo_locations: { countries: ["IQ"] },
+        targeting_automation: { advantage_audience: 0 },
+      },
       status: "PAUSED",
       ...(startTime ? { start_time: startTime.toISOString() } : {}),
       ...(endTime ? { end_time: endTime.toISOString() } : {}),
@@ -264,6 +267,9 @@ export async function launchVideoAd(params: {
   // مواضع محددة فقط عند طلبها؛ الافتراضي تلقائي (نتركها بلا publisher_platforms).
   if (targeting.placements && targeting.placements.length > 0)
     t.publisher_platforms = targeting.placements;
+  // تعطيل «الجمهور المتقدم» (Advantage+) حتى يُحترم العمر/الجنس المحددان بدل
+  // توسيعهما تلقائياً. Meta تفرض تحديد هذا الحقل صراحةً (0 أو 1).
+  t.targeting_automation = { advantage_audience: 0 };
 
   const adSet = await graphPost<{ id: string }>(
     `${adAccountId}/adsets`,
