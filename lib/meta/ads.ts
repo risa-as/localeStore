@@ -33,15 +33,12 @@ export const AD_OBJECTIVES = {
 export type AdObjective = keyof typeof AD_OBJECTIVES;
 
 /**
- * أزرار الحث على الإجراء (CTA). النص ثابت من Meta ويُعرض مترجَماً تلقائياً —
- * لا يمكن كتابة نص حر. المفتاح هو ما يُرسل، والقيمة تلميح للأدمن فقط.
+ * زر الحث على الإجراء (CTA). النص ثابت من Meta ويُعرض مترجَماً تلقائياً —
+ * لا يمكن كتابة نص حر. BOOK_NOW يُعرض «حجز الآن» ويطابق زر صفحة الهبوط.
+ * (BOOK_TRAVEL مختلف — خاص بالسفر — لذا لا نستخدمه.)
  */
 export const AD_CTAS = {
-  ORDER_NOW: "اطلب الآن",
-  SHOP_NOW: "تسوّق الآن",
-  LEARN_MORE: "اعرف المزيد",
-  GET_OFFER: "احصل على العرض",
-  MESSAGE_PAGE: "راسلنا",
+  BOOK_NOW: "حجز الآن",
 } as const;
 
 export type AdCta = keyof typeof AD_CTAS;

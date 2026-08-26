@@ -66,7 +66,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [postId, setPostId] = useState<string>(data.videos[0]?.id ?? "");
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
-  const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "ORDER_NOW");
+  const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
   const [budget, setBudget] = useState<string>("");
   const [ageMin, setAgeMin] = useState<string>("18");
   const [ageMax, setAgeMax] = useState<string>("65");
