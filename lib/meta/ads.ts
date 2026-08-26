@@ -125,6 +125,9 @@ export async function launchAdFromPagePost(params: {
       objective,
       status: "PAUSED",
       special_ad_categories: [],
+      // مطلوب عند استخدام ميزانية على مستوى المجموعة (لا ميزانية حملة): false
+      // يعني أن كل مجموعة تستخدم ميزانيتها الخاصة بلا مشاركة.
+      is_adset_budget_sharing_enabled: false,
     },
   );
 
@@ -243,6 +246,8 @@ export async function launchVideoAd(params: {
       objective: "OUTCOME_TRAFFIC",
       status: "PAUSED",
       special_ad_categories: [],
+      // مطلوب عند الميزانية على مستوى المجموعة (لا ميزانية حملة).
+      is_adset_budget_sharing_enabled: false,
     },
   );
 
