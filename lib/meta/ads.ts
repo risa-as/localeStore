@@ -141,6 +141,8 @@ export async function launchAdFromPagePost(params: {
       daily_budget: minorBudget,
       billing_event: spec.billing_event,
       optimization_goal: spec.optimization_goal,
+      // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       targeting: { geo_locations: { countries: ["IQ"] } },
       status: "PAUSED",
       ...(startTime ? { start_time: startTime.toISOString() } : {}),
@@ -272,6 +274,8 @@ export async function launchVideoAd(params: {
       daily_budget: minorBudget,
       billing_event: "IMPRESSIONS",
       optimization_goal: "LINK_CLICKS",
+      // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       targeting: t,
       status: "PAUSED",
     },
