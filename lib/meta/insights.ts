@@ -1,4 +1,5 @@
 import { graphGet, graphPost } from "./graph";
+import { currencyOffset } from "./ads";
 
 /**
  * تقارير أداء الإعلانات عبر كل الحسابات الإعلانية.
@@ -30,6 +31,8 @@ export type AdInsightRow = {
   objective: string | null;
   spend: number;
   impressions: number;
+  // المبلغ المخصّص للترويج (ميزانية المجموعة أو الحملة عند تحسين ميزانية الحملة).
+  budget: { amount: number; period: "daily" | "lifetime" } | null;
   purchase: InsightMetric;
   message: InsightMetric;
 };
@@ -142,14 +145,35 @@ async function getAccountSummary(actId: string, token: string, period: InsightsP
 }
 
 /** إعلانات الحساب للفترة (مع النتائج)؛ activeOnly يقصرها على النشطة فعلاً. */
+/** المبلغ المخصّص للترويج: ميزانية المجموعة، وإلا الحملة (CBO)؛ اليومية قبل الإجمالية. */
+function pickBudget(
+  ad: {
+    adset?: { daily_budget?: string; lifetime_budget?: string };
+    campaign?: { daily_budget?: string; lifetime_budget?: string };
+  },
+  offset: number,
+): { amount: number; period: "daily" | "lifetime" } | null {
+  const v = (x?: string) => {
+    const n = Number(x);
+    return n > 0 ? n : 0;
+  };
+  const daily = v(ad.adset?.daily_budget) || v(ad.campaign?.daily_budget);
+  if (daily) return { amount: daily / offset, period: "daily" };
+  const lifetime =
+    v(ad.adset?.lifetime_budget) || v(ad.campaign?.lifetime_budget);
+  if (lifetime) return { amount: lifetime / offset, period: "lifetime" };
+  return null;
+}
+
 async function getAccountAds(
   actId: string,
   token: string,
+  currency: string,
   period: InsightsPeriod,
   activeOnly: boolean,
 ): Promise<AdInsightRow[]> {
   const params: Record<string, string | undefined> = {
-    fields: `name,effective_status,campaign{objective},insights.${timeExpansion(period)}{spend,actions,cost_per_action_type,impressions,reach}`,
+    fields: `name,effective_status,adset{daily_budget,lifetime_budget},campaign{objective,daily_budget,lifetime_budget},insights.${timeExpansion(period)}{spend,actions,cost_per_action_type,impressions,reach}`,
     limit: "50",
   };
   if (activeOnly)
@@ -161,10 +185,16 @@ async function getAccountAds(
       id: string;
       name?: string;
       effective_status?: string;
-      campaign?: { objective?: string };
+      adset?: { daily_budget?: string; lifetime_budget?: string };
+      campaign?: {
+        objective?: string;
+        daily_budget?: string;
+        lifetime_budget?: string;
+      };
       insights?: { data?: Raw[] };
     }[];
   }>(`${actId}/ads`, token, params);
+  const offset = currencyOffset(currency);
   const ads = (j.data ?? []).map((ad) => {
     const r = ad.insights?.data?.[0];
     return {
@@ -174,6 +204,7 @@ async function getAccountAds(
       objective: ad.campaign?.objective ?? null,
       spend: Number(r?.spend ?? 0),
       impressions: Number(r?.impressions ?? 0),
+      budget: pickBudget(ad, offset),
       purchase: metric(r, PURCHASE),
       message: metric(r, MESSAGE),
     };
@@ -224,7 +255,7 @@ export async function getAccountInsight(
   try {
     const [sum, ads] = await Promise.all([
       getAccountSummary(acc.id, token, period),
-      getAccountAds(acc.id, token, period, activeOnly),
+      getAccountAds(acc.id, token, acc.currency, period, activeOnly),
     ]);
     return {
       ...acc,

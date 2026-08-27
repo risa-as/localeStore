@@ -536,6 +536,15 @@ function AdCard({
       </p>
       {/* المقاييس — كل قيمة قبالة تسميتها في سطرها */}
       <div className="mt-auto pt-2.5 border-t space-y-1.5">
+        <Line
+          label={
+            ad.budget?.period === "lifetime"
+              ? "الميزانية الإجمالية"
+              : "الميزانية اليومية"
+          }
+          value={ad.budget ? money(ad.budget.amount, currency) : "—"}
+          strong
+        />
         <Line label="الصرف" value={money(ad.spend, currency)} strong />
         <Line label={primary.label} value={cost(primary.m.cost, currency)} strong />
         <Line label="النتيجة" value={result} />
