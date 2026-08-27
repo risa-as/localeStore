@@ -69,9 +69,14 @@ export async function getAdInsights(input: {
   const visible = input.activeOnly
     ? rows.filter((r) => r.activeCount > 0)
     : rows;
-  // ترتيب أبجدي بأسماء الحسابات (مع وعي بالأرقام: A2 قبل A10).
-  visible.sort((a, b) =>
-    a.name.localeCompare(b.name, "ar", { numeric: true, sensitivity: "base" }),
+  // الحسابات ذات الأسماء العربية تأتي في النهاية، ثم ترتيب أبجدي داخل كل مجموعة
+  // (مع وعي بالأرقام: A2 قبل A10).
+  const arabicLast = (name: string) =>
+    /[؀-ۿ]/.test(name.trim().charAt(0)) ? 1 : 0;
+  visible.sort(
+    (a, b) =>
+      arabicLast(a.name) - arabicLast(b.name) ||
+      a.name.localeCompare(b.name, "ar", { numeric: true, sensitivity: "base" }),
   );
 
   const currencies = new Set(visible.map((r) => r.currency));
