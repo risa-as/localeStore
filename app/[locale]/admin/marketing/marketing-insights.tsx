@@ -231,9 +231,10 @@ export default function InsightsPanel() {
         </div>
       )}
 
-      {/* ── الحسابات — حسابان في الصف، وثلاثة على الشاشات الأوسع ── */}
+      {/* ── الحسابات — حسابان في الصف، وثلاثة على الشاشات الأوسع (بطاقات متساوية
+          الارتفاع داخل الصف) ── */}
       {data?.ok && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-stretch">
           {data.accounts.map((acc) => (
             <AccountCard key={acc.id} acc={acc} activeOnly={activeOnly} />
           ))}
@@ -278,7 +279,7 @@ function AccountCard({
   const hasMore = acc.ads.length > 4;
 
   return (
-    <div className="rounded-2xl border bg-card p-4 sm:p-5 space-y-4">
+    <div className="rounded-2xl border bg-card p-4 sm:p-5 flex flex-col gap-4 h-full">
       {/* رأس الحساب */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 space-y-1">
@@ -325,9 +326,9 @@ function AccountCard({
         <SummaryChip label="وصول" value={num(acc.reach)} />
       </div>
 
-      {/* شبكة الإعلانات — بطاقتان في الصف داخل الحساب */}
+      {/* شبكة الإعلانات — بطاقتان في الصف داخل الحساب (تملأ ارتفاع البطاقة) */}
       {acc.ads.length > 0 ? (
-        <div className="space-y-3">
+        <div className="space-y-3 flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {shown.map((ad) => (
               <AdCard key={ad.id} ad={ad} currency={acc.currency} />
@@ -353,11 +354,11 @@ function AccountCard({
           )}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <div className="flex-1 flex items-center justify-center rounded-lg border border-dashed py-6 text-xs text-muted-foreground text-center">
           {activeOnly
             ? "لا إعلانات نشطة في هذا الحساب ضمن الفترة."
             : "لا إعلانات بصرف في هذه الفترة."}
-        </p>
+        </div>
       )}
     </div>
   );
