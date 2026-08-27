@@ -640,10 +640,12 @@ export async function getAdsTabData() {
 }
 
 export async function launchVideoSalesAd(input: {
-  postId: string;
+  // معرّف المنشور الاجتماعي (SocialPost) إن كان الفيديو منشوراً من النظام — يُترك
+  // فارغاً عند إعادة استخدام منشور إعلان على الصفحة لم ينشره النظام.
+  socialPostId?: string;
   objective: CampaignObjective;
   useExistingPost: boolean;
-  // منشور إعلان سابق (يحمل الزر/الرابط) لإعادة استخدامه في وضع «منشور حالي».
+  // منشور إعلان (يحمل الزر/الرابط) لإعادة استخدامه في وضع «منشور حالي».
   reuseStoryId?: string;
   pixelId?: string; // البكسل المختار لهدف «مبيعات»
   destinationUrl: string;
@@ -693,14 +695,26 @@ export async function launchVideoSalesAd(input: {
   if (!conn.selectedPageId)
     return { success: false, message: "لم يتم اختيار صفحة" };
 
-  const post = await prisma.socialPost.findUnique({
-    where: { id: input.postId },
-  });
-  if (!post) return { success: false, message: "المنشور غير موجود" };
-  if (!post.fbVideoId)
+  // المنشور الاجتماعي إن كان الفيديو منشوراً من النظام. قد يغيب عند إعادة استخدام
+  // منشور إعلان على الصفحة لم ينشره النظام — عندها لا نحتاج فيديو (نعزّز المنشور
+  // بمعرّفه)، ونسجّل الإطلاق بلا postId.
+  const post = input.socialPostId
+    ? await prisma.socialPost.findUnique({ where: { id: input.socialPostId } })
+    : null;
+  if (input.socialPostId && !post)
+    return { success: false, message: "المنشور غير موجود" };
+  if (post && !post.fbVideoId)
     return {
       success: false,
       message: "هذا المنشور بلا فيديو فيسبوك — انشر الفيديو على فيسبوك أولاً",
+    };
+  // بلا منشور من النظام لا يمكن «إنشاء إعلان» (لا فيديو نبني منه مبدعاً) — يلزم
+  // إعادة استخدام منشور إعلان يحمل الزر/الرابط.
+  if (!post && !reusing)
+    return {
+      success: false,
+      message:
+        "هذا المنشور غير منشور من النظام — لا يمكن إنشاء إعلان جديد من فيديوه. استخدم «استخدام منشور حالي» بمنشور يحمل زراً/رابطاً.",
     };
 
   const targeting: VideoAdTargeting = {
@@ -740,8 +754,10 @@ export async function launchVideoSalesAd(input: {
       adAccountId: conn.selectedAdAccountId,
       token: conn.userAccessToken!,
       pageId: conn.selectedPageId,
-      videoId: post.fbVideoId,
-      message: post.caption ?? "",
+      // عند إعادة استخدام منشور إعلان بلا فيديو من النظام، يُمرَّر videoId فارغاً؛
+      // المبدع يعتمد على existingStoryId والفيديو غير مطلوب.
+      videoId: post?.fbVideoId ?? "",
+      message: post?.caption ?? "",
       destinationUrl: url,
       cta: input.cta,
       headline: input.headline?.trim() || undefined,
@@ -752,12 +768,13 @@ export async function launchVideoSalesAd(input: {
       dailyBudgetWhole: input.dailyBudget,
       targeting,
       currency,
-      campaignName: `${post.caption?.slice(0, 30) || "إعلان فيديو"} — ${new Date().toISOString().slice(0, 10)}`,
+      campaignName: `${post?.caption?.slice(0, 30) || "إعلان فيديو"} — ${new Date().toISOString().slice(0, 10)}`,
     });
 
     await prisma.metaAdLaunch.create({
       data: {
-        postId: post.id,
+        postId: post?.id ?? null,
+        pagePostStoryId: reusing ? input.reuseStoryId : null,
         adAccountId: conn.selectedAdAccountId,
         campaignId: result.campaignId,
         adSetId: result.adSetId,
@@ -785,7 +802,8 @@ export async function launchVideoSalesAd(input: {
     await prisma.metaAdLaunch
       .create({
         data: {
-          postId: post.id,
+          postId: post?.id ?? null,
+          pagePostStoryId: reusing ? input.reuseStoryId : null,
           adAccountId: conn.selectedAdAccountId,
           objective: input.objective,
           dailyBudget: input.dailyBudget,

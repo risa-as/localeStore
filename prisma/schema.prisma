@@ -310,9 +310,12 @@ model SocialPost {
 /// ملاحظة: dailyBudget ميزانية مخطّطة لا إنفاق فعلي — لا تُكتب في AdCampaign
 /// (ذاك جدول الإنفاق الفعلي الذي تعتمده صفحة الأرباح).
 model MetaAdLaunch {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  postId      String     @db.Uuid
-  post        SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // اختياري: قد يعيد الإعلان استخدام منشور إعلان على الصفحة لم ينشره النظام
+  // (لا SocialPost له) — عندها نسجّل المنشور المُعلَن عنه في pagePostStoryId.
+  postId      String?     @db.Uuid
+  post        SocialPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  pagePostStoryId String? // object_story_id للمنشور الذي أُعلن عنه (عند غياب postId)
   adAccountId String
   campaignId  String?
   adSetId     String?

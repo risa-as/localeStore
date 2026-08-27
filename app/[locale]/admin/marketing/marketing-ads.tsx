@@ -45,7 +45,7 @@ export type AdsData = {
   }[];
   launches: {
     id: string;
-    postId: string;
+    postId: string | null;
     status: string;
     dailyBudget: number;
     currency: string;
@@ -129,16 +129,21 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
 
   const isSales = objective === "OUTCOME_SALES";
-  // في وضع «منشور حالي»: إن كان المنشور المختار يحمل زراً/رابطاً (منشور إعلان)
-  // نعيد استخدامه — فيرث الزر والرابط. المنشور العضوي وحده لا يحمل زراً.
+  // «إنشاء إعلان» يتطلب فيديو من النظام؛ منشور إعلان على الصفحة (بلا SocialPost)
+  // لا يُتاح إلا لإعادة الاستخدام — عندها نُجبر وضع «منشور حالي».
+  const canCreateAd = !!selectedPost?.socialPostId;
+  const existingMode = useExistingPost || !canCreateAd;
+  // في «منشور حالي»: إن حمل المنشور زراً/رابطاً (منشور إعلان) نعيد استخدامه —
+  // فيرث الزر والرابط. المنشور العضوي وحده لا يحمل زراً.
   const reuseStoryId =
-    useExistingPost && selectedPost?.hasCta ? selectedPost.storyId : "";
+    existingMode && selectedPost?.hasCta ? selectedPost.storyId : "";
   const reusing = !!reuseStoryId;
   // «مبيعات» بوضع «منشور حالي» تحتاج منشوراً يحمل زراً، وإلا «إنشاء إعلان».
-  const salesNeedsCreate = isSales && useExistingPost && !reusing;
+  const salesNeedsCreate = isSales && existingMode && !reusing;
   const canLaunch =
     data.ready &&
-    !!selectedPost?.socialPostId &&
+    !!selectedPost &&
+    (canCreateAd || reusing) &&
     budgetNum > 0 &&
     (!isSales || reusing || destOk) &&
     !salesNeedsCreate &&
@@ -149,9 +154,9 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const onLaunch = () =>
     startTransition(async () => {
       const r = await launchVideoSalesAd({
-        postId: selectedPost?.socialPostId ?? "",
+        socialPostId: selectedPost?.socialPostId || undefined,
         objective: objective as never,
-        useExistingPost,
+        useExistingPost: existingMode,
         reuseStoryId: reuseStoryId || undefined,
         pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
@@ -303,12 +308,17 @@ export default function AdsPanel({ data }: { data: AdsData }) {
                   منشور عضوي (بلا زر)
                 </span>
               )}
-              {!selectedPost?.socialPostId && (
-                <span className="inline-flex items-center gap-1 text-amber-600">
-                  <AlertTriangle className="w-3 h-3" /> غير منشور من النظام — غير
-                  قابل للإطلاق
-                </span>
-              )}
+              {!selectedPost?.socialPostId &&
+                (selectedPost?.hasCta ? (
+                  <span className="inline-flex items-center gap-1 text-muted-foreground">
+                    منشور إعلان على الصفحة — يُعاد استخدامه فقط
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-amber-600">
+                    <AlertTriangle className="w-3 h-3" /> غير منشور من النظام وبلا
+                    زر — غير قابل للإطلاق
+                  </span>
+                ))}
             </div>
             {selectedPost?.hasCta && selectedPost.link && (
               <p
@@ -334,7 +344,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
             type="button"
             onClick={() => setUseExistingPost(true)}
             className={`h-9 px-4 rounded-md border text-sm transition-colors ${
-              useExistingPost
+              existingMode
                 ? "border-primary bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-muted"
             }`}
@@ -343,23 +353,31 @@ export default function AdsPanel({ data }: { data: AdsData }) {
           </button>
           <button
             type="button"
-            onClick={() => setUseExistingPost(false)}
+            disabled={!canCreateAd}
+            onClick={() => canCreateAd && setUseExistingPost(false)}
             className={`h-9 px-4 rounded-md border text-sm transition-colors ${
-              !useExistingPost
+              !existingMode
                 ? "border-primary bg-primary/10 text-primary"
                 : "text-muted-foreground hover:bg-muted"
-            }`}
+            } ${!canCreateAd ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             إنشاء إعلان بزر ورابط
           </button>
         </div>
+        {!canCreateAd && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            هذا المنشور غير منشور من النظام — «إنشاء إعلان» غير متاح؛ يُعاد
+            استخدامه فقط.
+          </p>
+        )}
         <p className="text-xs text-muted-foreground mt-1">
-          {useExistingPost
+          {existingMode
             ? "يعزّز المنشور المختار بتفاعله (إعجاباته ومشاهداته). إن كان يحمل زراً/رابطاً (🔗) يُورَّثان للإعلان — وهذا ما تحتاجه «المبيعات»."
             : "يُنشئ إعلاناً جديداً من فيديو المنشور مع زر ورابط (بلا تفاعل المنشور الأصلي)."}
         </p>
 
-        {useExistingPost && reusing && selectedPost?.link && (
+        {reusing && selectedPost?.link && (
           <p className="text-xs text-green-700 dark:text-green-400 mt-2 flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
             سيُعاد استخدام هذا المنشور بزره ورابطه:

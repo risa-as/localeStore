@@ -381,7 +381,9 @@ export async function launchVideoAd(params: {
   const currency =
     params.currency ?? (await getAdAccountCurrency(adAccountId, token));
   const minorBudget = Math.round(dailyBudgetWhole * currencyOffset(currency));
-  const thumbnail = await getVideoThumbnail(videoId, token);
+  // عند إعادة استخدام منشور إعلان بلا فيديو من النظام، يصل videoId فارغاً — لا
+  // نطلب صورة مصغّرة (تُستخدم فقط في مبدع «إنشاء إعلان»).
+  const thumbnail = videoId ? await getVideoThumbnail(videoId, token) : undefined;
 
   // 1) حملة — بالهدف المختار (مبيعات/تفاعل)، PAUSED.
   const campaign = await graphPost<{ id: string }>(
