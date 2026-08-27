@@ -37,7 +37,8 @@ export type AdObjective = keyof typeof AD_OBJECTIVES;
  * لا يمكن كتابة نص حر. كل هذه القيم مقبولة (اختُبرت) مع رابط الهبوط.
  */
 export const AD_CTAS = {
-  BOOK_NOW: "حجز الآن",
+  // BOOK_TRAVEL يُعرض «حجز الآن» ويُقبل لهذا النوع؛ BOOK_NOW كان يظهر «غير معروف».
+  BOOK_TRAVEL: "حجز الآن",
   ORDER_NOW: "اطلب الآن",
   SHOP_NOW: "تسوّق الآن",
   LEARN_MORE: "اعرف المزيد",
@@ -275,6 +276,7 @@ export async function launchVideoAd(params: {
   message: string;
   destinationUrl: string;
   cta: AdCta;
+  headline?: string; // عنوان الإعلان (يظهر أسفل الفيديو)
   objective: CampaignObjective;
   useExistingPost: boolean; // تعزيز المنشور الحالي بدل إنشاء مبدع جديد
   pixelId?: string; // مطلوب لهدف «مبيعات»
@@ -291,6 +293,7 @@ export async function launchVideoAd(params: {
     message,
     destinationUrl,
     cta,
+    headline,
     objective,
     useExistingPost,
     pixelId,
@@ -388,7 +391,9 @@ export async function launchVideoAd(params: {
       video_id: videoId,
       message,
       call_to_action: callToAction,
-      ...(isEngagement ? {} : { link_description: destinationUrl }),
+      // العنوان (headline) يظهر أسفل الفيديو. لا نضع الرابط في link_description
+      // (كان يظهر الرابط نصّاً في مكان الوصف).
+      ...(headline ? { title: headline } : {}),
     };
     if (thumbnail) videoData.image_url = thumbnail;
     creativeSpec = {

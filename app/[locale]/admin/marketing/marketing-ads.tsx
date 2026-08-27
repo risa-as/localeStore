@@ -75,7 +75,8 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [useExistingPost, setUseExistingPost] = useState(true);
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
-  const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_NOW");
+  const [headline, setHeadline] = useState<string>("");
+  const [cta, setCta] = useState<string>(data.ctas[0]?.key ?? "BOOK_TRAVEL");
   const [budget, setBudget] = useState<string>("");
   const [ageMin, setAgeMin] = useState<string>("24");
   const [ageMax, setAgeMax] = useState<string>("60");
@@ -99,6 +100,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     if (p) {
       const base = data.adsBaseUrl;
       setDestination(base ? `${base}/landing/${p.slug}` : `/landing/${p.slug}`);
+      if (!headline.trim()) setHeadline(p.name);
     }
   };
 
@@ -136,6 +138,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
         cta: cta as never,
+        headline: headline.trim() || undefined,
         dailyBudget: budgetNum,
         ageMin: Number(ageMin) || 18,
         ageMax: Number(ageMax) || 65,
@@ -350,6 +353,17 @@ export default function AdsPanel({ data }: { data: AdsData }) {
               ))}
             </select>
           </div>
+        </div>
+        <div className="mt-2">
+          <label className="text-xs text-muted-foreground">
+            العنوان (يظهر أسفل الفيديو)
+          </label>
+          <Input
+            value={headline}
+            onChange={(e) => setHeadline(e.target.value)}
+            placeholder="مثلاً: ساعة الحائط الرقمية — 37,000 د.ع"
+            className="mt-1"
+          />
         </div>
         <div className="mt-2">
           <label className="text-xs text-muted-foreground">رابط الوجهة</label>

@@ -548,6 +548,7 @@ export async function launchVideoSalesAd(input: {
   pixelId?: string; // البكسل المختار لهدف «مبيعات»
   destinationUrl: string;
   cta: AdCta;
+  headline?: string;
   dailyBudget: number;
   ageMin: number;
   ageMax: number;
@@ -643,6 +644,7 @@ export async function launchVideoSalesAd(input: {
       message: post.caption ?? "",
       destinationUrl: url,
       cta: input.cta,
+      headline: input.headline?.trim() || undefined,
       objective: input.objective,
       useExistingPost: input.useExistingPost,
       pixelId,
