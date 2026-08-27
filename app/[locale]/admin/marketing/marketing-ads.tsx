@@ -35,6 +35,12 @@ export type AdsData = {
     createdAt: string;
   }[];
   products: { id: string; name: string; slug: string }[];
+  reusablePosts: {
+    storyId: string;
+    label: string;
+    cta: string | null;
+    destinationUrl: string | null;
+  }[];
   launches: {
     id: string;
     postId: string;
@@ -73,6 +79,10 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [pixelId, setPixelId] = useState<string>(data.pixels[0]?.id ?? "");
   // افتراضياً «استخدام منشور حالي» — يعزّز المنشور الفعلي بتفاعله.
   const [useExistingPost, setUseExistingPost] = useState(true);
+  // منشور إعلان سابق (يحمل الزر/الرابط) لإعادة استخدامه.
+  const [reuseStoryId, setReuseStoryId] = useState<string>(
+    data.reusablePosts[0]?.storyId ?? "",
+  );
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [headline, setHeadline] = useState<string>("");
@@ -117,13 +127,16 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
 
   const isSales = objective === "OUTCOME_SALES";
-  // المنشور الحالي لا يقبل زر/رابط — فالمبيعات تحتاج «إنشاء إعلان».
-  const salesNeedsCreate = isSales && useExistingPost;
+  // إعادة استخدام منشور إعلان سابق (يحمل الزر/الرابط أصلاً).
+  const reusing = useExistingPost && !!reuseStoryId;
+  // المنشور العضوي وحده لا يقبل زراً/رابطاً — فالمبيعات تحتاج «إنشاء إعلان» أو
+  // إعادة استخدام إعلان سابق.
+  const salesNeedsCreate = isSales && useExistingPost && !reusing;
   const canLaunch =
     data.ready &&
     !!postId &&
     budgetNum > 0 &&
-    (!isSales || destOk) &&
+    (!isSales || reusing || destOk) &&
     !salesNeedsCreate &&
     selectedPlacements.length > 0 &&
     !(isSales && data.pixels.length === 0) &&
@@ -135,6 +148,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         postId,
         objective: objective as never,
         useExistingPost,
+        reuseStoryId: useExistingPost ? reuseStoryId || undefined : undefined,
         pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
         cta: cta as never,
@@ -300,14 +314,45 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {useExistingPost
-            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته) — كما هو، بلا زر أو رابط مُضاف (قيد من Meta على المنشورات الحالية)."
+            ? "يعزّز منشوراً منشوراً فعلاً (بإعجاباته ومشاهداته). لإعلان مبيعات بزر ورابط، أعِد استخدام «إعلان سابق» (يحمل الزر/الرابط أصلاً)."
             : "يُنشئ إعلاناً جديداً من الفيديو مع زر ورابط (بلا تفاعل المنشور الأصلي)."}
         </p>
+
+        {useExistingPost && (
+          <div className="mt-2">
+            <label className="text-xs text-muted-foreground">
+              أعِد استخدام إعلان سابق (يحمل الزر/الرابط)
+            </label>
+            {data.reusablePosts.length === 0 ? (
+              <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                لا توجد إعلانات سابقة بعد. أنشئ إعلاناً بـ «إنشاء إعلان بزر ورابط»
+                أولاً، ثم أعِد استخدام منشوره هنا.
+              </p>
+            ) : (
+              <select
+                value={reuseStoryId}
+                onChange={(e) => setReuseStoryId(e.target.value)}
+                className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="">
+                  — المنشور العضوي للفيديو (بلا زر/رابط) —
+                </option>
+                {data.reusablePosts.map((rp) => (
+                  <option key={rp.storyId} value={rp.storyId}>
+                    {rp.label}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        )}
+
         {salesNeedsCreate && (
           <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
             <AlertTriangle className="w-3.5 h-3.5" />
-            لإعلان «مبيعات» بزر «حجز الآن» ورابط الهبوط، اختر «إنشاء إعلان بزر
-            ورابط» — المنشور الحالي لا يقبل إضافة رابط.
+            لإعلان «مبيعات»: اختر «إعلان سابق» أعلاه، أو استخدم «إنشاء إعلان بزر
+            ورابط».
           </p>
         )}
       </Section>

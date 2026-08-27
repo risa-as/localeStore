@@ -123,6 +123,8 @@ export type LaunchResult = {
   adId: string;
   currency: string;
   minorBudget: number;
+  /** معرّف منشور الإعلان الناتج (يحمل الزر/الرابط) — لإعادة الاستخدام لاحقاً. */
+  effectiveStoryId?: string;
 };
 
 export async function launchAdFromPagePost(params: {
@@ -279,6 +281,9 @@ export async function launchVideoAd(params: {
   headline?: string; // عنوان الإعلان (يظهر أسفل الفيديو)
   objective: CampaignObjective;
   useExistingPost: boolean; // تعزيز المنشور الحالي بدل إنشاء مبدع جديد
+  // منشور إعلان سابق يحمل الزر/الرابط لإعادة استخدامه (وضع «منشور حالي»).
+  // إن غاب، نستخدم منشور الفيديو العضوي (بلا زر/رابط).
+  existingStoryId?: string;
   pixelId?: string; // مطلوب لهدف «مبيعات»
   dailyBudgetWhole: number;
   targeting: VideoAdTargeting;
@@ -296,6 +301,7 @@ export async function launchVideoAd(params: {
     headline,
     objective,
     useExistingPost,
+    existingStoryId,
     pixelId,
     dailyBudgetWhole,
     targeting,
@@ -375,13 +381,17 @@ export async function launchVideoAd(params: {
     ? { type: "MESSAGE_PAGE" }
     : { type: cta, value: { link: destinationUrl } };
 
-  // 3) المبدع — إما تعزيز المنشور الحالي كما هو، أو مبدع جديد بزر ورابط.
+  // 3) المبدع — إما تعزيز منشور حالي (object_story_id) أو مبدع جديد بزر ورابط.
   let creativeSpec: Record<string, unknown>;
   if (useExistingPost) {
-    // يعزّز المنشور المنشور فعلاً (بتفاعله) كما هو — بلا زر/رابط مُضاف.
-    const postId = await getVideoPostId(videoId, token);
-    if (!postId) throw new Error("تعذّر جلب معرّف المنشور للفيديو");
-    const storyId = postId.includes("_") ? postId : `${pageId}_${postId}`;
+    // إن مُرِّر منشور إعلان سابق (يحمل الزر/الرابط) نستخدمه؛ وإلا منشور الفيديو
+    // العضوي (كما هو، بلا زر/رابط).
+    let storyId = existingStoryId;
+    if (!storyId) {
+      const postId = await getVideoPostId(videoId, token);
+      if (!postId) throw new Error("تعذّر جلب معرّف المنشور للفيديو");
+      storyId = postId.includes("_") ? postId : `${pageId}_${postId}`;
+    }
     creativeSpec = {
       name: `${campaignName} — مبدع`,
       object_story_id: storyId,
@@ -416,6 +426,20 @@ export async function launchVideoAd(params: {
     status: "PAUSED",
   });
 
+  // معرّف منشور الإعلان الناتج (يحمل الزر/الرابط) — لإعادة استخدامه لاحقاً كمنشور
+  // حالي. يُقرأ من المبدع (لا نحتاج pages_read_engagement لقراءة حقل المبدع).
+  let effectiveStoryId: string | undefined;
+  try {
+    const cr = await graphGet<{ effective_object_story_id?: string }>(
+      creative.id,
+      token,
+      { fields: "effective_object_story_id" },
+    );
+    effectiveStoryId = cr.effective_object_story_id;
+  } catch {
+    /* غير حرج */
+  }
+
   return {
     campaignId: campaign.id,
     adSetId: adSet.id,
@@ -423,5 +447,6 @@ export async function launchVideoAd(params: {
     adId: ad.id,
     currency,
     minorBudget,
+    effectiveStoryId,
   };
 }

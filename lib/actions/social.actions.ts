@@ -498,8 +498,29 @@ export async function getAdsTabData() {
       adId: true,
       error: true,
       createdAt: true,
+      effectiveStoryId: true,
+      headline: true,
     },
   });
+
+  // منشورات إعلانات سابقة تحمل الزر/الرابط — قابلة لإعادة الاستخدام كـ«منشور حالي».
+  const seen = new Set<string>();
+  const reusablePosts = launches
+    .filter(
+      (l) =>
+        l.status === "PAUSED" &&
+        l.effectiveStoryId &&
+        !seen.has(l.effectiveStoryId) &&
+        seen.add(l.effectiveStoryId),
+    )
+    .map((l) => ({
+      storyId: l.effectiveStoryId!,
+      label:
+        l.headline ||
+        `${l.cta ?? ""} · ${new Date(l.createdAt).toLocaleDateString("ar-IQ")}`,
+      cta: l.cta,
+      destinationUrl: l.destinationUrl,
+    }));
 
   return {
     ready: !!conn?.selectedAdAccountId && !!conn?.selectedPageId,
@@ -526,6 +547,7 @@ export async function getAdsTabData() {
       createdAt: p.createdAt.toISOString(),
     })),
     products: products.map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
+    reusablePosts,
     launches: launches.map((l) => ({
       id: l.id,
       postId: l.postId,
@@ -545,6 +567,8 @@ export async function launchVideoSalesAd(input: {
   postId: string;
   objective: CampaignObjective;
   useExistingPost: boolean;
+  // منشور إعلان سابق (يحمل الزر/الرابط) لإعادة استخدامه في وضع «منشور حالي».
+  reuseStoryId?: string;
   pixelId?: string; // البكسل المختار لهدف «مبيعات»
   destinationUrl: string;
   cta: AdCta;
@@ -562,16 +586,16 @@ export async function launchVideoSalesAd(input: {
   if (!(input.dailyBudget > 0))
     return { success: false, message: "أدخل ميزانية يومية صحيحة" };
 
-  // «مبيعات» تحتاج زر رابط ووجهة عامة؛ «تفاعل» يستخدم زر «إرسال رسالة» بلا رابط.
+  // «مبيعات»: الزر/الرابط إمّا مبنيان في مبدع جديد («إنشاء إعلان») أو موروثان من
+  // منشور إعلان سابق يُعاد استخدامه. المنشور العضوي وحده لا يقبل زراً/رابطاً.
   const url = input.destinationUrl.trim();
-  if (input.objective === "OUTCOME_SALES") {
-    // المنشور الحالي يُعرض كما هو ولا يمكن إضافة زر/رابط له (قيد من Meta) —
-    // فالمبيعات تحتاج «إنشاء إعلان».
+  const reusing = input.useExistingPost && !!input.reuseStoryId;
+  if (input.objective === "OUTCOME_SALES" && !reusing) {
     if (input.useExistingPost)
       return {
         success: false,
         message:
-          "المنشور الحالي لا يقبل إضافة زر ورابط. لإعلان «مبيعات» بزر «حجز الآن» ورابط الهبوط، اختر «إنشاء إعلان».",
+          "المنشور العضوي لا يقبل زراً/رابطاً. اختر «إعلان سابق» يحمل الزر، أو استخدم «إنشاء إعلان بزر ورابط».",
       };
     if (!AD_CTAS[input.cta])
       return { success: false, message: "زر حث غير صالح" };
@@ -647,6 +671,7 @@ export async function launchVideoSalesAd(input: {
       headline: input.headline?.trim() || undefined,
       objective: input.objective,
       useExistingPost: input.useExistingPost,
+      existingStoryId: input.reuseStoryId,
       pixelId,
       dailyBudgetWhole: input.dailyBudget,
       targeting,
@@ -668,6 +693,8 @@ export async function launchVideoSalesAd(input: {
         adType: "video",
         destinationUrl: url,
         cta: input.cta,
+        headline: input.headline?.trim() || null,
+        effectiveStoryId: result.effectiveStoryId ?? null,
         status: "PAUSED",
       },
     });

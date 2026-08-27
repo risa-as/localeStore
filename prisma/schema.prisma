@@ -324,6 +324,9 @@ model MetaAdLaunch {
   adType      String     @default("boost") // boost (منشور صور) | video (إعلان فيديو)
   destinationUrl String? // رابط زر الإعلان (صفحة هبوط المنتج)
   cta         String? // نوع زر الحث (ORDER_NOW…)
+  // معرّف منشور الإعلان الناتج (يحمل الزر/الرابط) — لإعادة استخدامه كـ «منشور حالي».
+  effectiveStoryId String?
+  headline    String?
   startTime   DateTime?  @db.Timestamp(6)
   endTime     DateTime?  @db.Timestamp(6)
   status      String     @default("PAUSED")
