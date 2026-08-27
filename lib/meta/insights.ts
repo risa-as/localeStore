@@ -29,6 +29,7 @@ export type AdInsightRow = {
   status: string; // effective_status
   objective: string | null;
   spend: number;
+  impressions: number;
   purchase: InsightMetric;
   message: InsightMetric;
 };
@@ -172,6 +173,7 @@ async function getAccountAds(
       status: ad.effective_status ?? "UNKNOWN",
       objective: ad.campaign?.objective ?? null,
       spend: Number(r?.spend ?? 0),
+      impressions: Number(r?.impressions ?? 0),
       purchase: metric(r, PURCHASE),
       message: metric(r, MESSAGE),
     };

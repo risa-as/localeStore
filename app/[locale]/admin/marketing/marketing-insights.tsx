@@ -273,17 +273,17 @@ function AccountCard({
   activeOnly: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // نعرض أهم 5 إعلانات مباشرةً (الفلتر يُظهر الإعلانات، لا يُخفيها)، والبقية بزر.
-  const shown = open ? acc.ads : acc.ads.slice(0, 5);
-  const hasMore = acc.ads.length > 5;
+  // صفّان من البطاقات (4×2) مباشرةً، والبقية بزر.
+  const shown = open ? acc.ads : acc.ads.slice(0, 8);
+  const hasMore = acc.ads.length > 8;
 
   return (
-    <div className="rounded-xl border bg-card overflow-hidden">
+    <div className="rounded-2xl border bg-card p-4 sm:p-5 space-y-4">
       {/* رأس الحساب */}
-      <div className="p-4 flex items-center justify-between gap-3 flex-wrap border-b bg-muted/20">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="font-semibold truncate">{acc.name}</h3>
+            <h3 className="font-bold text-lg truncate">{acc.name}</h3>
             {acc.activeCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full border border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5 text-xs">
                 <Radio className="w-3 h-3" /> {acc.activeCount} نشط
@@ -307,44 +307,37 @@ function AccountCard({
         </div>
       </div>
 
-      {/* مقاييس الحساب — بلاطات مؤطّرة، كل تسمية فوق قيمتها مباشرةً */}
-      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricTile
+      {/* مقاييس الحساب — شرائح مدمجة */}
+      <div className="flex flex-wrap gap-2">
+        <SummaryChip
           icon={<ShoppingBag className="w-3.5 h-3.5" />}
           label="كلفة الشراء"
           value={cost(acc.purchase.cost, acc.currency)}
           sub={`${num(acc.purchase.count)} شراء`}
         />
-        <MetricTile
+        <SummaryChip
           icon={<MessageCircle className="w-3.5 h-3.5" />}
           label="كلفة الرسالة"
           value={cost(acc.message.cost, acc.currency)}
           sub={`${num(acc.message.count)} محادثة`}
         />
-        <MetricTile label="ظهور" value={num(acc.impressions)} />
-        <MetricTile label="وصول" value={num(acc.reach)} />
+        <SummaryChip label="ظهور" value={num(acc.impressions)} />
+        <SummaryChip label="وصول" value={num(acc.reach)} />
       </div>
 
-      {/* إعلانات الحساب */}
+      {/* شبكة الإعلانات — 4 بطاقات في الصف */}
       {acc.ads.length > 0 ? (
-        <div className="border-t">
-          {/* رأس أعمدة (على الشاشات المتوسطة فأكبر) — نفس القالب والفجوة تماماً
-              كصفوف الإعلانات حتى تتوازى القيم تحت عناوينها. */}
-          <div className="hidden sm:grid grid-cols-[1fr_7rem_10rem] gap-x-3 px-4 py-2 bg-muted/30 text-xs font-medium text-muted-foreground">
-            <span>الإعلان</span>
-            <span className="text-end">الصرف</span>
-            <span className="text-end">كلفة النتيجة</span>
-          </div>
-          <div className="divide-y">
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {shown.map((ad) => (
-              <AdRow key={ad.id} ad={ad} currency={acc.currency} />
+              <AdCard key={ad.id} ad={ad} currency={acc.currency} />
             ))}
           </div>
           {hasMore && (
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="w-full py-2 text-xs text-primary hover:bg-muted flex items-center justify-center gap-1 border-t"
+              className="w-full py-2 text-xs text-primary hover:bg-muted rounded-lg border border-dashed flex items-center justify-center gap-1"
             >
               {open ? (
                 <>
@@ -360,17 +353,17 @@ function AccountCard({
           )}
         </div>
       ) : (
-        <div className="border-t px-4 py-3 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {activeOnly
             ? "لا إعلانات نشطة في هذا الحساب ضمن الفترة."
             : "لا إعلانات بصرف في هذه الفترة."}
-        </div>
+        </p>
       )}
     </div>
   );
 }
 
-function MetricTile({
+function SummaryChip({
   icon,
   label,
   value,
@@ -382,15 +375,19 @@ function MetricTile({
   sub?: string;
 }) {
   return (
-    <div className="rounded-lg border bg-muted/30 p-3 flex flex-col">
-      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        {icon}
-        {label}
-      </span>
-      <span className="text-base font-bold mt-1.5" dir="ltr">
-        {value}
-      </span>
-      {sub && <span className="text-xs text-muted-foreground mt-auto pt-0.5">{sub}</span>}
+    <div className="rounded-lg border bg-muted/30 px-3 py-2 flex items-center gap-2">
+      {icon && <span className="text-muted-foreground shrink-0">{icon}</span>}
+      <div className="leading-tight">
+        <p className="text-[11px] text-muted-foreground">{label}</p>
+        <p className="text-sm font-bold" dir="ltr">
+          {value}
+          {sub && (
+            <span className="text-[11px] font-normal text-muted-foreground ms-1">
+              ({sub})
+            </span>
+          )}
+        </p>
+      </div>
     </div>
   );
 }
@@ -444,7 +441,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function AdRow({ ad, currency }: { ad: AdInsightRow; currency: string | null }) {
+function AdCard({ ad, currency }: { ad: AdInsightRow; currency: string | null }) {
   const isSales = (ad.objective || "").includes("SALES") ||
     (ad.objective || "").includes("CONVERSION");
   // النتيجة الأنسب للهدف؛ إن لم يُحدَّد نُظهر ما له قيمة.
@@ -458,34 +455,52 @@ function AdRow({ ad, currency }: { ad: AdInsightRow; currency: string | null }) 
       : "لا نتائج بعد";
 
   return (
-    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-[1fr_7rem_10rem] gap-x-3 gap-y-2 items-center text-sm hover:bg-muted/30 transition-colors">
-      {/* الاسم + الحالة (سطر كامل على الجوال) */}
-      <div className="col-span-2 sm:col-span-1 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <StatusBadge status={ad.status} />
-          <p className="font-medium truncate" title={ad.name}>
-            {prettyAdName(ad.name)}
-          </p>
-        </div>
+    <div className="rounded-xl border bg-background p-3 flex flex-col gap-2.5 hover:border-primary/40 hover:shadow-sm transition-all">
+      {/* الحالة + الهدف */}
+      <div className="flex items-center justify-between gap-2">
+        <StatusBadge status={ad.status} />
         {objLabel && (
-          <p className="text-xs text-muted-foreground mt-1">هدف: {objLabel}</p>
+          <span className="text-[10px] text-muted-foreground rounded-full border px-1.5 py-0.5 leading-none shrink-0">
+            {objLabel}
+          </span>
         )}
       </div>
-      {/* الصرف */}
-      <div className="text-start sm:text-end">
-        <p className="text-xs text-muted-foreground sm:hidden">الصرف</p>
-        <p className="font-bold" dir="ltr">
-          {money(ad.spend, currency)}
-        </p>
+      {/* الاسم — سطران بحد أقصى */}
+      <p
+        className="font-medium text-sm leading-snug line-clamp-2 min-h-[2.5rem]"
+        title={ad.name}
+      >
+        {prettyAdName(ad.name)}
+      </p>
+      {/* المقاييس — كل قيمة قبالة تسميتها في سطرها */}
+      <div className="mt-auto pt-2.5 border-t space-y-1.5">
+        <Line label="الصرف" value={money(ad.spend, currency)} strong />
+        <Line label={primary.label} value={cost(primary.m.cost, currency)} strong />
+        <Line label="النتيجة" value={result} />
+        <Line label="ظهور" value={num(ad.impressions)} />
       </div>
-      {/* كلفة النتيجة */}
-      <div className="text-start sm:text-end">
-        <p className="text-xs text-muted-foreground sm:hidden">{primary.label}</p>
-        <p className="font-bold" dir="ltr">
-          {cost(primary.m.cost, currency)}
-        </p>
-        <p className="text-xs text-muted-foreground">{result}</p>
-      </div>
+    </div>
+  );
+}
+
+function Line({
+  label,
+  value,
+  strong,
+}: {
+  label: string;
+  value: string;
+  strong?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span
+        className={strong ? "font-bold text-sm" : "text-xs text-muted-foreground"}
+        dir="ltr"
+      >
+        {value}
+      </span>
     </div>
   );
 }
