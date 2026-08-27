@@ -347,6 +347,10 @@ export async function launchVideoAd(params: {
       ...(objSpec.needsPixel && pixelId
         ? { promoted_object: { pixel_id: pixelId, custom_event_type: "PURCHASE" } }
         : {}),
+      // استراتيجية دورة حياة العميل = «الحصول على تحويلات من كل الجماهير».
+      // 100 يعني إتاحة كامل الميزانية للعملاء الحاليين أيضاً (أي كل الجماهير).
+      // خاص بحملات المبيعات؛ اختُبر أنه مقبول (بينما 0 يتطلب قائمة عملاء).
+      ...(objSpec.needsPixel ? { existing_customer_budget_percentage: 100 } : {}),
       // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
       targeting: t,
