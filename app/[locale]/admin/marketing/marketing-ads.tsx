@@ -204,7 +204,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   }
 
   return (
-    <div className="space-y-5 max-w-3xl">
+    <div className="space-y-5 w-full">
       <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
         <span className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1">
           <Target className="w-3.5 h-3.5" /> {data.adAccountName}

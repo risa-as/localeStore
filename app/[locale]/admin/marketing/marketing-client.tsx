@@ -92,7 +92,7 @@ export default function MarketingClient({
   }, [flash]);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 w-full">
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-lg bg-primary/10">
           <Megaphone className="w-6 h-6 text-primary" />
