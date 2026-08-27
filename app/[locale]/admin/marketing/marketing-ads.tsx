@@ -28,18 +28,20 @@ export type AdsData = {
   objectives: { key: string; label: string }[];
   pixels: { id: string; name: string }[];
   placementOptions: { key: string; label: string }[];
-  videos: {
-    id: string;
-    caption: string | null;
-    videoUrl: string | null;
-    createdAt: string;
-  }[];
   products: { id: string; name: string; slug: string }[];
-  reusablePosts: {
-    storyId: string;
-    label: string;
+  // منشورات فيديو الصفحة القابلة للإعلان — عضوية (بلا زر) أو منشورات إعلانات
+  // تحمل زراً/رابطاً (hasCta) قابلة لإعادة الاستخدام.
+  pagePosts: {
+    storyId: string; // "" = منشور عضوي يُحلّ منشوره وقت الإطلاق
+    key: string;
+    videoId: string | null;
+    socialPostId: string | null; // مطلوب للإطلاق (FK + معرّف الفيديو)
+    videoUrl: string | null;
+    message: string;
     cta: string | null;
-    destinationUrl: string | null;
+    link: string | null;
+    permalink: string | null;
+    hasCta: boolean;
   }[];
   launches: {
     id: string;
@@ -72,17 +74,16 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [postId, setPostId] = useState<string>(data.videos[0]?.id ?? "");
+  // المنشور المختار من منشورات الصفحة (يُعرَّف بمفتاحه).
+  const [selectedKey, setSelectedKey] = useState<string>(
+    data.pagePosts[0]?.key ?? "",
+  );
   const [objective, setObjective] = useState<string>(
     data.objectives[0]?.key ?? "OUTCOME_SALES",
   );
   const [pixelId, setPixelId] = useState<string>(data.pixels[0]?.id ?? "");
   // افتراضياً «استخدام منشور حالي» — يعزّز المنشور الفعلي بتفاعله.
   const [useExistingPost, setUseExistingPost] = useState(true);
-  // منشور إعلان سابق (يحمل الزر/الرابط) لإعادة استخدامه.
-  const [reuseStoryId, setReuseStoryId] = useState<string>(
-    data.reusablePosts[0]?.storyId ?? "",
-  );
   const [productId, setProductId] = useState<string>("");
   const [destination, setDestination] = useState<string>("");
   const [headline, setHeadline] = useState<string>("");
@@ -101,7 +102,8 @@ export default function AdsPanel({ data }: { data: AdsData }) {
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
 
-  const selectedVideo = data.videos.find((v) => v.id === postId);
+  const selectedPost =
+    data.pagePosts.find((p) => p.key === selectedKey) ?? data.pagePosts[0];
   const budgetNum = Number(budget) || 0;
 
   const onPickProduct = (id: string) => {
@@ -127,14 +129,16 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
 
   const isSales = objective === "OUTCOME_SALES";
-  // إعادة استخدام منشور إعلان سابق (يحمل الزر/الرابط أصلاً).
-  const reusing = useExistingPost && !!reuseStoryId;
-  // المنشور العضوي وحده لا يقبل زراً/رابطاً — فالمبيعات تحتاج «إنشاء إعلان» أو
-  // إعادة استخدام إعلان سابق.
+  // في وضع «منشور حالي»: إن كان المنشور المختار يحمل زراً/رابطاً (منشور إعلان)
+  // نعيد استخدامه — فيرث الزر والرابط. المنشور العضوي وحده لا يحمل زراً.
+  const reuseStoryId =
+    useExistingPost && selectedPost?.hasCta ? selectedPost.storyId : "";
+  const reusing = !!reuseStoryId;
+  // «مبيعات» بوضع «منشور حالي» تحتاج منشوراً يحمل زراً، وإلا «إنشاء إعلان».
   const salesNeedsCreate = isSales && useExistingPost && !reusing;
   const canLaunch =
     data.ready &&
-    !!postId &&
+    !!selectedPost?.socialPostId &&
     budgetNum > 0 &&
     (!isSales || reusing || destOk) &&
     !salesNeedsCreate &&
@@ -145,10 +149,10 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const onLaunch = () =>
     startTransition(async () => {
       const r = await launchVideoSalesAd({
-        postId,
+        postId: selectedPost?.socialPostId ?? "",
         objective: objective as never,
         useExistingPost,
-        reuseStoryId: useExistingPost ? reuseStoryId || undefined : undefined,
+        reuseStoryId: reuseStoryId || undefined,
         pixelId: pixelId || undefined,
         destinationUrl: destination.trim(),
         cta: cta as never,
@@ -182,11 +186,11 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     );
   }
 
-  if (data.videos.length === 0) {
+  if (data.pagePosts.length === 0) {
     return (
       <div className="rounded-xl border bg-card p-6 text-center space-y-2">
         <Film className="w-8 h-8 mx-auto text-muted-foreground" />
-        <p className="font-semibold">لا توجد فيديوهات للإعلان</p>
+        <p className="font-semibold">لا توجد منشورات فيديو للإعلان</p>
         <p className="text-sm text-muted-foreground">
           انشر فيديو على فيسبوك من تبويب «النشر»، ثم أنشئ إعلاناً منه هنا.
         </p>
@@ -257,33 +261,70 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         )}
       </Section>
 
-      {/* ── الوسائط ── */}
-      <Section icon={<Film className="w-4 h-4" />} title="فيديو الإعلان">
+      {/* ── منشور الإعلان (منشورات فيديو الصفحة) ── */}
+      <Section icon={<Film className="w-4 h-4" />} title="منشور الإعلان">
         <div className="flex gap-3">
-          {selectedVideo?.videoUrl && (
+          {selectedPost?.videoUrl ? (
             <video
-              src={selectedVideo.videoUrl}
+              src={selectedPost.videoUrl}
               className="w-24 h-24 rounded-lg border object-cover bg-black shrink-0"
               controls
             />
-          )}
+          ) : selectedPost?.permalink ? (
+            <a
+              href={selectedPost.permalink}
+              target="_blank"
+              rel="noreferrer"
+              className="w-24 h-24 rounded-lg border bg-muted flex items-center justify-center shrink-0 text-xs text-muted-foreground hover:bg-muted/70"
+            >
+              مشاهدة
+            </a>
+          ) : null}
           <div className="flex-1 min-w-0 space-y-2">
             <select
-              value={postId}
-              onChange={(e) => setPostId(e.target.value)}
+              value={selectedKey}
+              onChange={(e) => setSelectedKey(e.target.value)}
               className="w-full h-9 rounded-md border bg-background px-2 text-sm"
             >
-              {data.videos.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {(v.caption || "فيديو").slice(0, 50).replace(/\n/g, " ")}
+              {data.pagePosts.map((p) => (
+                <option key={p.key} value={p.key}>
+                  {(p.hasCta ? "🔗 " : "") +
+                    (p.message || "فيديو").slice(0, 50).replace(/\n/g, " ")}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-muted-foreground line-clamp-2">
-              {selectedVideo?.caption}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {selectedPost?.hasCta ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5">
+                  <CheckCircle2 className="w-3 h-3" /> يحمل زراً ورابطاً
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-muted-foreground">
+                  منشور عضوي (بلا زر)
+                </span>
+              )}
+              {!selectedPost?.socialPostId && (
+                <span className="inline-flex items-center gap-1 text-amber-600">
+                  <AlertTriangle className="w-3 h-3" /> غير منشور من النظام — غير
+                  قابل للإطلاق
+                </span>
+              )}
+            </div>
+            {selectedPost?.hasCta && selectedPost.link && (
+              <p
+                className="text-xs text-muted-foreground truncate"
+                dir="ltr"
+              >
+                {selectedPost.link}
+              </p>
+            )}
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mt-1">
+          منشورات الفيديو على صفحتك — العضوية وتلك التي أُعلن عنها سابقاً (تحمل
+          زراً/رابطاً 🔗). لإعلان «مبيعات» بوضع «استخدام منشور حالي»، اختر منشوراً
+          يحمل زراً.
+        </p>
       </Section>
 
       {/* ── إعداد الإعلان ── */}
@@ -314,51 +355,32 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {useExistingPost
-            ? "يعزّز منشوراً منشوراً فعلاً (بإعجاباته ومشاهداته). لإعلان مبيعات بزر ورابط، أعِد استخدام «إعلان سابق» (يحمل الزر/الرابط أصلاً)."
-            : "يُنشئ إعلاناً جديداً من الفيديو مع زر ورابط (بلا تفاعل المنشور الأصلي)."}
+            ? "يعزّز المنشور المختار بتفاعله (إعجاباته ومشاهداته). إن كان يحمل زراً/رابطاً (🔗) يُورَّثان للإعلان — وهذا ما تحتاجه «المبيعات»."
+            : "يُنشئ إعلاناً جديداً من فيديو المنشور مع زر ورابط (بلا تفاعل المنشور الأصلي)."}
         </p>
 
-        {useExistingPost && (
-          <div className="mt-2">
-            <label className="text-xs text-muted-foreground">
-              أعِد استخدام إعلان سابق (يحمل الزر/الرابط)
-            </label>
-            {data.reusablePosts.length === 0 ? (
-              <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                لا توجد إعلانات سابقة بعد. أنشئ إعلاناً بـ «إنشاء إعلان بزر ورابط»
-                أولاً، ثم أعِد استخدام منشوره هنا.
-              </p>
-            ) : (
-              <select
-                value={reuseStoryId}
-                onChange={(e) => setReuseStoryId(e.target.value)}
-                className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-              >
-                <option value="">
-                  — المنشور العضوي للفيديو (بلا زر/رابط) —
-                </option>
-                {data.reusablePosts.map((rp) => (
-                  <option key={rp.storyId} value={rp.storyId}>
-                    {rp.label}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
+        {useExistingPost && reusing && selectedPost?.link && (
+          <p className="text-xs text-green-700 dark:text-green-400 mt-2 flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            سيُعاد استخدام هذا المنشور بزره ورابطه:
+            <span dir="ltr" className="truncate">
+              {selectedPost.link}
+            </span>
+          </p>
         )}
 
         {salesNeedsCreate && (
-          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+          <p className="text-xs text-red-600 mt-2 flex items-center gap-1">
             <AlertTriangle className="w-3.5 h-3.5" />
-            لإعلان «مبيعات»: اختر «إعلان سابق» أعلاه، أو استخدم «إنشاء إعلان بزر
-            ورابط».
+            لإعلان «مبيعات» بوضع «منشور حالي»: اختر منشوراً يحمل زراً/رابطاً (🔗)
+            من القائمة أعلاه، أو استخدم «إنشاء إعلان بزر ورابط».
           </p>
         )}
       </Section>
 
-      {/* ── الوجهة (لهدف «مبيعات» فقط) ── */}
-      {isSales && (
+      {/* ── الوجهة — لهدف «مبيعات» عند «إنشاء إعلان» فقط (عند إعادة استخدام منشور
+          إعلان، الزر والرابط موروثان منه). ── */}
+      {isSales && !reusing && (
       <Section icon={<Link2 className="w-4 h-4" />} title="وجهة الزر (صفحة الهبوط)">
         {!data.adsBaseUrl && (
           <p className="text-xs text-amber-600 flex items-center gap-1 mb-2">

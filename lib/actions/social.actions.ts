@@ -14,6 +14,7 @@ import {
 import {
   launchAdFromPagePost,
   launchVideoAd,
+  getPageVideoPosts,
   getAdAccountCurrency,
   getAdAccountPixels,
   AD_OBJECTIVES,
@@ -483,6 +484,15 @@ export async function getAdsTabData() {
     ]);
   }
 
+  // منشورات فيديو الصفحة الحيّة (عضوية + منشورات إعلانات تحمل زراً/رابطاً).
+  const pageVideoPosts =
+    conn?.selectedPageId && conn.selectedPageToken
+      ? await getPageVideoPosts(
+          conn.selectedPageId,
+          conn.selectedPageToken,
+        ).catch(() => [])
+      : [];
+
   const launches = await prisma.metaAdLaunch.findMany({
     where: { adType: "video" },
     orderBy: { createdAt: "desc" },
@@ -500,27 +510,93 @@ export async function getAdsTabData() {
       createdAt: true,
       effectiveStoryId: true,
       headline: true,
+      post: { select: { id: true, fbVideoId: true, videoUrls: true, caption: true } },
     },
   });
 
-  // منشورات إعلانات سابقة تحمل الزر/الرابط — قابلة لإعادة الاستخدام كـ«منشور حالي».
-  const seen = new Set<string>();
-  const reusablePosts = launches
-    .filter(
-      (l) =>
-        l.status === "PAUSED" &&
-        l.effectiveStoryId &&
-        !seen.has(l.effectiveStoryId) &&
-        seen.add(l.effectiveStoryId),
+  // ── منشورات الإعلان: نوحّد منشورات الصفحة الحيّة + منشورات إعلانات النظام
+  //    المخزّنة + فيديوهات النظام العضوية، ونربط كلاً بمنشور اجتماعي (FK) عبر
+  //    معرّف الفيديو، مع حالة الزر/الرابط لكلٍّ (hasCta).
+  const spByVideo = new Map(
+    posts.filter((p) => p.fbVideoId).map((p) => [p.fbVideoId as string, p]),
+  );
+  type PagePost = {
+    storyId: string; // "" = منشور عضوي يُحلّ منشوره وقت الإطلاق
+    key: string; // مفتاح اختيار فريد
+    videoId: string | null;
+    socialPostId: string | null; // مطلوب للإطلاق (FK + معرّف الفيديو)
+    videoUrl: string | null;
+    message: string;
+    cta: string | null;
+    link: string | null;
+    permalink: string | null;
+    hasCta: boolean; // يحمل زراً/رابطاً (منشور إعلان قابل لإعادة الاستخدام)
+  };
+  const pagePosts: PagePost[] = [];
+  const seenStory = new Set<string>();
+  const seenVideo = new Set<string>();
+
+  // (1) الخلاصة الحيّة (published_posts + ads_posts).
+  for (const p of pageVideoPosts) {
+    seenStory.add(p.storyId);
+    if (p.videoId) seenVideo.add(p.videoId);
+    const sp = p.videoId ? spByVideo.get(p.videoId) : undefined;
+    pagePosts.push({
+      storyId: p.storyId,
+      key: p.storyId,
+      videoId: p.videoId,
+      socialPostId: sp?.id ?? null,
+      videoUrl: sp?.videoUrls[0] ?? null,
+      message: p.message || sp?.caption || "",
+      cta: p.cta,
+      link: p.link,
+      permalink: p.permalink,
+      hasCta: !!p.cta,
+    });
+  }
+
+  // (2) منشورات إعلانات النظام المخزّنة (effectiveStoryId) الغائبة عن الخلاصة.
+  for (const l of launches) {
+    if (
+      l.status !== "PAUSED" ||
+      !l.effectiveStoryId ||
+      seenStory.has(l.effectiveStoryId)
     )
-    .map((l) => ({
-      storyId: l.effectiveStoryId!,
-      label:
-        l.headline ||
-        `${l.cta ?? ""} · ${new Date(l.createdAt).toLocaleDateString("ar-IQ")}`,
+      continue;
+    seenStory.add(l.effectiveStoryId);
+    if (l.post?.fbVideoId) seenVideo.add(l.post.fbVideoId);
+    pagePosts.push({
+      storyId: l.effectiveStoryId,
+      key: l.effectiveStoryId,
+      videoId: l.post?.fbVideoId ?? null,
+      socialPostId: l.postId,
+      videoUrl: l.post?.videoUrls[0] ?? null,
+      message: l.headline || l.post?.caption || "",
       cta: l.cta,
-      destinationUrl: l.destinationUrl,
-    }));
+      link: l.destinationUrl,
+      permalink: null,
+      hasCta: !!l.cta,
+    });
+  }
+
+  // (3) فيديوهات النظام العضوية غير الممثّلة بعد — لإتاحة «إنشاء إعلان» من كل
+  //     فيديو نشره النظام (يُحلّ منشوره العضوي وقت الإطلاق).
+  for (const p of posts) {
+    if (!p.fbVideoId || seenVideo.has(p.fbVideoId)) continue;
+    seenVideo.add(p.fbVideoId);
+    pagePosts.push({
+      storyId: "",
+      key: `sp:${p.id}`,
+      videoId: p.fbVideoId,
+      socialPostId: p.id,
+      videoUrl: p.videoUrls[0] ?? null,
+      message: p.caption || "",
+      cta: null,
+      link: null,
+      permalink: null,
+      hasCta: false,
+    });
+  }
 
   return {
     ready: !!conn?.selectedAdAccountId && !!conn?.selectedPageId,
@@ -547,7 +623,7 @@ export async function getAdsTabData() {
       createdAt: p.createdAt.toISOString(),
     })),
     products: products.map((p) => ({ id: p.id, name: p.name, slug: p.slug })),
-    reusablePosts,
+    pagePosts,
     launches: launches.map((l) => ({
       id: l.id,
       postId: l.postId,

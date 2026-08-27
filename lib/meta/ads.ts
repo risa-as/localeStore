@@ -234,6 +234,75 @@ export async function getVideoPostId(
   }
 }
 
+/** منشور فيديو على الصفحة قابل للإعلان (عضوي أو منشور إعلان يحمل زراً/رابطاً). */
+export type PageVideoPost = {
+  storyId: string; // معرّف المنشور (object_story_id): {pageId}_{postId}
+  videoId: string | null; // معرّف الفيديو (attachments.target.id)
+  message: string;
+  cta: string | null; // نوع الزر إن كان منشور إعلان (BOOK_TRAVEL…) — وإلا null
+  link: string | null; // رابط الزر إن وُجد
+  permalink: string | null; // رابط المشاهدة (reel)
+  createdAt: string;
+};
+
+/**
+ * منشورات فيديو الصفحة القابلة للإعلان — من الخلاصة العضوية (published_posts)
+ * ومن منشورات الإعلانات (ads_posts). المنشور الذي يحمل call_to_action هو منشور
+ * إعلان (يحمل الزر/الرابط) قابل لإعادة الاستخدام؛ وغيره منشور عضوي (بلا زر).
+ * نوحّدها بلا تكرار (بمعرّف المنشور). كل مصدر يفشل بهدوء على حدة (ads_posts قد
+ * تُرفض بصلاحيات مختلفة عن published_posts).
+ */
+export async function getPageVideoPosts(
+  pageId: string,
+  pageToken: string,
+): Promise<PageVideoPost[]> {
+  const fields =
+    "id,message,created_time,call_to_action,attachments{media_type,target}";
+  type Raw = {
+    id: string;
+    message?: string;
+    created_time?: string;
+    call_to_action?: { type?: string; value?: { link?: string } };
+    attachments?: {
+      data?: { media_type?: string; target?: { id?: string; url?: string } }[];
+    };
+  };
+  const fetchEdge = async (edge: string): Promise<Raw[]> => {
+    try {
+      const res = await graphGet<{ data?: Raw[] }>(
+        `${pageId}/${edge}`,
+        pageToken,
+        { fields, limit: "50" },
+      );
+      return res.data ?? [];
+    } catch {
+      return [];
+    }
+  };
+  const [published, adsPosts] = await Promise.all([
+    fetchEdge("published_posts"),
+    fetchEdge("ads_posts"),
+  ]);
+  const byStory = new Map<string, PageVideoPost>();
+  for (const p of [...published, ...adsPosts]) {
+    const att = p.attachments?.data?.[0];
+    if (att?.media_type !== "video") continue; // منشورات فيديو فقط
+    const existing = byStory.get(p.id);
+    // إن تكرّر المنشور، فضّل النسخة التي تحمل زراً (call_to_action).
+    if (existing && existing.cta && !p.call_to_action?.type) continue;
+    byStory.set(p.id, {
+      storyId: p.id,
+      videoId: att.target?.id ?? null,
+      message: p.message ?? "",
+      cta: p.call_to_action?.type ?? null,
+      link: p.call_to_action?.value?.link ?? null,
+      permalink: att.target?.url ?? null,
+      createdAt: p.created_time ?? new Date().toISOString(),
+    });
+  }
+  return [...byStory.values()];
+}
+
 /** صورة مصغّرة للفيديو (مطلوبة كخيار في مبدع الفيديو). تفشل بهدوء إن تعذّرت. */
 export async function getVideoThumbnail(
   videoId: string,
