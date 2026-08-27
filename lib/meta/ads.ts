@@ -343,9 +343,17 @@ export async function launchVideoAd(params: {
       daily_budget: minorBudget,
       billing_event: "IMPRESSIONS",
       optimization_goal: objSpec.optimization_goal,
-      // «مبيعات» تتطلب هدف تحويل عبر بكسل الحساب (حدث الشراء).
+      // «مبيعات» تتطلب هدف تحويل عبر بكسل الحساب (حدث الشراء) + وجهة التحويل
+      // موقع الويب. بدون destination_type=WEBSITE تبقى المجموعة ناقصة الإعداد
+      // (destination_type=UNDEFINED) فتظهر «استراتيجية دورة حياة العميل» بلا اختيار.
       ...(objSpec.needsPixel && pixelId
-        ? { promoted_object: { pixel_id: pixelId, custom_event_type: "PURCHASE" } }
+        ? {
+            promoted_object: {
+              pixel_id: pixelId,
+              custom_event_type: "PURCHASE",
+            },
+            destination_type: "WEBSITE",
+          }
         : {}),
       // أقل تكلفة تلقائي — لا يتطلب مبلغ عرض أسعار (bid_amount).
       bid_strategy: "LOWEST_COST_WITHOUT_CAP",
