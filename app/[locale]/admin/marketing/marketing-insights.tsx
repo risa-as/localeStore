@@ -328,8 +328,9 @@ function AccountCard({
       {/* إعلانات الحساب */}
       {acc.ads.length > 0 ? (
         <div className="border-t">
-          {/* رأس أعمدة (على الشاشات المتوسطة فأكبر) */}
-          <div className="hidden sm:grid grid-cols-[1fr_7rem_10rem] gap-2 px-4 py-2 bg-muted/30 text-xs text-muted-foreground">
+          {/* رأس أعمدة (على الشاشات المتوسطة فأكبر) — نفس القالب والفجوة تماماً
+              كصفوف الإعلانات حتى تتوازى القيم تحت عناوينها. */}
+          <div className="hidden sm:grid grid-cols-[1fr_7rem_10rem] gap-x-3 px-4 py-2 bg-muted/30 text-xs font-medium text-muted-foreground">
             <span>الإعلان</span>
             <span className="text-end">الصرف</span>
             <span className="text-end">كلفة النتيجة</span>
