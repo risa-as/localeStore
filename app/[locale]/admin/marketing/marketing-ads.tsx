@@ -115,11 +115,14 @@ export default function AdsPanel({ data }: { data: AdsData }) {
     !/localhost|127\.0\.0\.1|\.local/i.test(destination);
 
   const isSales = objective === "OUTCOME_SALES";
+  // المنشور الحالي لا يقبل زر/رابط — فالمبيعات تحتاج «إنشاء إعلان».
+  const salesNeedsCreate = isSales && useExistingPost;
   const canLaunch =
     data.ready &&
     !!postId &&
     budgetNum > 0 &&
     (!isSales || destOk) &&
+    !salesNeedsCreate &&
     selectedPlacements.length > 0 &&
     !(isSales && data.pixels.length === 0) &&
     !pending;
@@ -294,13 +297,16 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {useExistingPost
-            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته)، مع إضافة الزر داخل الإعلان — لا يتغيّر المنشور الأصلي."
-            : "يُنشئ إعلاناً جديداً من الفيديو (بلا تفاعل المنشور الأصلي)."}
-          {" "}
-          {isSales
-            ? "زر «اطلب الآن» يوجّه لصفحة هبوط المنتج."
-            : "زر «إرسال رسالة» يفتح محادثة مع صفحتك."}
+            ? "يعزّز منشورك المنشور فعلاً (بإعجاباته ومشاهداته) — كما هو، بلا زر أو رابط مُضاف (قيد من Meta على المنشورات الحالية)."
+            : "يُنشئ إعلاناً جديداً من الفيديو مع زر ورابط (بلا تفاعل المنشور الأصلي)."}
         </p>
+        {salesNeedsCreate && (
+          <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            لإعلان «مبيعات» بزر «حجز الآن» ورابط الهبوط، اختر «إنشاء إعلان بزر
+            ورابط» — المنشور الحالي لا يقبل إضافة رابط.
+          </p>
+        )}
       </Section>
 
       {/* ── الوجهة (لهدف «مبيعات» فقط) ── */}

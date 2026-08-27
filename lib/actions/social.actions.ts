@@ -564,6 +564,14 @@ export async function launchVideoSalesAd(input: {
   // «مبيعات» تحتاج زر رابط ووجهة عامة؛ «تفاعل» يستخدم زر «إرسال رسالة» بلا رابط.
   const url = input.destinationUrl.trim();
   if (input.objective === "OUTCOME_SALES") {
+    // المنشور الحالي يُعرض كما هو ولا يمكن إضافة زر/رابط له (قيد من Meta) —
+    // فالمبيعات تحتاج «إنشاء إعلان».
+    if (input.useExistingPost)
+      return {
+        success: false,
+        message:
+          "المنشور الحالي لا يقبل إضافة زر ورابط. لإعلان «مبيعات» بزر «حجز الآن» ورابط الهبوط، اختر «إنشاء إعلان».",
+      };
     if (!AD_CTAS[input.cta])
       return { success: false, message: "زر حث غير صالح" };
     if (!isPublicHttpUrl(url))
