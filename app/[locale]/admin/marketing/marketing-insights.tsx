@@ -231,9 +231,9 @@ export default function InsightsPanel() {
         </div>
       )}
 
-      {/* ── الحسابات ── */}
+      {/* ── الحسابات — حسابان في الصف، وثلاثة على الشاشات الأوسع ── */}
       {data?.ok && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-start">
           {data.accounts.map((acc) => (
             <AccountCard key={acc.id} acc={acc} activeOnly={activeOnly} />
           ))}
@@ -273,9 +273,9 @@ function AccountCard({
   activeOnly: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  // صفّان من البطاقات (4×2) مباشرةً، والبقية بزر.
-  const shown = open ? acc.ads : acc.ads.slice(0, 8);
-  const hasMore = acc.ads.length > 8;
+  // الحساب الآن نصف/ثلث عرض الصفحة، فنعرض أهم 4 إعلانات (صفّان × عمودين) والبقية بزر.
+  const shown = open ? acc.ads : acc.ads.slice(0, 4);
+  const hasMore = acc.ads.length > 4;
 
   return (
     <div className="rounded-2xl border bg-card p-4 sm:p-5 space-y-4">
@@ -325,10 +325,10 @@ function AccountCard({
         <SummaryChip label="وصول" value={num(acc.reach)} />
       </div>
 
-      {/* شبكة الإعلانات — 4 بطاقات في الصف */}
+      {/* شبكة الإعلانات — بطاقتان في الصف داخل الحساب */}
       {acc.ads.length > 0 ? (
         <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {shown.map((ad) => (
               <AdCard key={ad.id} ad={ad} currency={acc.currency} />
             ))}
