@@ -69,7 +69,10 @@ export async function getAdInsights(input: {
   const visible = input.activeOnly
     ? rows.filter((r) => r.activeCount > 0)
     : rows;
-  visible.sort((a, b) => b.spend - a.spend);
+  // ترتيب أبجدي بأسماء الحسابات (مع وعي بالأرقام: A2 قبل A10).
+  visible.sort((a, b) =>
+    a.name.localeCompare(b.name, "ar", { numeric: true, sensitivity: "base" }),
+  );
 
   const currencies = new Set(visible.map((r) => r.currency));
   const currency = currencies.size === 1 ? [...currencies][0] : null;
