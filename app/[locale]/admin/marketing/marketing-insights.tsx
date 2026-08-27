@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { getAdInsights } from "@/lib/actions/insights.actions";
+import { getAdInsights, setAdActive } from "@/lib/actions/insights.actions";
 import {
   DATE_PRESETS,
   type AdInsightsResult,
@@ -9,6 +9,7 @@ import {
   type AdInsightRow,
 } from "@/lib/meta/insights";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/hooks/use-toast";
 import {
   BarChart3,
   Loader2,
@@ -19,6 +20,8 @@ import {
   ChevronDown,
   ChevronUp,
   Radio,
+  Play,
+  Pause,
 } from "lucide-react";
 
 function curLabel(code: string | null) {
@@ -84,6 +87,30 @@ export default function InsightsPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preset, custom, since, until, activeOnly]);
+
+  // تحديث حالة إعلان محلياً بعد تشغيله/إطفائه (بلا إعادة جلب الكل).
+  const setAdStatus = useCallback(
+    (accId: string, adId: string, status: string) => {
+      setData((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          accounts: prev.accounts.map((a) => {
+            if (a.id !== accId) return a;
+            const ads = a.ads.map((ad) =>
+              ad.id === adId ? { ...ad, status } : ad,
+            );
+            return {
+              ...a,
+              ads,
+              activeCount: ads.filter((ad) => ad.status === "ACTIVE").length,
+            };
+          }),
+        };
+      });
+    },
+    [],
+  );
 
   const totals = data?.totals;
 
@@ -236,7 +263,12 @@ export default function InsightsPanel() {
       {data?.ok && (
         <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-4 items-stretch">
           {data.accounts.map((acc) => (
-            <AccountCard key={acc.id} acc={acc} activeOnly={activeOnly} />
+            <AccountCard
+              key={acc.id}
+              acc={acc}
+              activeOnly={activeOnly}
+              onAdStatus={(adId, status) => setAdStatus(acc.id, adId, status)}
+            />
           ))}
         </div>
       )}
@@ -269,9 +301,11 @@ function StatCard({
 function AccountCard({
   acc,
   activeOnly,
+  onAdStatus,
 }: {
   acc: AccountInsight;
   activeOnly: boolean;
+  onAdStatus: (adId: string, status: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   // الحساب الآن نصف/ثلث عرض الصفحة، فنعرض أهم 4 إعلانات (صفّان × عمودين) والبقية بزر.
@@ -331,7 +365,12 @@ function AccountCard({
         <div className="space-y-3 flex-1">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {shown.map((ad) => (
-              <AdCard key={ad.id} ad={ad} currency={acc.currency} />
+              <AdCard
+                key={ad.id}
+                ad={ad}
+                currency={acc.currency}
+                onStatus={(status) => onAdStatus(ad.id, status)}
+              />
             ))}
           </div>
           {hasMore && (
@@ -442,7 +481,17 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function AdCard({ ad, currency }: { ad: AdInsightRow; currency: string | null }) {
+function AdCard({
+  ad,
+  currency,
+  onStatus,
+}: {
+  ad: AdInsightRow;
+  currency: string | null;
+  onStatus: (status: string) => void;
+}) {
+  const { toast } = useToast();
+  const [pending, startTransition] = useTransition();
   const isSales = (ad.objective || "").includes("SALES") ||
     (ad.objective || "").includes("CONVERSION");
   // النتيجة الأنسب للهدف؛ إن لم يُحدَّد نُظهر ما له قيمة.
@@ -454,6 +503,18 @@ function AdCard({ ad, currency }: { ad: AdInsightRow; currency: string | null })
     primary.m.count > 0
       ? `${num(primary.m.count)} ${primary.unit}`
       : "لا نتائج بعد";
+  const running = ad.status === "ACTIVE";
+
+  const toggle = () =>
+    startTransition(async () => {
+      const r = await setAdActive(ad.id, !running);
+      toast({
+        description: r.message,
+        variant: r.success ? undefined : "destructive",
+        duration: r.success ? 6000 : 5000,
+      });
+      if (r.success && r.status) onStatus(r.status);
+    });
 
   return (
     <div className="rounded-xl border bg-background p-3 flex flex-col gap-2.5 hover:border-primary/40 hover:shadow-sm transition-all">
@@ -480,6 +541,29 @@ function AdCard({ ad, currency }: { ad: AdInsightRow; currency: string | null })
         <Line label="النتيجة" value={result} />
         <Line label="ظهور" value={num(ad.impressions)} />
       </div>
+      {/* زر التشغيل/الإطفاء */}
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={pending}
+        className={`mt-1 h-9 rounded-lg border text-sm font-medium flex items-center justify-center gap-1.5 transition-colors disabled:opacity-60 ${
+          running
+            ? "border-red-300 dark:border-red-900 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+            : "border-green-300 dark:border-green-900 text-green-700 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-950/30"
+        }`}
+      >
+        {pending ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : running ? (
+          <>
+            <Pause className="w-4 h-4" /> إيقاف
+          </>
+        ) : (
+          <>
+            <Play className="w-4 h-4" /> تشغيل
+          </>
+        )}
+      </button>
     </div>
   );
 }

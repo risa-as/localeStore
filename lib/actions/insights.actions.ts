@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import {
   getAllAdAccounts,
   getAccountInsight,
+  setAdRunning,
   type AdInsightsResult,
   type InsightsPeriod,
 } from "@/lib/meta/insights";
@@ -96,4 +97,45 @@ export async function getAdInsights(input: {
     },
     generatedAt: new Date().toISOString(),
   };
+}
+
+/**
+ * تشغيل/إطفاء إعلان مباشرةً. التشغيل يفعّل الحملة والمجموعة والإعلان (فيبدأ العرض
+ * والصرف الفعلي)؛ الإطفاء يوقف الإعلان فقط.
+ */
+export async function setAdActive(
+  adId: string,
+  active: boolean,
+): Promise<{ success: boolean; message: string; status?: string }> {
+  await requireAdmin();
+  const conn = await prisma.metaConnection.findUnique({ where: { id: "default" } });
+  if (!conn?.userAccessToken)
+    return { success: false, message: "لا يوجد اتصال بـ Meta" };
+  try {
+    const status = await setAdRunning(adId, conn.userAccessToken, active);
+    // الإطفاء: نعرف أنه أُوقف (قد تُرجع Meta IN_PROCESS لحظياً). التشغيل:
+    // IN_PROCESS يعني «قيد المعالجة» بعد التفعيل — نعامله كنشط؛ ونُبرز المشاكل فقط.
+    if (!active)
+      return { success: true, status: "PAUSED", message: "تم إيقاف الإعلان." };
+    const problem = ["DISAPPROVED", "WITH_ISSUES", "PENDING_REVIEW"].includes(
+      status,
+    );
+    const PROB_AR: Record<string, string> = {
+      DISAPPROVED: "مرفوض",
+      WITH_ISSUES: "به مشكلة",
+      PENDING_REVIEW: "قيد المراجعة",
+    };
+    return {
+      success: true,
+      status: status === "IN_PROCESS" ? "ACTIVE" : status,
+      message: problem
+        ? `فُعّل الإعلان لكن حالته: ${PROB_AR[status]}.`
+        : "تم تشغيل الإعلان — سيبدأ العرض والصرف.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: `تعذّر تغيير حالة الإعلان: ${(e as Error).message}`,
+    };
+  }
 }

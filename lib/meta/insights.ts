@@ -1,4 +1,4 @@
-import { graphGet } from "./graph";
+import { graphGet, graphPost } from "./graph";
 
 /**
  * تقارير أداء الإعلانات عبر كل الحسابات الإعلانية.
@@ -180,6 +180,38 @@ async function getAccountAds(
   });
   ads.sort((a, b) => b.spend - a.spend);
   return ads;
+}
+
+/**
+ * تشغيل/إطفاء إعلان.
+ * - التشغيل يفعّل الحملة ثم المجموعة ثم الإعلان (وإلا يبقى الإعلان موقوفاً بسبب
+ *   أحد أبويه فلا يعرض) — إعلانات النظام تُنشأ والحملة موقوفة.
+ * - الإطفاء يوقف الإعلان فقط (لا نمسّ الحملة/المجموعة حتى لا نؤثّر على إعلانات
+ *   أخرى فيها).
+ * يعيد effective_status الناتج بعد التغيير.
+ */
+export async function setAdRunning(
+  adId: string,
+  token: string,
+  active: boolean,
+): Promise<string> {
+  if (active) {
+    const info = await graphGet<{
+      campaign?: { id: string };
+      adset?: { id: string };
+    }>(adId, token, { fields: "campaign{id},adset{id}" });
+    if (info.campaign?.id)
+      await graphPost(info.campaign.id, token, { status: "ACTIVE" });
+    if (info.adset?.id)
+      await graphPost(info.adset.id, token, { status: "ACTIVE" });
+    await graphPost(adId, token, { status: "ACTIVE" });
+  } else {
+    await graphPost(adId, token, { status: "PAUSED" });
+  }
+  const r = await graphGet<{ effective_status?: string }>(adId, token, {
+    fields: "effective_status",
+  });
+  return r.effective_status ?? (active ? "ACTIVE" : "PAUSED");
 }
 
 /** ملخّص + إعلانات حساب واحد، مع try/catch محلّي (فشل حساب لا يُسقط البقية). */
