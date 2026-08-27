@@ -394,6 +394,55 @@ function MetricTile({
   );
 }
 
+/** اسم إعلان أنظف — نحذف لواحق النظام «— التاريخ — إعلان» (لا تمسّ أسماء أخرى). */
+function prettyAdName(name: string) {
+  const cleaned = name
+    .replace(/\s*—\s*إعلان\s*$/, "")
+    .replace(/\s*—\s*\d{4}-\d{2}-\d{2}\s*$/, "")
+    .trim();
+  return cleaned || name;
+}
+
+/** تسمية عربية لهدف الحملة. */
+function objectiveLabel(obj: string | null) {
+  const o = obj || "";
+  if (o.includes("SALES") || o.includes("CONVERSION")) return "مبيعات";
+  if (o.includes("ENGAGEMENT") || o.includes("MESSAGE")) return "تفاعل";
+  if (o.includes("TRAFFIC")) return "زيارات";
+  if (o.includes("LEADS")) return "عملاء محتملون";
+  if (o.includes("AWARENESS")) return "وعي";
+  if (o.includes("APP")) return "تطبيق";
+  return null;
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const active = status === "ACTIVE";
+  const issue = [
+    "WITH_ISSUES",
+    "DISAPPROVED",
+    "PENDING_REVIEW",
+    "IN_PROCESS",
+  ].includes(status);
+  const cls = active
+    ? "border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+    : issue
+      ? "border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-500"
+      : "border-border bg-muted text-muted-foreground";
+  const dot = active
+    ? "bg-green-500"
+    : issue
+      ? "bg-amber-500"
+      : "bg-muted-foreground/50";
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] leading-none shrink-0 ${cls}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+      {STATUS_AR[status] || status}
+    </span>
+  );
+}
+
 function AdRow({ ad, currency }: { ad: AdInsightRow; currency: string | null }) {
   const isSales = (ad.objective || "").includes("SALES") ||
     (ad.objective || "").includes("CONVERSION");
@@ -401,39 +450,40 @@ function AdRow({ ad, currency }: { ad: AdInsightRow; currency: string | null }) 
   const primary = isSales
     ? { label: "كلفة الشراء", m: ad.purchase, unit: "شراء" }
     : { label: "كلفة الرسالة", m: ad.message, unit: "محادثة" };
-  const statusAr = STATUS_AR[ad.status] || ad.status;
-  const active = ad.status === "ACTIVE";
+  const objLabel = objectiveLabel(ad.objective);
+  const result =
+    primary.m.count > 0
+      ? `${num(primary.m.count)} ${primary.unit}`
+      : "لا نتائج بعد";
 
   return (
-    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-[1fr_7rem_10rem] gap-x-2 gap-y-3 items-center text-sm">
+    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-[1fr_7rem_10rem] gap-x-3 gap-y-2 items-center text-sm hover:bg-muted/30 transition-colors">
       {/* الاسم + الحالة (سطر كامل على الجوال) */}
-      <div className="col-span-2 sm:col-span-1 flex items-center gap-2 min-w-0">
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${active ? "bg-green-500" : "bg-muted-foreground/40"}`}
-          title={statusAr}
-        />
-        <div className="min-w-0">
-          <p className="truncate">{ad.name}</p>
-          <p className="text-xs text-muted-foreground">{statusAr}</p>
+      <div className="col-span-2 sm:col-span-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <StatusBadge status={ad.status} />
+          <p className="font-medium truncate" title={ad.name}>
+            {prettyAdName(ad.name)}
+          </p>
         </div>
+        {objLabel && (
+          <p className="text-xs text-muted-foreground mt-1">هدف: {objLabel}</p>
+        )}
       </div>
-      {/* الصرف — تسمية فوق القيمة */}
+      {/* الصرف */}
       <div className="text-start sm:text-end">
         <p className="text-xs text-muted-foreground sm:hidden">الصرف</p>
-        <p className="font-semibold" dir="ltr">
+        <p className="font-bold" dir="ltr">
           {money(ad.spend, currency)}
         </p>
       </div>
-      {/* كلفة النتيجة — تسمية فوق القيمة */}
+      {/* كلفة النتيجة */}
       <div className="text-start sm:text-end">
         <p className="text-xs text-muted-foreground sm:hidden">{primary.label}</p>
-        <p className="font-semibold" dir="ltr">
+        <p className="font-bold" dir="ltr">
           {cost(primary.m.cost, currency)}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {num(primary.m.count)} {primary.unit}
-          <span className="hidden sm:inline"> · {primary.label}</span>
-        </p>
+        <p className="text-xs text-muted-foreground">{result}</p>
       </div>
     </div>
   );
