@@ -280,8 +280,8 @@ function AccountCard({
   return (
     <div className="rounded-xl border bg-card overflow-hidden">
       {/* رأس الحساب */}
-      <div className="p-4 flex items-start justify-between gap-3 flex-wrap">
-        <div className="min-w-0">
+      <div className="p-4 flex items-center justify-between gap-3 flex-wrap border-b bg-muted/20">
+        <div className="min-w-0 space-y-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="font-semibold truncate">{acc.name}</h3>
             {acc.activeCount > 0 && (
@@ -289,43 +289,51 @@ function AccountCard({
                 <Radio className="w-3 h-3" /> {acc.activeCount} نشط
               </span>
             )}
-            <span className="text-xs text-muted-foreground" dir="ltr">
-              {acc.accountId}
-            </span>
           </div>
+          <p className="text-xs text-muted-foreground" dir="ltr">
+            {acc.accountId}
+          </p>
           {acc.error && (
-            <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
+            <p className="text-xs text-red-600 flex items-center gap-1">
               <AlertTriangle className="w-3 h-3" /> {acc.error}
             </p>
           )}
         </div>
-        <div className="text-left shrink-0">
-          <p className="text-xl font-bold" dir="ltr">
+        <div className="shrink-0 text-end">
+          <p className="text-2xl font-bold leading-none" dir="ltr">
             {money(acc.spend, acc.currency)}
           </p>
-          <p className="text-xs text-muted-foreground">صرف الفترة</p>
+          <p className="text-xs text-muted-foreground mt-1.5">صرف الفترة</p>
         </div>
       </div>
 
-      {/* مقاييس الحساب */}
-      <div className="px-4 pb-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-        <Metric
+      {/* مقاييس الحساب — بلاطات مؤطّرة، كل تسمية فوق قيمتها مباشرةً */}
+      <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MetricTile
+          icon={<ShoppingBag className="w-3.5 h-3.5" />}
           label="كلفة الشراء"
           value={cost(acc.purchase.cost, acc.currency)}
           sub={`${num(acc.purchase.count)} شراء`}
         />
-        <Metric
+        <MetricTile
+          icon={<MessageCircle className="w-3.5 h-3.5" />}
           label="كلفة الرسالة"
           value={cost(acc.message.cost, acc.currency)}
           sub={`${num(acc.message.count)} محادثة`}
         />
-        <Metric label="ظهور" value={num(acc.impressions)} />
-        <Metric label="وصول" value={num(acc.reach)} />
+        <MetricTile label="ظهور" value={num(acc.impressions)} />
+        <MetricTile label="وصول" value={num(acc.reach)} />
       </div>
 
       {/* إعلانات الحساب */}
       {acc.ads.length > 0 ? (
         <div className="border-t">
+          {/* رأس أعمدة (على الشاشات المتوسطة فأكبر) */}
+          <div className="hidden sm:grid grid-cols-[1fr_7rem_10rem] gap-2 px-4 py-2 bg-muted/30 text-xs text-muted-foreground">
+            <span>الإعلان</span>
+            <span className="text-end">الصرف</span>
+            <span className="text-end">كلفة النتيجة</span>
+          </div>
           <div className="divide-y">
             {shown.map((ad) => (
               <AdRow key={ad.id} ad={ad} currency={acc.currency} />
@@ -335,7 +343,7 @@ function AccountCard({
             <button
               type="button"
               onClick={() => setOpen((v) => !v)}
-              className="w-full py-2 text-xs text-primary hover:bg-muted flex items-center justify-center gap-1"
+              className="w-full py-2 text-xs text-primary hover:bg-muted flex items-center justify-center gap-1 border-t"
             >
               {open ? (
                 <>
@@ -361,22 +369,27 @@ function AccountCard({
   );
 }
 
-function Metric({
+function MetricTile({
+  icon,
   label,
   value,
   sub,
 }: {
+  icon?: React.ReactNode;
   label: string;
   value: string;
   sub?: string;
 }) {
   return (
-    <div>
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="font-semibold" dir="ltr">
+    <div className="rounded-lg border bg-muted/30 p-3 flex flex-col">
+      <span className="flex items-center gap-1 text-xs text-muted-foreground">
+        {icon}
+        {label}
+      </span>
+      <span className="text-base font-bold mt-1.5" dir="ltr">
         {value}
-      </p>
-      {sub && <p className="text-xs text-muted-foreground">{sub}</p>}
+      </span>
+      {sub && <span className="text-xs text-muted-foreground mt-auto pt-0.5">{sub}</span>}
     </div>
   );
 }
@@ -392,27 +405,34 @@ function AdRow({ ad, currency }: { ad: AdInsightRow; currency: string | null }) 
   const active = ad.status === "ACTIVE";
 
   return (
-    <div className="px-4 py-2.5 flex items-center gap-3 text-sm">
-      <span
-        className={`w-2 h-2 rounded-full shrink-0 ${active ? "bg-green-500" : "bg-muted-foreground/40"}`}
-        title={statusAr}
-      />
-      <div className="flex-1 min-w-0">
-        <p className="truncate">{ad.name}</p>
-        <p className="text-xs text-muted-foreground">{statusAr}</p>
+    <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-[1fr_7rem_10rem] gap-x-2 gap-y-3 items-center text-sm">
+      {/* الاسم + الحالة (سطر كامل على الجوال) */}
+      <div className="col-span-2 sm:col-span-1 flex items-center gap-2 min-w-0">
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${active ? "bg-green-500" : "bg-muted-foreground/40"}`}
+          title={statusAr}
+        />
+        <div className="min-w-0">
+          <p className="truncate">{ad.name}</p>
+          <p className="text-xs text-muted-foreground">{statusAr}</p>
+        </div>
       </div>
-      <div className="text-left shrink-0 w-24">
+      {/* الصرف — تسمية فوق القيمة */}
+      <div className="text-start sm:text-end">
+        <p className="text-xs text-muted-foreground sm:hidden">الصرف</p>
         <p className="font-semibold" dir="ltr">
           {money(ad.spend, currency)}
         </p>
-        <p className="text-xs text-muted-foreground">صرف</p>
       </div>
-      <div className="text-left shrink-0 w-28">
+      {/* كلفة النتيجة — تسمية فوق القيمة */}
+      <div className="text-start sm:text-end">
+        <p className="text-xs text-muted-foreground sm:hidden">{primary.label}</p>
         <p className="font-semibold" dir="ltr">
           {cost(primary.m.cost, currency)}
         </p>
         <p className="text-xs text-muted-foreground">
-          {primary.label} · {num(primary.m.count)} {primary.unit}
+          {num(primary.m.count)} {primary.unit}
+          <span className="hidden sm:inline"> · {primary.label}</span>
         </p>
       </div>
     </div>
