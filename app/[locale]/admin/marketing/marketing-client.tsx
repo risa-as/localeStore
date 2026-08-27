@@ -22,9 +22,11 @@ import {
   AlertTriangle,
   Link as LinkIcon,
   Send,
+  BarChart3,
 } from "lucide-react";
 import PublishPanel, { type Feed, type AdMeta } from "./marketing-publish";
 import AdsPanel, { type AdsData } from "./marketing-ads";
+import InsightsPanel from "./marketing-insights";
 
 type Status =
   | { configured: boolean; connected: false }
@@ -73,9 +75,9 @@ export default function MarketingClient({
   const { toast } = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState<"connection" | "publish" | "ads">(
-    status.connected ? "publish" : "connection",
-  );
+  const [tab, setTab] = useState<
+    "connection" | "publish" | "ads" | "insights"
+  >(status.connected ? "publish" : "connection");
 
   useEffect(() => {
     if (flash && FLASH[flash]) {
@@ -124,6 +126,12 @@ export default function MarketingClient({
               label="الإعلانات"
             />
             <TabButton
+              active={tab === "insights"}
+              onClick={() => setTab("insights")}
+              icon={<BarChart3 className="w-4 h-4" />}
+              label="الأداء"
+            />
+            <TabButton
               active={tab === "connection"}
               onClick={() => setTab("connection")}
               icon={<LinkIcon className="w-4 h-4" />}
@@ -143,6 +151,8 @@ export default function MarketingClient({
             ) : (
               <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
             )
+          ) : tab === "insights" ? (
+            <InsightsPanel />
           ) : (
             <Connected
               status={status}
