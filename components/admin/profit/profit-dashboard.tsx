@@ -303,12 +303,12 @@ export default function ProfitDashboard({
 
     const coords = values.map((v, i) => ({ x: x(i), y: y(v) }));
     const linePath = coords
-      .map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`)
+      .map(
+        (c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`,
+      )
       .join(" ");
     const areaPath =
-      coords.length > 0
-        ? `${linePath} L${W},${H - 20} L0,${H - 20} Z`
-        : "";
+      coords.length > 0 ? `${linePath} L${W},${H - 20} L0,${H - 20} Z` : "";
 
     const barW = Math.max(2, (W / points.length) * 0.6);
     const bars = values.map((v, i) => {
@@ -324,7 +324,9 @@ export default function ProfitDashboard({
     // Six evenly spaced x labels (DD/MM), matching the handoff.
     const labelCount = Math.min(6, points.length);
     const labels = Array.from({ length: labelCount }, (_, i) => {
-      const idx = Math.round((i / Math.max(1, labelCount - 1)) * (points.length - 1));
+      const idx = Math.round(
+        (i / Math.max(1, labelCount - 1)) * (points.length - 1),
+      );
       const [, m, d] = points[idx].date.split("-");
       return `${d}/${m}`;
     });
@@ -450,9 +452,9 @@ export default function ProfitDashboard({
     ];
   }, [ranked, netProfit, orderSummary.totalOrderCount]);
 
-  // 14 fixed columns: #, name, qty, returned, revenue, cost, profit, margin,
-  // the 4 ad columns + ROI, and profit share.
-  const colSpan = 14;
+  // 13 fixed columns: #, name, qty, returned, revenue, cost, profit,
+  // margin, the 4 ad columns, and profit share.
+  const colSpan = 13;
 
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
@@ -482,10 +484,10 @@ export default function ProfitDashboard({
               <>
                 <div className="pa-meta mt-2 mb-3">
                   المبلغ المُحصَّل يختلف عن (مجموع الأصناف + التوصيل). النظام
-                  يعتمد المبلغ المُحصَّل، لذا يُوزَّع الفرق على المنتجات ويرفع أو
-                  يخفض سعر بيع الوحدة. غالباً السبب أن الكمية المسجّلة في الطلب
-                  أقل من الكمية التي شُحنت فعلاً — وهذا يعني أن التكلفة أقل من
-                  الحقيقة والمخزون أعلى من الحقيقة.
+                  يعتمد المبلغ المُحصَّل، لذا يُوزَّع الفرق على المنتجات ويرفع
+                  أو يخفض سعر بيع الوحدة. غالباً السبب أن الكمية المسجّلة في
+                  الطلب أقل من الكمية التي شُحنت فعلاً — وهذا يعني أن التكلفة
+                  أقل من الحقيقة والمخزون أعلى من الحقيقة.
                 </div>
                 <div className="flex flex-col gap-2">
                   {inconsistentOrders.map((o) => (
@@ -600,16 +602,18 @@ export default function ProfitDashboard({
             <span>
               المصاريف{" "}
               <span className="font-normal pa-meta">
-                — القيم من قاعدة البيانات؛ يمكنك تعديلها مؤقتاً لتجربة سيناريو (لا
-                تُحفظ)
+                — القيم من قاعدة البيانات؛ يمكنك تعديلها مؤقتاً لتجربة سيناريو
+                (لا تُحفظ)
               </span>
             </span>
             <ProfitExportButton
               productStats={productStats}
-              adByProduct={Array.from(adByProduct).map(([productId, amount]) => {
-                const p = productStats.find((x) => x.productId === productId);
-                return { productId, name: p?.name ?? "", amount };
-              })}
+              adByProduct={Array.from(adByProduct).map(
+                ([productId, amount]) => {
+                  const p = productStats.find((x) => x.productId === productId);
+                  return { productId, name: p?.name ?? "", amount };
+                },
+              )}
               from={exportContext.from}
               to={exportContext.to}
               summary={exportContext.summary}
@@ -860,9 +864,7 @@ export default function ProfitDashboard({
                       height={b.h}
                       rx="3"
                       fill="oklch(0.72 0.15 155)"
-                      opacity={
-                        hoverIdx === null || hoverIdx === i ? 1 : 0.45
-                      }
+                      opacity={hoverIdx === null || hoverIdx === i ? 1 : 0.45}
                     />
                   ))
                 )}
@@ -1049,7 +1051,6 @@ export default function ProfitDashboard({
                   <th>مصاريف الإعلان</th>
                   <th>إعلان / طلب</th>
                   <th>الربح بعد الإعلان</th>
-                  <th title="(الربح بعد الإعلان ÷ مصاريف الإعلان) ×100 — كل 1 د.ع إعلان ولّد كم د.ع ربحاً">ROI الإعلان</th>
                   <th>هامش بعد الإعلان</th>
                   <th>% من الربح</th>
                 </tr>
@@ -1071,10 +1072,6 @@ export default function ProfitDashboard({
                       ? "meta"
                       : "manual";
                     const profitAfterAds = p.totalProfit - adCost;
-                    // ROI الإعلان = (الربح بعد الإعلان ÷ الإعلان) ×100 —
-                    // كل 1 د.ع إعلان ولّد كم د.ع ربحاً بعد الإعلان.
-                    const adRoi =
-                      adCost > 0 ? (profitAfterAds / adCost) * 100 : null;
                     // «هامش بعد الإعلان» = الربح بعد الإعلان ÷ تكلفة البضاعة
                     // (لا الإيراد) — بطلب المالك.
                     const marginAfterAds =
@@ -1189,25 +1186,6 @@ export default function ProfitDashboard({
                             {adCost > 0 ? formatCurrency(profitAfterAds) : "—"}
                           </td>
                           <td>
-                            {adRoi != null ? (
-                              <span
-                                className={`pa-badge ${
-                                  adRoi >= 100
-                                    ? "pa-badge--green"
-                                    : adRoi >= 0
-                                      ? "pa-badge--green"
-                                      : "pa-badge--danger"
-                                }`}
-                                title="(الربح بعد الإعلان ÷ مصاريف الإعلان) ×100"
-                              >
-                                {adRoi >= 0 ? "" : ""}
-                                {adRoi.toFixed(0)}%
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td>
                             {adCost > 0 ? (
                               <span
                                 className={`pa-badge ${marginAfterAds >= 15 ? "pa-badge--green" : "pa-badge--danger"}`}
@@ -1253,7 +1231,9 @@ export default function ProfitDashboard({
                                 <Detail
                                   label="تكلفة الوحدة"
                                   value={formatCurrency(
-                                    p.totalQty > 0 ? p.totalCost / p.totalQty : 0,
+                                    p.totalQty > 0
+                                      ? p.totalCost / p.totalQty
+                                      : 0,
                                   )}
                                 />
                                 <Detail
@@ -1275,9 +1255,9 @@ export default function ProfitDashboard({
                                 />
                               </div>
                               <div className="pa-meta mt-2.5">
-                                التكلفة محسوبة حسب الدفعات (الأقدم أولاً) — FIFO.
-                                الإيراد الصافي موزّع نسبياً بعد خصم تكلفة التوصيل
-                                الفعلية.
+                                التكلفة محسوبة حسب الدفعات (الأقدم أولاً) —
+                                FIFO. الإيراد الصافي موزّع نسبياً بعد خصم تكلفة
+                                التوصيل الفعلية.
                               </div>
                             </td>
                           </tr>
@@ -1316,18 +1296,11 @@ export default function ProfitDashboard({
                     {adsActive ? formatCurrency(netProfit - adsExpense) : "—"}
                   </td>
                   <td>
-                    {adsActive && adsExpense > 0
-                      ? `${(((netProfit - adsExpense) / adsExpense) * 100).toFixed(0)}%`
-                      : "—"}
-                  </td>
-                  <td>
                     {adsActive && totals.cost > 0
                       ? `${(((netProfit - adsExpense) / totals.cost) * 100).toFixed(1)}%`
                       : "—"}
                   </td>
-                  <td>
-                    {totals.profit != 0 ? "100%" : "—"}
-                  </td>
+                  <td>{totals.profit != 0 ? "100%" : "—"}</td>
                 </tr>
               </tfoot>
             </table>
