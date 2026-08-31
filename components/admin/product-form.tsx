@@ -32,10 +32,59 @@ import { Checkbox } from "../ui/checkbox";
 import { UploadButton } from "@/lib/uploadthing";
 import { useTranslations } from "next-intl";
 import { X } from "lucide-react";
+import { useEffect, useState } from "react";
 
 type ProductFormValues =
   | z.infer<typeof insertProductSchema>
   | z.infer<typeof updateProductSchema>;
+
+/** تحويل النص المكتوب إلى مصفوفة ألوان — يقبل الفاصلة اللاتينية والعربية */
+function parseColors(text: string): string[] {
+  return text
+    .split(/[,،]/)
+    .map((color) => color.trim())
+    .filter((color) => color.length > 0);
+}
+
+/**
+ * حقل الألوان.
+ *
+ * لا يصحّ ربط الحقل مباشرة بالمصفوفة: كتابة فاصلة تُنتج عنصراً فارغاً تحذفه
+ * التصفية، فتختفي الفاصلة فور كتابتها ويتعذّر الفصل بين الألوان. لذلك نحتفظ
+ * بالنص الخام كما يكتبه المستخدم ونشتق منه المصفوفة للنموذج فقط.
+ */
+function ColorsInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string[] | undefined;
+  onChange: (colors: string[]) => void;
+  placeholder?: string;
+}) {
+  const [text, setText] = useState(() => (value ?? []).join("، "));
+
+  // مزامنة من الخارج فقط (تحميل منتج للتعديل أو إعادة ضبط النموذج): أثناء
+  // الكتابة يطابق النص المحلي القيمة الواردة فلا يُمسّ ما يكتبه المستخدم.
+  useEffect(() => {
+    const incoming = (value ?? []).join("\0");
+    if (parseColors(text).join("\0") !== incoming) {
+      setText((value ?? []).join("، "));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  return (
+    <Input
+      placeholder={placeholder}
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(parseColors(e.target.value));
+      }}
+    />
+  );
+}
 
 const ProductForm = ({
   product,
@@ -227,18 +276,10 @@ const ProductForm = ({
                 <FormItem className="w-full">
                   <FormLabel>{t('colors')}</FormLabel>
                   <FormControl>
-                    <Input
+                    <ColorsInput
                       placeholder={t('placeholderColors')}
-                      value={field.value?.length > 0 ? field.value.join(", ") : ""}
-                      onChange={(e) => {
-                        const inputValue = e.target.value;
-                        if (!inputValue.trim()) {
-                          field.onChange([]);
-                        } else {
-                          const colorsArray = inputValue.split(",").map((color) => color.trim()).filter((color) => color.length > 0);
-                          field.onChange(colorsArray);
-                        }
-                      }}
+                      value={field.value}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
