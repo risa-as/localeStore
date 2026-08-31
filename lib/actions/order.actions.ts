@@ -28,14 +28,31 @@ function buildDeliveryInput(o: {
   quantity?: number | null;
   totalPrice?: Prisma.Decimal | number | string | null;
   notes?: string | null;
-  orderitems?: { name: string }[] | null;
+  orderitems?: { name: string; selectedColor?: string | null }[] | null;
 }): DeliveryOrderInput {
   const rawPrice = Number(o.totalPrice ?? 0);
   const price = rawPrice > 0 && rawPrice < 1000 ? rawPrice * 1000 : rawPrice;
   const productNames =
     o.orderitems && o.orderitems.length > 0
-      ? o.orderitems.map((i) => i.name).join(" + ")
+      ? o.orderitems
+          .map((i) =>
+            i.selectedColor
+              ? `${i.name} (${i.selectedColor})`
+              : i.name,
+          )
+          .join(" + ")
       : "طلب إلكتروني";
+  // اللون يدخل الملاحظات المُرسلة لشركة التوصيل — اختياري لبعض المنتجات فقط.
+  const colorParts =
+    o.orderitems
+      ?.map((i) => i.selectedColor?.trim())
+      .filter((c): c is string => !!c) ?? [];
+  const colorNote =
+    colorParts.length > 0
+      ? `اللون: ${[...new Set(colorParts)].join(" / ")}`
+      : '';
+  const baseNotes =
+    o.notes && o.notes.trim().length > 0 ? o.notes.trim() : '';
   return {
     clientName: o.fullName ?? "",
     phone: o.phoneNumber ?? "",
@@ -44,7 +61,7 @@ function buildDeliveryInput(o: {
     itemsNumber: o.quantity ?? 1,
     price,
     productNames,
-    notes: o.notes ?? undefined,
+    notes: [baseNotes, colorNote].filter(Boolean).join(" | ") || undefined,
     referenceId: o.id ?? undefined,
   };
 }
@@ -887,7 +904,7 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
         notes: true,
         address: true,
         orderitems: {
-          select: { name: true },
+          select: { name: true, selectedColor: true },
         },
       },
     });
@@ -1031,7 +1048,7 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
           totalPrice: true,
           notes: true,
           orderitems: {
-            select: { name: true, qty: true },
+            select: { name: true, qty: true, selectedColor: true },
           },
         },
       });
@@ -1131,7 +1148,7 @@ export async function resendOrderToModon(orderId: string) {
         deliveryTrackingId: true,
         status: true,
         orderitems: {
-          select: { name: true, qty: true },
+          select: { name: true, qty: true, selectedColor: true },
         },
       },
     });

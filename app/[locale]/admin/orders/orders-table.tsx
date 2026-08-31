@@ -51,6 +51,7 @@ import {
   Pencil,
   Eye,
   MessageCircle,
+  Palette,
   ChevronUp,
   Package,
   Send,
@@ -158,8 +159,28 @@ const OrderRow = memo(function OrderRow({
       <TableCell>{order.quantity}</TableCell>
       <TableCell>{formatCurrency(order.totalPrice)}</TableCell>
       <TableCell>{formatCurrency(order.actualShippingCost ?? 0)}</TableCell>
-      <TableCell className="max-w-[200px] truncate" title={order.notes || ""}>
-        {order.notes || "-"}
+      <TableCell className="max-w-[200px]">
+        <div className="flex flex-col gap-1">
+          {order.notes && (
+            <span
+              className="truncate block"
+              title={order.notes}
+            >
+              {order.notes}
+            </span>
+          )}
+          {order.orderitems?.[0]?.selectedColor && (
+            <span
+              className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+            >
+              <Palette className="w-3 h-3" />
+              {order.orderitems[0].selectedColor}
+            </span>
+          )}
+          {!order.notes && !order.orderitems?.[0]?.selectedColor && (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         <span
