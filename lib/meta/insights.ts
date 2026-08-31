@@ -35,6 +35,37 @@ export type AdInsightRow = {
   budget: { amount: number; period: "daily" | "lifetime" } | null;
   purchase: InsightMetric;
   message: InsightMetric;
+  // لربط الإعلان بمجموعته عند إعادة التجميع تحت الحملة.
+  adsetId: string | null;
+};
+
+/** مجموعة إعلانية داخل بطاقة الحملة. */
+export type AdSetRow = {
+  id: string;
+  name: string;
+  status: string; // مشتق من إعلاناتها
+  budget: { amount: number; period: "daily" | "lifetime" } | null;
+  ads: AdInsightRow[];
+};
+
+/** بطاقة الحملة — الوحدة التي يديرها المالك في مدير إعلانات Meta. */
+export type CampaignRow = {
+  id: string;
+  name: string;
+  status: string; // effective_status كما تعيده Meta
+  objective: string | null;
+  spend: number;
+  impressions: number;
+  budget: { amount: number; period: "daily" | "lifetime" } | null;
+  purchase: InsightMetric;
+  message: InsightMetric;
+  adSets: AdSetRow[];
+  ads: AdInsightRow[];
+  activeCount: number;
+  /** المنتج المرتبط (ربط يدوي أو إطلاق نظام) — اختياري للعرض في الأداء. */
+  productName?: string | null;
+  /** true = ربط تلقائي من إطلاقات النظام. */
+  productAuto?: boolean;
 };
 
 export type AccountInsight = {
@@ -49,9 +80,11 @@ export type AccountInsight = {
   purchase: InsightMetric;
   message: InsightMetric;
   ads: AdInsightRow[];
+  campaigns: CampaignRow[];
   activeCount: number;
   error: string | null;
 };
+
 
 /** قوائم تحكّم الفترة الزمنية (تُعرض في الواجهة). */
 export const DATE_PRESETS: { key: string; label: string }[] = [
@@ -87,6 +120,8 @@ type Raw = {
   reach?: string;
   actions?: { action_type: string; value: string }[];
   cost_per_action_type?: { action_type: string; value: string }[];
+  // معرّف الحملة في insights level=campaign — قد يأتي بهذا الشكل بدل campaign_id.
+  campaign?: { id?: string };
 };
 
 function metric(row: Raw | undefined, type: string): InsightMetric {
@@ -173,7 +208,7 @@ async function getAccountAds(
   activeOnly: boolean,
 ): Promise<AdInsightRow[]> {
   const params: Record<string, string | undefined> = {
-    fields: `name,effective_status,adset{daily_budget,lifetime_budget},campaign{objective,daily_budget,lifetime_budget},insights.${timeExpansion(period)}{spend,actions,cost_per_action_type,impressions,reach}`,
+    fields: `adset_id,name,effective_status,adset{daily_budget,lifetime_budget},campaign{objective,daily_budget,lifetime_budget},insights.${timeExpansion(period)}{spend,actions,cost_per_action_type,impressions,reach}`,
     limit: "50",
   };
   if (activeOnly)
@@ -183,6 +218,7 @@ async function getAccountAds(
   const j = await graphGet<{
     data?: {
       id: string;
+      adset_id?: string;
       name?: string;
       effective_status?: string;
       adset?: { daily_budget?: string; lifetime_budget?: string };
@@ -199,6 +235,7 @@ async function getAccountAds(
     const r = ad.insights?.data?.[0];
     return {
       id: ad.id,
+      adsetId: ad.adset_id ?? null,
       name: ad.name ?? "إعلان",
       status: ad.effective_status ?? "UNKNOWN",
       objective: ad.campaign?.objective ?? null,
@@ -211,6 +248,231 @@ async function getAccountAds(
   });
   ads.sort((a, b) => b.spend - a.spend);
   return ads;
+}
+
+/** ملخصات كل حملات الحساب — مبنيّة من إعلاناتها (المصدر الموثوق للمطابقة). */
+async function getCampaignSummaries(
+  actId: string,
+  token: string,
+  currency: string,
+  period: InsightsPeriod,
+  activeOnly: boolean,
+): Promise<
+  Map<
+    string,
+    {
+      spend: number;
+      impressions: number;
+      purchase: InsightMetric;
+      message: InsightMetric;
+    }
+  >
+> {
+  // ملاحظة تشخيصية (تم التحقق مباشرة من Graph): نداء insights level=campaign
+  // على هذا الحساب لا يُرجع campaign_id في صفوفه — ففشلت المطابقة وبقي صرف
+  // الحملات صفراً. الحل: نجمع insights مستوى الإعلان (من /ads حيث campaign
+  // ظاهر) ونجمّعها يدوياً تحت حملاتها عبر خريطة المجموعات → الحملة.
+  const [ads, adsetsRes] = await Promise.all([
+    getAccountAds(actId, token, currency, period, activeOnly),
+    graphGet<{ data?: { id: string; campaign_id?: string }[] }>(
+      `${actId}/adsets`,
+      token,
+      { fields: "campaign_id", limit: "250" },
+    ),
+  ]);
+  const adsetToCampaign = new Map<string, string>();
+  for (const s of adsetsRes.data ?? []) {
+    if (s.campaign_id) adsetToCampaign.set(s.id, s.campaign_id);
+  }
+  const map = new Map<
+    string,
+    {
+      spend: number;
+      impressions: number;
+      purchase: InsightMetric;
+      message: InsightMetric;
+    }
+  >();
+  for (const ad of ads) {
+    const cid = ad.adsetId ? adsetToCampaign.get(ad.adsetId) : null;
+    if (!cid) continue;
+    const cur =
+      map.get(cid) ??
+      {
+        spend: 0,
+        impressions: 0,
+        purchase: { count: 0, cost: null },
+        message: { count: 0, cost: null },
+      };
+    cur.spend += ad.spend;
+    cur.impressions += ad.impressions;
+    if (ad.purchase.count > 0 || ad.purchase.cost != null) {
+      cur.purchase.count += ad.purchase.count;
+      if (ad.purchase.cost != null) cur.purchase.cost = ad.purchase.cost;
+    }
+    if (ad.message.count > 0 || ad.message.cost != null) {
+      cur.message.count += ad.message.count;
+      if (ad.message.cost != null) cur.message.cost = ad.message.cost;
+    }
+    map.set(cid, cur);
+  }
+  return map;
+}
+/** حملات الحساب مع مجموعاتها الإعلانية وإعلاناتها — الوحدة التي يديرها المالك. */
+export async function getAccountCampaigns(
+  actId: string,
+  token: string,
+  currency: string,
+  period: InsightsPeriod,
+  activeOnly: boolean,
+): Promise<CampaignRow[]> {
+  const offset = currencyOffset(currency);
+  const campParams: Record<string, string | undefined> = {
+    fields: "name,effective_status,objective,daily_budget,lifetime_budget",
+    limit: "100",
+  };
+  if (activeOnly)
+    campParams.filtering = JSON.stringify([
+      { field: "effective_status", operator: "IN", value: ["ACTIVE"] },
+    ]);
+  const [campsRes, adsetsRes, ads, sums] = await Promise.all([
+    graphGet<{
+      data?: {
+        id: string;
+        name?: string;
+        effective_status?: string;
+        objective?: string;
+        daily_budget?: string;
+        lifetime_budget?: string;
+      }[];
+    }>(`${actId}/campaigns`, token, campParams),
+    graphGet<{
+      data?: {
+        id: string;
+        campaign_id?: string;
+        name?: string;
+        effective_status?: string;
+        daily_budget?: string;
+        lifetime_budget?: string;
+      }[];
+    }>(`${actId}/adsets`, token, {
+      fields: "campaign_id,name,effective_status,daily_budget,lifetime_budget",
+      limit: "250",
+      ...(activeOnly
+        ? {
+            filtering: JSON.stringify([
+              { field: "effective_status", operator: "IN", value: ["ACTIVE"] },
+            ]),
+          }
+        : {}),
+    }),
+    getAccountAds(actId, token, currency, period, activeOnly),
+    getCampaignSummaries(actId, token, currency, period, activeOnly),
+  ]);
+
+  const camps = (campsRes.data ?? []).filter(
+    (c) => c.effective_status !== "ARCHIVED" && c.effective_status !== "DELETED",
+  );
+
+  const rows: CampaignRow[] = camps.map((c) => {
+    const sum = sums.get(c.id);
+    return {
+      id: c.id,
+      name: c.name ?? "حملة",
+      status: c.effective_status ?? "UNKNOWN",
+      objective: c.objective ?? null,
+      spend: sum?.spend ?? 0,
+      impressions: sum?.impressions ?? 0,
+      budget: pickBudget({ campaign: c }, offset),
+      purchase: sum?.purchase ?? { count: 0, cost: null },
+      message: sum?.message ?? { count: 0, cost: null },
+      adSets: [],
+      ads: [],
+      activeCount: 0,
+    };
+  });
+
+  // تجميع المجموعات الإعلانية تحت حملاتها ثم توزيع الإعلانات عليها.
+  const setsByCampaign = new Map<string, AdSetRow[]>();
+  for (const a of adsetsRes.data ?? []) {
+    if (!a.campaign_id) continue;
+    const list = setsByCampaign.get(a.campaign_id) ?? [];
+    list.push({
+      id: a.id,
+      name: a.name ?? "مجموعة",
+      status: a.effective_status ?? "UNKNOWN",
+      budget: pickBudget({ adset: a }, offset),
+      ads: [],
+    });
+    setsByCampaign.set(a.campaign_id, list);
+  }
+
+  // الإعلانات التي لم تجد مجموعتها (مجموعة مفلترة في activeOnly، أو adsetId غائب
+  // في الإعلانات المُنشأة بـ GUIDED_CREATION) — نربطها بحملتها عبر adsetId →
+  // مجموعة → حملة، وإلا تبقى معلّقة ويظهر صرفها صفراً خطأً في بطاقة الحملة.
+  const adsetToCampaign = new Map<string, string>();
+  for (const [cid, sets] of setsByCampaign)
+    for (const s of sets) adsetToCampaign.set(s.id, cid);
+
+  for (const camp of rows) {
+    const sets = setsByCampaign.get(camp.id) ?? [];
+    for (const ad of ads) {
+      const target = ad.adsetId ? sets.find((s) => s.id === ad.adsetId) : null;
+      if (target) {
+        target.ads.push(ad);
+        continue;
+      }
+      // fallback 1: المجموعة غير موجودة في قوائمنا (مفلترة) — أنشئ مجموعة حامل
+      // تحت الحملة الصحيحة كي لا يضيع إعلانها وصرفه.
+      if (ad.adsetId) {
+        const cid = adsetToCampaign.get(ad.adsetId);
+        if (cid === camp.id) {
+          let holder = sets.find((s) => s.id === ad.adsetId);
+          if (!holder) {
+            holder = {
+              id: ad.adsetId,
+              name: "مجموعة الإعلان",
+              status: ad.status,
+              budget: null,
+              ads: [],
+            };
+            sets.push(holder);
+            adsetToCampaign.set(ad.adsetId, camp.id);
+          }
+          holder.ads.push(ad);
+        }
+      }
+    }
+    for (const s of sets) {
+      s.ads.sort((a, b) => b.spend - a.spend);
+      s.status = deriveGroupStatus(s.ads);
+    }
+    sets.sort(
+      (a, b) =>
+        b.ads.length - a.ads.length ||
+        b.ads.reduce((s, x) => s + x.spend, 0) -
+          a.ads.reduce((s, x) => s + x.spend, 0),
+    );
+    camp.adSets = sets;
+    camp.ads = sets.flatMap((s) => s.ads);
+    camp.activeCount = camp.ads.filter((a) => a.status === "ACTIVE").length;
+  }
+  rows.sort((a, b) => b.spend - a.spend || b.ads.length - a.ads.length);
+  return rows;
+}
+
+/** حالة المجموعة الإعلانية مشتقة من إعلاناتها. */
+function deriveGroupStatus(ads: { status: string }[]): string {
+  if (ads.length === 0) return "ADSET_NO_ACTIVE_ADS";
+  if (ads.some((a) => a.status === "ACTIVE")) return "ACTIVE";
+  if (
+    ads.some((a) =>
+      ["WITH_ISSUES", "PENDING_REVIEW", "IN_PROCESS"].includes(a.status),
+    )
+  )
+    return "ADSET_ATTENTION";
+  if (ads.some((a) => a.status === "DISAPPROVED")) return "ADSET_REJECTED";
+  return "PAUSED";
 }
 
 /**
@@ -245,6 +507,48 @@ export async function setAdRunning(
   return r.effective_status ?? (active ? "ACTIVE" : "PAUSED");
 }
 
+/**
+ * تشغيل/إطفاء حملة إعلانية كاملة.
+ * - الإطفاء: يوقف الحملة فقط — فيتوقف عرض كل إعلاناتها دفعة واحدة (وهو ما يراه
+ *   المالك في مدير الإعلانات).
+ * - التشغيل: يفعّل الحملة ثم مجموعاتها ثم إعلاناتها (إعلانات النظام تُنشأ
+ *   والسلسلة كلها موقوفة)، مع تخطي المرفوض وقيد المراجعة والمشاكل.
+ */
+export async function setCampaignRunning(
+  campaignId: string,
+  token: string,
+  active: boolean,
+): Promise<string> {
+  if (!active) {
+    await graphPost(campaignId, token, { status: "PAUSED" });
+    return "CAMPAIGN_PAUSED";
+  }
+  await graphPost(campaignId, token, { status: "ACTIVE" });
+  const SKIP = ["ACTIVE", "DISAPPROVED", "PENDING_REVIEW", "WITH_ISSUES"];
+  const sets = await graphGet<{
+    data?: { id: string; effective_status?: string }[];
+  }>(`${campaignId}/adsets`, token, { fields: "effective_status", limit: "100" });
+  const setIds = (sets.data ?? [])
+    .filter((s) => !SKIP.includes(s.effective_status ?? ""))
+    .map((s) => s.id);
+  await Promise.allSettled(
+    setIds.map((id) => graphPost(id, token, { status: "ACTIVE" })),
+  );
+  const ads = await graphGet<{
+    data?: { id: string; effective_status?: string }[];
+  }>(`${campaignId}/ads`, token, { fields: "effective_status", limit: "250" });
+  const adIds = (ads.data ?? [])
+    .filter((a) => !SKIP.includes(a.effective_status ?? ""))
+    .map((a) => a.id);
+  await Promise.allSettled(
+    adIds.map((id) => graphPost(id, token, { status: "ACTIVE" })),
+  );
+  const r = await graphGet<{ effective_status?: string }>(campaignId, token, {
+    fields: "effective_status",
+  });
+  return r.effective_status ?? "ACTIVE";
+}
+
 /** ملخّص + إعلانات حساب واحد، مع try/catch محلّي (فشل حساب لا يُسقط البقية). */
 export async function getAccountInsight(
   acc: { id: string; accountId: string; name: string; currency: string; status: number },
@@ -253,10 +557,17 @@ export async function getAccountInsight(
   activeOnly: boolean,
 ): Promise<AccountInsight> {
   try {
-    const [sum, ads] = await Promise.all([
+    const [sum, campaigns] = await Promise.all([
       getAccountSummary(acc.id, token, period),
-      getAccountAds(acc.id, token, acc.currency, period, activeOnly),
+      getAccountCampaigns(
+        acc.id,
+        token,
+        acc.currency,
+        period,
+        activeOnly,
+      ),
     ]);
+    const ads = campaigns.flatMap((c) => c.ads);
     return {
       ...acc,
       currency: sum.currency ?? acc.currency,
@@ -266,6 +577,7 @@ export async function getAccountInsight(
       purchase: sum.purchase,
       message: sum.message,
       ads,
+      campaigns,
       activeCount: ads.filter((a) => a.status === "ACTIVE").length,
       error: null,
     };
@@ -278,6 +590,7 @@ export async function getAccountInsight(
       purchase: { count: 0, cost: null },
       message: { count: 0, cost: null },
       ads: [],
+      campaigns: [],
       activeCount: 0,
       error: (e as Error).message,
     };

@@ -19,73 +19,97 @@ interface ProfitExportButtonProps {
   from: string;
   to: string;
   summary: {
-    totalGrossRevenue: number;
-    totalActualShippingCost: number;
     totalOrderCount: number;
     baghdadOrderCount: number;
     othersOrderCount: number;
+    totalGrossRevenue: number;
+    totalActualShippingCost: number;
     baghdadActualShippingCost: number;
     othersActualShippingCost: number;
   };
-  totalCost: number;
-  totalAdCost: number;
-  totalExpenses: number;
+  /** قيم ما-لو الحيّة المعروضة على الشاشة (بوحدة الألف د.ع). */
+  totals: { qty: number; revenue: number; cost: number; profit: number; returned: number };
+  adsExpense: number;
+  opexExpense: number;
   trueNetProfit: number;
 }
 
+/**
+ * زر تصدير Excel — يُستدعى من داخل لوحة الأرباح بقيم ما-لو الحيّة، فالملف
+ * يطابق الشاشة تماماً حتى بعد تعديل المصاريف مؤقتاً. كل المبالغ تُحوَّل من
+ * وحدة «الألف د.ع» المخزّنة إلى الدينار الكامل في الملف.
+ */
 export default function ProfitExportButton({
   productStats,
   adByProduct,
   from,
   to,
   summary,
-  totalCost,
-  totalAdCost,
-  totalExpenses,
+  totals,
+  adsExpense,
+  opexExpense,
   trueNetProfit,
 }: ProfitExportButtonProps) {
   const handleExport = () => {
     const adMap = new Map(adByProduct.map((a) => [a.productId, a.amount]));
+    const toIQD = (v: number) => Math.round(v * 1000);
 
-    // Sheet 1: Product breakdown
-    const productRows = productStats.map((item, i) => {
+    // Sheet 1: Product breakdown — بقيم ما-لو المعروضة.
+    type ProductRow = {
+      "#": number | string;
+      المنتج: string;
+      الكمية: number;
+      "الإيراد الصافي (د.ع)": number;
+      "تكلفة البضاعة (د.ع)": number;
+      "صافي الربح (د.ع)": number;
+      "هامش الربح": string;
+      "مصاريف الإعلان (د.ع)": number | string;
+      "الربح بعد الإعلان (د.ع)": number | string;
+    };
+    const dbRevenue = productStats.reduce((s, p) => s + p.totalRevenue, 0);
+    const revScale = dbRevenue > 0 ? totals.revenue / dbRevenue : 1;
+    const dbProfit = productStats.reduce((s, p) => s + p.totalProfit, 0);
+    const profitScale = dbProfit > 0 ? totals.profit / dbProfit : 1;
+
+    const productRows: ProductRow[] = productStats.map((item, i) => {
       const margin =
         item.totalRevenue > 0
           ? ((item.totalProfit / item.totalRevenue) * 100).toFixed(1) + "%"
           : "0%";
       const adCost = adMap.get(item.productId) ?? 0;
-      const profitAfterAd = item.totalProfit - adCost;
+      const scaledProfit = item.totalProfit * profitScale;
+      const profitAfterAd = scaledProfit - adCost;
       return {
         "#": i + 1,
         المنتج: item.name,
         الكمية: item.totalQty,
-        "الإيراد الصافي (د.ع)": item.totalRevenue,
-        "تكلفة البضاعة (د.ع)": item.totalCost,
-        "صافي الربح (د.ع)": item.totalProfit,
+        "الإيراد الصافي (د.ع)": toIQD(item.totalRevenue * revScale),
+        "تكلفة البضاعة (د.ع)": toIQD(
+          item.totalRevenue * revScale - scaledProfit,
+        ),
+        "صافي الربح (د.ع)": toIQD(scaledProfit),
         "هامش الربح": margin,
-        "مصاريف الإعلان (د.ع)": adCost > 0 ? adCost : "",
-        "الربح بعد الإعلان (د.ع)": adCost > 0 ? profitAfterAd : "",
+        "مصاريف الإعلان (د.ع)": adCost > 0 ? toIQD(adCost) : "",
+        "الربح بعد الإعلان (د.ع)": adCost > 0 ? toIQD(profitAfterAd) : "",
       };
     });
 
-    // Totals row
-    const totalQty = productStats.reduce((s, p) => s + p.totalQty, 0);
-    const totalRevenue = productStats.reduce((s, p) => s + p.totalRevenue, 0);
-    const netProfit = productStats.reduce((s, p) => s + p.totalProfit, 0);
-    const overallMargin =
-      totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) + "%" : "0%";
-
-    productRows.push({
+    const totalRow: ProductRow = {
       "#": "",
       المنتج: "المجموع",
-      الكمية: totalQty,
-      "الإيراد الصافي (د.ع)": totalRevenue,
-      "تكلفة البضاعة (د.ع)": totalCost,
-      "صافي الربح (د.ع)": netProfit,
-      "هامش الربح": overallMargin,
-      "مصاريف الإعلان (د.ع)": totalAdCost > 0 ? totalAdCost : "",
-      "الربح بعد الإعلان (د.ع)": totalAdCost > 0 ? netProfit - totalAdCost : "",
-    } as any);
+      الكمية: totals.qty,
+      "الإيراد الصافي (د.ع)": toIQD(totals.revenue),
+      "تكلفة البضاعة (د.ع)": toIQD(totals.cost),
+      "صافي الربح (د.ع)": toIQD(totals.profit),
+      "هامش الربح":
+        totals.revenue > 0
+          ? ((totals.profit / totals.revenue) * 100).toFixed(1) + "%"
+          : "0%",
+      "مصاريف الإعلان (د.ع)": adsExpense > 0 ? toIQD(adsExpense) : "",
+      "الربح بعد الإعلان (د.ع)":
+        adsExpense > 0 ? toIQD(totals.profit - adsExpense) : "",
+    };
+    productRows.push(totalRow);
 
     const ws1 = XLSX.utils.json_to_sheet(productRows);
     ws1["!cols"] = [
@@ -100,26 +124,26 @@ export default function ProfitExportButton({
       { wch: 24 },
     ];
 
-    // Sheet 2: Summary
+    // Sheet 2: Summary — بقيم ما-لو أيضاً.
     const summaryRows = [
       { البيان: "الفترة", القيمة: `${from} → ${to}` },
       { البيان: "", القيمة: "" },
       { البيان: "إجمالي الطلبات المكتملة", القيمة: summary.totalOrderCount },
-      { البيان: "إجمالي ما حُصِّل (د.ع)", القيمة: summary.totalGrossRevenue },
-      { البيان: "تكلفة التوصيل الفعلية (د.ع)", القيمة: summary.totalActualShippingCost },
-      { البيان: "تكلفة البضاعة (د.ع)", القيمة: totalCost },
-      { البيان: "صافي الربح قبل المصاريف (د.ع)", القيمة: netProfit },
+      { البيان: "إجمالي ما حُصِّل (د.ع)", القيمة: toIQD(summary.totalGrossRevenue) },
+      { البيان: "تكلفة التوصيل الفعلية (د.ع)", القيمة: toIQD(summary.totalActualShippingCost) },
+      { البيان: "تكلفة البضاعة (د.ع)", القيمة: toIQD(totals.cost) },
+      { البيان: "صافي الربح قبل المصاريف (د.ع)", القيمة: toIQD(totals.profit) },
       { البيان: "", القيمة: "" },
-      { البيان: "مصاريف الإعلانات (د.ع)", القيمة: totalAdCost },
-      { البيان: "المصاريف التشغيلية (د.ع)", القيمة: totalExpenses },
-      { البيان: "إجمالي المصاريف (د.ع)", القيمة: totalAdCost + totalExpenses },
+      { البيان: "مصاريف الإعلانات (د.ع)", القيمة: toIQD(adsExpense) },
+      { البيان: "المصاريف التشغيلية (د.ع)", القيمة: toIQD(opexExpense) },
+      { البيان: "إجمالي المصاريف (د.ع)", القيمة: toIQD(adsExpense + opexExpense) },
       { البيان: "", القيمة: "" },
-      { البيان: "صافي الربح الحقيقي (د.ع)", القيمة: trueNetProfit },
+      { البيان: "صافي الربح الحقيقي (د.ع)", القيمة: toIQD(trueNetProfit) },
       { البيان: "", القيمة: "" },
       { البيان: "طلبات بغداد", القيمة: summary.baghdadOrderCount },
-      { البيان: "تكلفة توصيل بغداد (د.ع)", القيمة: summary.baghdadActualShippingCost },
+      { البيان: "تكلفة توصيل بغداد (د.ع)", القيمة: toIQD(summary.baghdadActualShippingCost) },
       { البيان: "طلبات باقي المحافظات", القيمة: summary.othersOrderCount },
-      { البيان: "تكلفة توصيل المحافظات (د.ع)", القيمة: summary.othersActualShippingCost },
+      { البيان: "تكلفة توصيل المحافظات (د.ع)", القيمة: toIQD(summary.othersActualShippingCost) },
     ];
 
     const ws2 = XLSX.utils.json_to_sheet(summaryRows);

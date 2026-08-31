@@ -100,6 +100,8 @@ export async function getSocialFeed() {
       error: p.error,
       // فيديو إنستغرام قيد المعالجة: حاوية موجودة بلا نشر بعد.
       needsIgFinish: !!p.igContainerId && !p.igPostId,
+      // لشارة "بلا منتج" — تنبيه مبكر قبل إطلاق إعلان غير قابل للربط.
+      productId: p.productId,
       createdAt: p.createdAt.toISOString(),
       launches: p.adLaunches.map((a) => ({
         id: a.id,
@@ -131,6 +133,8 @@ export async function publishPost(input: {
   videoUrls: string[];
   platforms: string[]; // ["facebook","instagram"]
   productId?: string | null;
+  /** تأكيد صريح من المالك على النشر بلا منتج — يكسر الربط التلقائي لاحقاً. */
+  confirmNoProduct?: boolean;
 }) {
   await requireAdmin();
 
@@ -146,6 +150,15 @@ export async function publishPost(input: {
     return { success: false, message: "اختر منصة واحدة على الأقل" };
   if (!caption && imageUrls.length === 0 && !hasVideo)
     return { success: false, message: "أضِف نصاً أو صورة أو فيديو" };
+  // النشر بلا منتج يجعل أي إعلان لاحق غير قابل للربط التلقائي بصرف Meta —
+  // نطلب تأكيداً صريحاً بدل المنع (قد يكون المنشور العام مقصوداً).
+  if (!input.productId && !input.confirmNoProduct)
+    return {
+      success: false,
+      noProductConfirm: true as const,
+      message:
+        "المنشور بلا منتج — لن يُربط صرف إعلانه تلقائياً بأي منتج. أعد المحاولة مع اختيار منتج، أو أكّد النشر بلا منتج.",
+    };
   // منع دمج فيديو وصور — لا يُدعم في منشور واحد.
   if (hasVideo && imageUrls.length > 0)
     return {
@@ -337,6 +350,47 @@ export async function deleteSocialPost(id: string) {
   await prisma.socialPost.delete({ where: { id } }).catch(() => null);
   revalidatePath("/admin/marketing");
   return { success: true, message: "تم حذف السجل" };
+}
+
+/** حذف عدة سجلات منشورات من السجل المحلي بضغطة واحدة (المنشورات تبقى على المنصة). */
+export async function deleteSocialPostsBulk(ids: string[]) {
+  await requireAdmin();
+  const clean = [...new Set((ids ?? []).filter(Boolean))];
+  if (clean.length === 0)
+    return { success: false, message: "لا توجد منشورات محددة" };
+  const r = await prisma.socialPost.deleteMany({
+    where: { id: { in: clean } },
+  });
+  revalidatePath("/admin/marketing");
+  return {
+    success: true,
+    message:
+      r.count === clean.length
+        ? `حُذفت ${r.count} سجل من السجل`
+        : `حُذفت ${r.count} من ${clean.length} — بعض السجلات غير موجودة أو حُذفت سابقاً`,
+  };
+}
+
+/**
+ * حذف سجلات إطلاقات إعلانات (فيديو/تعزيز) من السجل المحلي — الإعلان نفسه
+ * يبقى على Meta وتدار حالته من تبويب «الأداء» أو مدير الإعلانات.
+ */
+export async function deleteAdLaunchesBulk(ids: string[]) {
+  await requireAdmin();
+  const clean = [...new Set((ids ?? []).filter(Boolean))];
+  if (clean.length === 0)
+    return { success: false, message: "لا توجد إعلانات محددة" };
+  const r = await prisma.metaAdLaunch.deleteMany({
+    where: { id: { in: clean } },
+  });
+  revalidatePath("/admin/marketing");
+  return {
+    success: true,
+    message:
+      r.count === clean.length
+        ? `حُذفت ${r.count} سجل إعلان من السجل`
+        : `حُذفت ${r.count} من ${clean.length} — بعض السجلات غير موجودة أو حُذفت سابقاً`,
+  };
 }
 
 // ─── إطلاق إعلان من منشور ─────────────────────────────────────────────────────

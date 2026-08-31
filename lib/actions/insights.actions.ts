@@ -6,6 +6,7 @@ import {
   getAllAdAccounts,
   getAccountInsight,
   setAdRunning,
+  setCampaignRunning,
   type AdInsightsResult,
   type InsightsPeriod,
 } from "@/lib/meta/insights";
@@ -67,6 +68,41 @@ export async function getAdInsights(input: {
     accounts.map((acc) => getAccountInsight(acc, token, period, input.activeOnly)),
   );
 
+  // إثراء الحملات بالمنتج المرتبط (ربط يدوي CampaignProductMap أو إطلاقات النظام
+  // عبر destinationUrl/SocialPost) — لرؤية ROI لكل حملة-منتج في تبويب الأداء.
+  let campaignProducts: Map<string, { name: string; auto: boolean }> | null = null;
+  try {
+    const { buildCampaignProductMap } = await import("@/lib/meta/adspend");
+    const resolve = await buildCampaignProductMap();
+    const ids = [...new Set([...resolve.values()].map((v) => v.productId))];
+    const prods = ids.length
+      ? await prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+      : [];
+    const nameOf = new Map(prods.map((p) => [p.id, p.name]));
+    const manualIds = new Set(
+      (await prisma.campaignProductMap.findMany({ select: { campaignId: true } })).map((m) => m.campaignId),
+    );
+    campaignProducts = new Map();
+    for (const [campaignId, v] of resolve) {
+      const name = nameOf.get(v.productId);
+      if (name)
+        campaignProducts.set(campaignId, { name, auto: !manualIds.has(campaignId) });
+    }
+  } catch {
+    campaignProducts = null; // الفشل غير حاجز — الأداء يعمل بلا أسماء المنتجات
+  }
+  if (campaignProducts) {
+    for (const acc of rows) {
+      for (const camp of acc.campaigns) {
+        const p = campaignProducts.get(camp.id);
+        if (p) {
+          camp.productName = p.name;
+          camp.productAuto = p.auto;
+        }
+      }
+    }
+  }
+
   const visible = input.activeOnly
     ? rows.filter((r) => r.activeCount > 0)
     : rows;
@@ -99,6 +135,54 @@ export async function getAdInsights(input: {
   };
 }
 
+/**
+ * تشغيل/إطفاء حملة إعلانية كاملة من لوحة الأداء.
+ * - التشغيل: يفعّل الحملة ثم مجموعاتها وإعلاناتها (المطلوب لكون إعلانات النظام
+ *   تُنشأ والسلسلة كلها موقوفة) — تخطي المرفوض/قيد المراجعة.
+ * - الإطفاء: يوقف الحملة فقط، فيتوقف عرض كل إعلاناتها دفعة واحدة.
+ */
+export async function setCampaignActive(
+  campaignId: string,
+  active: boolean,
+): Promise<{ success: boolean; message: string; status?: string }> {
+  await requireAdmin();
+  const conn = await prisma.metaConnection.findUnique({ where: { id: "default" } });
+  if (!conn?.userAccessToken)
+    return { success: false, message: "لا يوجد اتصال بـ Meta" };
+  try {
+    const status = await setCampaignRunning(
+      campaignId,
+      conn.userAccessToken,
+      active,
+    );
+    if (!active)
+      return {
+        success: true,
+        status: "CAMPAIGN_PAUSED",
+        message: "أُوقفت الحملة — توقف عرض كل إعلاناتها.",
+      };
+    const problem = ["DISAPPROVED", "WITH_ISSUES", "PENDING_REVIEW"].includes(
+      status,
+    );
+    const PROB_AR: Record<string, string> = {
+      DISAPPROVED: "مرفوضة",
+      WITH_ISSUES: "بها مشكلة",
+      PENDING_REVIEW: "قيد المراجعة",
+    };
+    return {
+      success: true,
+      status: status === "IN_PROCESS" ? "ACTIVE" : status,
+      message: problem
+        ? `فُعّلت الحملة لكن حالتها: ${PROB_AR[status]}.`
+        : "فُعّلت الحملة مع مجموعاتها وإعلاناتها — بدأ العرض والصرف.",
+    };
+  } catch (e) {
+    return {
+      success: false,
+      message: `تعذّر تغيير حالة الحملة: ${(e as Error).message}`,
+    };
+  }
+}
 /**
  * تشغيل/إطفاء إعلان مباشرةً. التشغيل يفعّل الحملة والمجموعة والإعلان (فيبدأ العرض
  * والصرف الفعلي)؛ الإطفاء يوقف الإعلان فقط.

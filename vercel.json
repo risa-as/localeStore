@@ -3,6 +3,10 @@
     {
       "path": "/api/modon/sync",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/adspend-sync",
+      "schedule": "0 2 * * *"
     }
   ]
 }

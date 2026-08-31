@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { Metadata } from "next";
 import { BarChart3 } from "lucide-react";
-import { getExpenses, getAdCampaigns } from "@/lib/actions/expense.actions";
+import { getExpenses } from "@/lib/actions/expense.actions";
 import { prisma } from "@/db/prisma";
 import ExpensesClient from "./expenses-client";
 
@@ -12,9 +12,10 @@ export default async function ExpensesPage() {
   const session = await auth();
   if (session?.user?.role !== "admin") redirect("/unauthorized");
 
-  const [expensesRaw, campaignsRaw, products] = await Promise.all([
+  // الصفوف اليدوية للإعلانات تُجلب داخل الجدول الموحّد (getUnifiedCampaignRows)
+  // — لا حاجة لاستعلام مكرر هنا.
+  const [expensesRaw, products] = await Promise.all([
     getExpenses(),
-    getAdCampaigns(),
     prisma.product.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -24,11 +25,6 @@ export default async function ExpensesPage() {
   const expenses = expensesRaw.map((e) => ({
     ...e,
     amount: Number(e.amount),
-  }));
-
-  const campaigns = campaignsRaw.map((c) => ({
-    ...c,
-    amount: Number(c.amount),
   }));
 
   return (
@@ -45,11 +41,7 @@ export default async function ExpensesPage() {
         </div>
       </div>
 
-      <ExpensesClient
-        expenses={expenses}
-        campaigns={campaigns}
-        products={products}
-      />
+      <ExpensesClient expenses={expenses} products={products} />
     </div>
   );
 }

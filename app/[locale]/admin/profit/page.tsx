@@ -1,6 +1,5 @@
 import { auth } from "@/auth";
 import ProfitDatePicker from "@/components/admin/profit-date-picker";
-import ProfitExportButton from "@/components/admin/profit-export-button";
 import ProfitDashboard from "@/components/admin/profit/profit-dashboard";
 import { getOrderProfitStats } from "@/lib/actions/order.actions";
 import { getExpenseStatsForPeriod } from "@/lib/actions/expense.actions";
@@ -39,7 +38,7 @@ const ProfitPage = async (props: {
     ? parseDate(searchParams.from)
     : parseDate(`${iraqYear}-${iraqMonth}-01`);
   const defaultTo = searchParams.to
-    ? parseDate(searchParams.to)
+    ? parseDate(`${iraqYear}-${iraqMonth}-${iraqDay}`)
     : parseDate(`${iraqYear}-${iraqMonth}-${iraqDay}`);
 
   // Immediately preceding window of the same length, for the delta badges.
@@ -63,15 +62,6 @@ const ProfitPage = async (props: {
     fefoActive,
     fefoFallbackQty,
   } = current;
-
-  const productTotals = productStats.reduce(
-    (acc, item) => ({
-      totalRevenue: acc.totalRevenue + item.totalRevenue,
-      totalCost: acc.totalCost + item.totalCost,
-      totalProfit: acc.totalProfit + item.totalProfit,
-    }),
-    { totalRevenue: 0, totalCost: 0, totalProfit: 0 },
-  );
 
   // Previous period, net of that period's own expenses, so the comparison is
   // like-for-like against the current "صافي الربح الحقيقي".
@@ -116,30 +106,11 @@ const ProfitPage = async (props: {
             </p>
           </div>
         </div>
-        <div className="flex items-end gap-2">
-          <ProfitExportButton
-            productStats={productStats}
-            adByProduct={expenseStats.adByProduct}
-            from={fromLabel}
-            to={toLabel}
-            summary={orderSummary}
-            totalCost={productTotals.totalCost}
-            totalAdCost={expenseStats.totalAdCost}
-            totalExpenses={expenseStats.totalExpenses}
-            trueNetProfit={
-              productTotals.totalProfit - expenseStats.totalOverheadCost
-            }
-          />
-          <ProfitDatePicker defaultFrom={fromLabel} defaultTo={toLabel} />
-        </div>
+        <ProfitDatePicker defaultFrom={fromLabel} defaultTo={toLabel} />
       </div>
 
-      {/* Keyed on the period so a range change remounts the dashboard. Its
-          expense inputs seed from props via useState, and the date picker
-          navigates with router.push (a soft nav that keeps the component
-          mounted) — without the key the initialiser never re-runs and the
-          previous period's expense figures stay in the inputs while every
-          prop-driven number around them updates. */}
+      {/* Export lives INSIDE the client dashboard so the Excel file reflects the
+          live what-if figures the admin sees on screen, not just the DB values. */}
       <ProfitDashboard
         key={`${fromLabel}:${toLabel}`}
         productStats={productStats}
@@ -152,9 +123,17 @@ const ProfitPage = async (props: {
           totalExpenses: expenseStats.totalExpenses,
           adByProduct: expenseStats.adByProduct,
           expenseByCategory: expenseStats.expenseByCategory,
+          importedAdTotalIQD: expenseStats.importedAdTotalIQD,
+          replacedManualTotal: expenseStats.replacedManualTotal,
+          importedProductIds: expenseStats.importedProductIds,
         }}
         comparison={comparison}
         inconsistentOrders={inconsistentOrders}
+        exportContext={{
+          from: fromLabel,
+          to: toLabel,
+          summary: orderSummary,
+        }}
       />
     </div>
   );

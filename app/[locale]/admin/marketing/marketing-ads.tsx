@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { launchVideoSalesAd } from "@/lib/actions/social.actions";
+import { launchVideoSalesAd, deleteAdLaunchesBulk } from "@/lib/actions/social.actions";
 import {
   Rocket,
   Film,
@@ -16,6 +16,9 @@ import {
   AlertTriangle,
   Loader2,
   CheckCircle2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export type AdsData = {
@@ -96,6 +99,15 @@ export default function AdsPanel({ data }: { data: AdsData }) {
   const [selectedPlacements, setSelectedPlacements] = useState<string[]>(
     data.placementOptions.map((p) => p.key),
   );
+
+  // تحديد سجلات الإعلانات للحذف الجماعي + حد عرض السجل (10 والبقية خلف السلايدر).
+  const [selectedLaunches, setSelectedLaunches] = useState<Set<string>>(new Set());
+  const [showAllLaunches, setShowAllLaunches] = useState(false);
+  const LAUNCHES_PREVIEW_LIMIT = 10;
+  const visibleLaunches = showAllLaunches
+    ? data.launches
+    : data.launches.slice(0, LAUNCHES_PREVIEW_LIMIT);
+  const hiddenLaunches = data.launches.length - visibleLaunches.length;
 
   const togglePlacement = (key: string) =>
     setSelectedPlacements((prev) =>
@@ -580,45 +592,169 @@ export default function AdsPanel({ data }: { data: AdsData }) {
         )}
       </Button>
 
-      {/* ── الإعلانات المُنشأة ── */}
+      {/* ── الإعلانات المُنشأة ── بطاقات بحافة ملونة: نجح أو فشل بنظرة ── */}
       {data.launches.length > 0 && (
         <div className="space-y-2 pt-2">
-          <h3 className="text-sm font-semibold">إعلانات الفيديو ({data.launches.length})</h3>
-          {data.launches.map((l) => (
-            <div
-              key={l.id}
-              className="rounded-lg border bg-card p-3 flex items-center gap-2 flex-wrap text-sm"
-            >
-              {l.status === "failed" ? (
-                <AlertTriangle className="w-4 h-4 text-red-600" />
-              ) : (
-                <CheckCircle2 className="w-4 h-4 text-green-600" />
-              )}
-              <span className="font-semibold">
-                {fmtAdMoney(l.dailyBudget, l.currency)}/يوم
-              </span>
-              <span className="text-muted-foreground">
-                · {l.status === "failed" ? "فشل" : "أُنشئ موقوفاً"}
-              </span>
-              {l.destinationUrl && (
-                <a
-                  href={l.destinationUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary hover:underline truncate max-w-[220px]"
-                  dir="ltr"
-                >
-                  {l.destinationUrl}
-                </a>
-              )}
-              <span className="text-muted-foreground text-xs">
-                {new Date(l.createdAt).toLocaleDateString("ar-IQ")}
-              </span>
-              {l.error && (
-                <span className="text-red-600 text-xs w-full">{l.error}</span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="text-sm font-semibold">
+              إعلانات الفيديو ({data.launches.length})
+            </h3>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">
+                تابعها وفعّلها من تبويب «الأداء»
+              </p>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary"
+                  checked={
+                    selectedLaunches.size === data.launches.length &&
+                    data.launches.length > 0
+                  }
+                  onChange={(e) =>
+                    setSelectedLaunches(
+                      e.target.checked
+                        ? new Set(data.launches.map((l) => l.id))
+                        : new Set(),
+                    )
+                  }
+                />
+                تحديد الكل
+              </label>
+              {selectedLaunches.size > 0 && (
+                <span className="text-xs text-primary font-medium">
+                  {selectedLaunches.size} محدد
+                </span>
               )}
             </div>
-          ))}
+          </div>
+
+          {/* شريط الحذف الجماعي — يظهر فقط عند وجود تحديد */}
+          {selectedLaunches.size > 0 && (
+            <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 flex items-center justify-between gap-2 flex-wrap">
+              <p className="text-xs text-red-700 dark:text-red-400">
+                سيُحذف السجل المحدد ({selectedLaunches.size}) من هذا السجل فقط —
+                الإعلان نفسه يبقى على Meta ويُدار من تبويب «الأداء».
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setSelectedLaunches(new Set())}
+                  disabled={pending}
+                >
+                  إلغاء التحديد
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const r = await deleteAdLaunchesBulk([...selectedLaunches]);
+                      toast({
+                        description: r.message,
+                        variant: r.success ? undefined : "destructive",
+                      });
+                      if (r.success) setSelectedLaunches(new Set());
+                      router.refresh();
+                    })
+                  }
+                >
+                  {pending ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4 ml-1" /> حذف المحدد ({selectedLaunches.size})
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div className="grid gap-2 sm:grid-cols-2">
+            {visibleLaunches.map((l) => {
+              const failed = l.status === "failed";
+              const checked = selectedLaunches.has(l.id);
+              return (
+                <div
+                  key={l.id}
+                  className={`rounded-lg border bg-card p-3 border-s-4 flex flex-col gap-2 ${
+                    failed ? "border-s-red-500" : "border-s-green-500"
+                  } ${checked ? "border-primary/60 ring-1 ring-primary/30" : ""}`}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-primary shrink-0 cursor-pointer"
+                      checked={checked}
+                      onChange={(e) =>
+                        setSelectedLaunches((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(l.id);
+                          else next.delete(l.id);
+                          return next;
+                        })
+                      }
+                      aria-label="تحديد سجل الإعلان للحذف الجماعي"
+                    />
+                    {failed ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 px-2 py-0.5 text-xs">
+                        <AlertTriangle className="w-3 h-3" /> فشل
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5 text-xs">
+                        <CheckCircle2 className="w-3 h-3" /> أُنشئ موقوفاً
+                      </span>
+                    )}
+                    <span className="font-semibold text-sm">
+                      {fmtAdMoney(l.dailyBudget, l.currency)}/يوم
+                    </span>
+                    <span className="ms-auto text-xs text-muted-foreground">
+                      {new Date(l.createdAt).toLocaleDateString("ar-IQ")}
+                    </span>
+                  </div>
+                  {l.destinationUrl && (
+                    <a
+                      href={l.destinationUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs text-primary hover:underline truncate"
+                      dir="ltr"
+                    >
+                      {l.destinationUrl}
+                    </a>
+                  )}
+                  {l.error && (
+                    <p className="text-xs text-red-600 leading-snug">{l.error}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* زر فتح بقية سجل الإعلانات */}
+          {hiddenLaunches > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowAllLaunches(true)}
+              className="w-full py-2.5 text-xs text-primary hover:bg-muted rounded-lg border border-dashed flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              عرض بقية السجل ({hiddenLaunches} إعلان)
+            </button>
+          )}
+          {showAllLaunches && data.launches.length > LAUNCHES_PREVIEW_LIMIT && (
+            <button
+              type="button"
+              onClick={() => setShowAllLaunches(false)}
+              className="w-full py-2 text-[11px] text-muted-foreground hover:bg-muted rounded-lg border border-dashed flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <ChevronUp className="w-3.5 h-3.5" />
+              إظهار آخر {LAUNCHES_PREVIEW_LIMIT} فقط
+            </button>
+          )}
         </div>
       )}
     </div>

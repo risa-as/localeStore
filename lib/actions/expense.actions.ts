@@ -23,6 +23,11 @@ const adCampaignSchema = z.object({
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
 
+/** منتصف يوم UTC لتاريخ معطى — نفس دلالة النسخة في adspend.actions. */
+function dayStart(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
 export async function getExpenses() {
   return prisma.expense.findMany({ orderBy: { fromDate: "desc" } });
 }
@@ -144,7 +149,7 @@ function campaignDays(from: Date, to: Date): number {
 
 export async function getExpenseStatsForPeriod(from: Date, to: Date) {
   // Fetch campaigns and expenses that overlap with [from, to]
-  const [campaigns, expenses] = await Promise.all([
+  const [campaignsRaw, expenses] = await Promise.all([
     prisma.adCampaign.findMany({
       where: { fromDate: { lte: to }, toDate: { gte: from } },
       include: { product: { select: { id: true, name: true } } },
@@ -154,16 +159,113 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     }),
   ]);
 
-  // Per-product ad spend
+  // ── الصرف المستورد من Meta (الأرقام الفعلية اليومية) ──
+  // الصفوف تُخزَّن بالدينار الكامل (amountIQD)، بينما بقية هذه الدالة تعمل
+  // بوحدة «الألف د.ع» (نظام تخزين الأسعار المختصر الذي تعرضه formatCurrency
+  // بعد ضربه ×1000). لذلك نقسم على 1000 هنا ليخرج كل شيء بوحدة واحدة،
+  // فلا تتضاعف المصاريف المستوردة في صفحة الأرباح.
+  const importedRows = await prisma.adSpendDaily.findMany({
+    where: { date: { gte: from, lte: to } },
+    select: { productId: true, amountIQD: true, amount: true },
+  });
+  const importedIQDByProduct = new Map<string, number>();
+  let importedTotalIQD = 0;
+  for (const r of importedRows) {
+    const iqd = Number(r.amountIQD) / 1000;
+    importedTotalIQD += iqd;
+    importedIQDByProduct.set(
+      r.productId,
+      (importedIQDByProduct.get(r.productId) ?? 0) + iqd,
+    );
+  }
+
+  // ── قاعدة الاستبدال: اليدوي المتقاطع مع نفس المنتج له صفوف Meta داخل مداه
+  //    يُستبعد من الحساب ويُوسم (بلا حذف) — Meta هو المرجع.
+  const importedDaysByProduct = new Map<string, Set<string>>();
+  const allImported = await prisma.adSpendDaily.findMany({
+    select: { productId: true, date: true },
+  });
+  for (const r of allImported) {
+    let s = importedDaysByProduct.get(r.productId);
+    if (!s) {
+      s = new Set<string>();
+      importedDaysByProduct.set(r.productId, s);
+    }
+    s.add(r.date.toISOString().slice(0, 10));
+  }
+  const campaigns = campaignsRaw.map((c) => {
+    const days = importedDaysByProduct.get(c.productId);
+    if (!days || days.size === 0) return { ...c, _replaced: false as const, _partial: false as const };
+    // هل أي يوم ضمن [fromDate, toDate] له صف مستورد؟ (نفحص التقاطع مع مدى الإدخال
+    // وليس مع نافذة التقرير — الوسم خاصية للإدخال نفسه)
+    let hit = false;
+    const cur = new Date(c.fromDate.getTime());
+    const end = c.toDate;
+    while (cur <= end) {
+      if (days.has(cur.toISOString().slice(0, 10))) {
+        hit = true;
+        break;
+      }
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    if (!hit) return { ...c, _replaced: false as const, _partial: false as const };
+    // جزئي = بعض أيام مداه بلا تغطية Meta (فجوة جلب أو قبل بدء المزامنة)
+    let covered = 0;
+    let total = 0;
+    const cur2 = new Date(c.fromDate.getTime());
+    while (cur2 <= end) {
+      total += 1;
+      if (days.has(cur2.toISOString().slice(0, 10))) covered += 1;
+      cur2.setUTCDate(cur2.getUTCDate() + 1);
+    }
+    return {
+      ...c,
+      _replaced: true as const,
+      _partial: covered < total,
+    };
+  });
+
+  // Per-product ad spend — اليدوي غير المستبدل + المستورد الفعلي
+  // إدخال يدوي بعملة USD: لا يبقى بالألف د.ع (نظام الأسعار) بل يُحوَّل
+  // بسعر صرف يوم بداية الإدخال إلى الدينار ثم يُقسم على 1000 ليطابق الوحدة.
+  const usdRows = campaignsRaw.filter((c) => c.currency === "USD");
+  const usdToKiqd = new Map<string, number>(); // id → معامل التحويل
+  if (usdRows.length > 0) {
+    const fxRows = await prisma.fxRate.findMany({ orderBy: { fromDate: "desc" } });
+    for (const c of usdRows) {
+      const day = dayStart(c.fromDate);
+      const fx = fxRows.find(
+        (f) =>
+          f.fromDate <= day && (f.toDate === null || f.toDate > day),
+      );
+      if (fx) usdToKiqd.set(c.id, Number(fx.rate) / 1000); // د.ع → ألف د.ع
+    }
+  }
   const adByProduct = new Map<string, { productId: string; name: string; amount: number }>();
   let totalAdCost = 0;
+  let replacedManualTotal = 0;
   for (const c of campaigns) {
-    const total   = Number(c.amount);
+    let total   = Number(c.amount);
+    const usdFactor = usdToKiqd.get(c.id);
+    if (c.currency === "USD") {
+      if (usdFactor == null) {
+        // لا سعر صرف يغطي بداية الإدخال — استبعاده من الحساب مع الإبقاء ظاهراً.
+        replacedManualTotal += 0;
+        continue;
+      }
+      total = total * usdFactor; // دولار → ألف د.ع
+    }
     const days    = campaignDays(c.fromDate, c.toDate);
     const overlap = overlapDays(c.fromDate, c.toDate, from, to);
     const portion = days > 0 ? (total * overlap) / days : 0;
-    totalAdCost += portion;
+    if (c._replaced) {
+      // مُستبدَل تلقائياً من Meta — خارج الحساب (يبقى السجل ظاهراً مشطوباً).
+      // portion هنا بوحدة الألف د.ع (نفس وحدة الإدخال اليدوي).
+      replacedManualTotal += portion;
+      continue;
+    }
 
+    totalAdCost += portion;
     const existing = adByProduct.get(c.productId);
     if (existing) {
       existing.amount += portion;
@@ -173,6 +275,20 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
         name: c.product.name,
         amount: portion,
       });
+    }
+  }
+
+  // المستورد من Meta — يُدمج مع اليدوي (لن يتكرر: اليدوي المتقاطع استُبعد أعلاه).
+  // القيم أصلاً حُوّلت إلى وحدة الألف د.ع أعلاه.
+  for (const [productId, iqd] of importedIQDByProduct) {
+    const camp = campaignsRaw.find((x) => x.productId === productId);
+    const name = camp?.product.name ?? "منتج";
+    totalAdCost += iqd;
+    const existing = adByProduct.get(productId);
+    if (existing) {
+      existing.amount += iqd;
+    } else {
+      adByProduct.set(productId, { productId, name, amount: iqd });
     }
   }
 
@@ -200,5 +316,10 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     expenseByCategory: Array.from(expenseByCategory.values()),
     totalExpenses,
     totalOverheadCost: totalAdCost + totalExpenses,
+    // شفافية التكامل (بوحدة الألف د.ع مثل بقية الحقول):
+    importedAdTotalIQD: importedTotalIQD,
+    replacedManualTotal,
+    // لشارة مصدر الصرف في لوحة الأرباح.
+    importedProductIds: [...new Set(importedRows.map((r) => r.productId))],
   };
 }

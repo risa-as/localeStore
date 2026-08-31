@@ -23,10 +23,13 @@ import {
   Link as LinkIcon,
   Send,
   BarChart3,
+  CircleDot,
 } from "lucide-react";
 import PublishPanel, { type Feed, type AdMeta } from "./marketing-publish";
 import AdsPanel, { type AdsData } from "./marketing-ads";
-import InsightsPanel from "./marketing-insights";
+import InsightsPanel, {
+  type InsightsHealth,
+} from "./marketing-insights";
 
 type Status =
   | { configured: boolean; connected: false }
@@ -78,6 +81,8 @@ export default function MarketingClient({
   const [tab, setTab] = useState<
     "connection" | "publish" | "ads" | "insights"
   >(status.connected ? "publish" : "connection");
+  // نبضة حالة الإعلانات القادمة من تبويب الأداء — نقطة على التبويب أينما كنت.
+  const [insightsHealth, setInsightsHealth] = useState<InsightsHealth>(null);
 
   useEffect(() => {
     if (flash && FLASH[flash]) {
@@ -129,6 +134,17 @@ export default function MarketingClient({
               active={tab === "insights"}
               onClick={() => setTab("insights")}
               icon={<BarChart3 className="w-4 h-4" />}
+              pulse={
+                <CircleDot
+                  className={`w-2.5 h-2.5 ${
+                    insightsHealth === "problem"
+                      ? "text-red-500 animate-pulse"
+                      : insightsHealth === "running"
+                        ? "text-green-500"
+                        : "text-muted-foreground/40"
+                  }`}
+                />
+              }
               label="الأداء"
             />
             <TabButton
@@ -152,7 +168,7 @@ export default function MarketingClient({
               <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
             )
           ) : tab === "insights" ? (
-            <InsightsPanel />
+            <InsightsPanel onHealth={setInsightsHealth} />
           ) : (
             <Connected
               status={status}
@@ -197,11 +213,13 @@ function TabButton({
   onClick,
   icon,
   label,
+  pulse,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  pulse?: React.ReactNode;
 }) {
   return (
     <button
@@ -215,6 +233,7 @@ function TabButton({
     >
       {icon}
       {label}
+      {pulse}
     </button>
   );
 }

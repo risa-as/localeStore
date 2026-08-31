@@ -1,9 +1,10 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Tajawal } from "next/font/google";
 import { formatCurrency } from "@/lib/utils";
+import ProfitExportButton from "@/components/admin/profit-export-button";
 import {
   AlertTriangle,
   ArrowDown,
@@ -53,11 +54,33 @@ export type ProfitDashboardProps = {
   };
   fefoActive: boolean;
   fefoFallbackQty: number;
+  /** سياق التصدير — يمرر من الصفحة ليُبنى ملف Excel بقيم ما-لو الحيّة. */
+  exportContext: {
+    from: string;
+    to: string;
+    summary: {
+      totalOrderCount: number;
+      baghdadOrderCount: number;
+      othersOrderCount: number;
+      totalGrossRevenue: number;
+      totalActualShippingCost: number;
+      baghdadActualShippingCost: number;
+      othersActualShippingCost: number;
+    };
+  };
+  /** ما-لو مصاريف التشغيل — يُمرَّر للأعلى للتصدير يطابق الشاشة. */
+  onWhatIfChange?: (next: { ads: number; opex: number }) => void;
   expenses: {
     totalAdCost: number;
     totalExpenses: number;
     adByProduct: { productId: string; name: string; amount: number }[];
     expenseByCategory: { category: string; amount: number }[];
+    /** الإجمالي المستورد فعلياً من Meta (بوحدة الألف د.ع) — للشفافية. */
+    importedAdTotalIQD?: number;
+    /** الإدخال اليدوي الذي استبدله Meta (بوحدة الألف د.ع). */
+    replacedManualTotal?: number;
+    /** مُعرّفات المنتجات التي لها صفوف Meta مستوردة في الفترة — لشارة المصدر. */
+    importedProductIds?: string[];
   };
   /** Same metrics for the immediately preceding period, for the delta badges. */
   comparison: {
@@ -101,14 +124,24 @@ export default function ProfitDashboard({
   orderSummary,
   fefoActive,
   fefoFallbackQty,
+  exportContext,
   expenses,
   comparison,
   inconsistentOrders,
+  onWhatIfChange,
 }: ProfitDashboardProps) {
   // Expense inputs start from the real database figures and can be overridden
   // locally for what-if analysis. Overrides are never persisted.
   const [adsExpense, setAdsExpense] = useState(expenses.totalAdCost);
   const [opexExpense, setOpexExpense] = useState(expenses.totalExpenses);
+  // شفافية التكامل: المستورد من Meta والإدخال اليدوي المستبدل (اختياريان).
+  const importedAdTotalIQD = expenses.importedAdTotalIQD ?? 0;
+  const replacedManualTotal = expenses.replacedManualTotal ?? 0;
+  // إبلاغ الأب بقيم ما-لو للتصدير (مرة عند التركيب ومع كل تغيير).
+  useEffect(() => {
+    onWhatIfChange?.({ ads: adsExpense, opex: opexExpense });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adsExpense, opexExpense]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -144,6 +177,11 @@ export default function ProfitDashboard({
   // admin overrides the total, the real split is scaled proportionally so the
   // relative weighting between products is preserved. Falls back to revenue
   // share only when there is no campaign data to scale.
+  // مُعرّفات المنتجات ذات صفوف Meta مستوردة — لشارة "Meta" على عمود الإعلان.
+  const importedProductIds = useMemo(
+    () => new Set(expenses.importedProductIds ?? []),
+    [expenses.importedProductIds],
+  );
   const adByProduct = useMemo(() => {
     const map = new Map<string, number>();
     const realTotal = expenses.totalAdCost;
@@ -412,9 +450,9 @@ export default function ProfitDashboard({
     ];
   }, [ranked, netProfit, orderSummary.totalOrderCount]);
 
-  // 13 fixed columns: #, name, qty, returned, revenue, cost, profit, margin,
-  // the 4 ad columns, and revenue share.
-  const colSpan = 13;
+  // 14 fixed columns: #, name, qty, returned, revenue, cost, profit, margin,
+  // the 4 ad columns + ROI, and profit share.
+  const colSpan = 14;
 
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
@@ -558,12 +596,28 @@ export default function ProfitDashboard({
 
         {/* ── Expenses (editable) ──────────────────────────────────────── */}
         <div>
-          <div className="pa-section-title">
-            المصاريف{" "}
-            <span className="font-normal pa-meta">
-              — القيم من قاعدة البيانات؛ يمكنك تعديلها مؤقتاً لتجربة سيناريو (لا
-              تُحفظ)
+          <div className="pa-section-title flex items-center justify-between gap-2 flex-wrap">
+            <span>
+              المصاريف{" "}
+              <span className="font-normal pa-meta">
+                — القيم من قاعدة البيانات؛ يمكنك تعديلها مؤقتاً لتجربة سيناريو (لا
+                تُحفظ)
+              </span>
             </span>
+            <ProfitExportButton
+              productStats={productStats}
+              adByProduct={Array.from(adByProduct).map(([productId, amount]) => {
+                const p = productStats.find((x) => x.productId === productId);
+                return { productId, name: p?.name ?? "", amount };
+              })}
+              from={exportContext.from}
+              to={exportContext.to}
+              summary={exportContext.summary}
+              totals={totals}
+              adsExpense={adsExpense}
+              opexExpense={opexExpense}
+              trueNetProfit={realProfit}
+            />
           </div>
           <div className="pa-grid">
             <div className="pa-kpi">
@@ -573,8 +627,14 @@ export default function ProfitDashboard({
                 onChange={setAdsExpense}
                 label="مصاريف الإعلانات"
               />
-              <div className="pa-meta">
-                {expenses.adByProduct.length} منتج معلن
+              <div className="pa-meta flex items-center gap-2">
+                <span>{expenses.adByProduct.length} منتج معلن</span>
+                <Link
+                  href="/admin/expenses"
+                  className="text-primary hover:underline"
+                >
+                  إدارة الصرف ←
+                </Link>
               </div>
             </div>
 
@@ -591,9 +651,9 @@ export default function ProfitDashboard({
             </div>
 
             <Kpi
-              label="إجمالي المصاريف"
-              value={formatCurrency(allExpenses)}
-              meta="إعلانات + تشغيلية"
+              label="مصاريف الإعلانات المستبدلة"
+              value={formatCurrency(importedAdTotalIQD)}
+              meta={`مستورد من Meta — استبدل ${formatCurrency(replacedManualTotal)} يدوي`}
             />
             <Kpi
               label="صافي الربح الحقيقي"
@@ -989,8 +1049,9 @@ export default function ProfitDashboard({
                   <th>مصاريف الإعلان</th>
                   <th>إعلان / طلب</th>
                   <th>الربح بعد الإعلان</th>
+                  <th title="(الربح بعد الإعلان ÷ مصاريف الإعلان) ×100 — كل 1 د.ع إعلان ولّد كم د.ع ربحاً">ROI الإعلان</th>
                   <th>هامش بعد الإعلان</th>
-                  <th>% من الإيراد</th>
+                  <th>% من الربح</th>
                 </tr>
               </thead>
               <tbody>
@@ -1004,14 +1065,28 @@ export default function ProfitDashboard({
                   visibleProducts.map((p) => {
                     const m = marginOf(p);
                     const adCost = adByProduct.get(p.productId) ?? 0;
+                    // مصدر الصرف: مستورد من Meta إن كان للمنتج صفوف AdSpendDaily
+                    // في هذه الفترة (expensed المنتج الموجود في importedMap).
+                    const adCostSource = importedProductIds.has(p.productId)
+                      ? "meta"
+                      : "manual";
                     const profitAfterAds = p.totalProfit - adCost;
+                    // ROI الإعلان = (الربح بعد الإعلان ÷ الإعلان) ×100 —
+                    // كل 1 د.ع إعلان ولّد كم د.ع ربحاً بعد الإعلان.
+                    const adRoi =
+                      adCost > 0 ? (profitAfterAds / adCost) * 100 : null;
+                    // «هامش بعد الإعلان» = الربح بعد الإعلان ÷ تكلفة البضاعة
+                    // (لا الإيراد) — بطلب المالك.
                     const marginAfterAds =
-                      p.totalRevenue > 0
-                        ? (profitAfterAds / p.totalRevenue) * 100
+                      p.totalCost > 0
+                        ? (profitAfterAds / p.totalCost) * 100
                         : 0;
+                    // «% من الربح» = حصة المنتج من الربح الكلي لجميع المنتجات
+                    // (صافي الربح قبل المصاريف) — بطلب المالك. المنتجات ذات
+                    // الربح السالب تُحتسب ضمن البسط كما هي (قد تجعل النسب تتجاوز 100%).
                     const share =
-                      totals.revenue > 0
-                        ? (p.totalRevenue / totals.revenue) * 100
+                      totals.profit != 0
+                        ? (p.totalProfit / totals.profit) * 100
                         : 0;
                     const isOpen = expandedId === p.productId;
                     const rankClass =
@@ -1076,7 +1151,23 @@ export default function ProfitDashboard({
                           {/* Ad columns stay visible even with no ad spend, so
                               the table shape never shifts; they read "—" until a
                               campaign covers the product. */}
-                          <td>{adCost > 0 ? formatCurrency(adCost) : "—"}</td>
+                          <td>
+                            {adCost > 0 ? (
+                              <span className="inline-flex items-center gap-1.5">
+                                {formatCurrency(adCost)}
+                                {adCostSource === "meta" && (
+                                  <span
+                                    className="text-[9px] rounded-full border px-1.5 py-0.5 text-muted-foreground"
+                                    title="صرف Meta المستورد فعلياً — لهذا المنتج في هذه الفترة"
+                                  >
+                                    Meta
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
                           <td>
                             {adCost > 0 && p.orderCount > 0
                               ? formatCurrency(adCost / p.orderCount)
@@ -1098,6 +1189,25 @@ export default function ProfitDashboard({
                             {adCost > 0 ? formatCurrency(profitAfterAds) : "—"}
                           </td>
                           <td>
+                            {adRoi != null ? (
+                              <span
+                                className={`pa-badge ${
+                                  adRoi >= 100
+                                    ? "pa-badge--green"
+                                    : adRoi >= 0
+                                      ? "pa-badge--green"
+                                      : "pa-badge--danger"
+                                }`}
+                                title="(الربح بعد الإعلان ÷ مصاريف الإعلان) ×100"
+                              >
+                                {adRoi >= 0 ? "" : ""}
+                                {adRoi.toFixed(0)}%
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td>
                             {adCost > 0 ? (
                               <span
                                 className={`pa-badge ${marginAfterAds >= 15 ? "pa-badge--green" : "pa-badge--danger"}`}
@@ -1115,12 +1225,15 @@ export default function ProfitDashboard({
                                   className="pa-bar-fill"
                                   style={{
                                     width: `${Math.min(share, 100)}%`,
-                                    background: "var(--pa-green)",
+                                    background:
+                                      share > 25
+                                        ? "var(--pa-danger)"
+                                        : "var(--pa-green)",
                                   }}
                                 />
                               </div>
                               <span className="min-w-[32px]">
-                                {share.toFixed(0)}%
+                                {share.toFixed(1)}%
                               </span>
                             </div>
                           </td>
@@ -1203,11 +1316,18 @@ export default function ProfitDashboard({
                     {adsActive ? formatCurrency(netProfit - adsExpense) : "—"}
                   </td>
                   <td>
-                    {adsActive && totals.revenue > 0
-                      ? `${(((netProfit - adsExpense) / totals.revenue) * 100).toFixed(1)}%`
+                    {adsActive && adsExpense > 0
+                      ? `${(((netProfit - adsExpense) / adsExpense) * 100).toFixed(0)}%`
                       : "—"}
                   </td>
-                  <td>100%</td>
+                  <td>
+                    {adsActive && totals.cost > 0
+                      ? `${(((netProfit - adsExpense) / totals.cost) * 100).toFixed(1)}%`
+                      : "—"}
+                  </td>
+                  <td>
+                    {totals.profit != 0 ? "100%" : "—"}
+                  </td>
                 </tr>
               </tfoot>
             </table>

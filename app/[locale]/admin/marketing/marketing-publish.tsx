@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import {
   publishPost,
   deleteSocialPost,
+  deleteSocialPostsBulk,
   launchAd,
   finishInstagramVideo,
 } from "@/lib/actions/social.actions";
@@ -27,6 +28,8 @@ import {
   Rocket,
   CheckCircle2,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export type Feed = {
@@ -47,6 +50,7 @@ export type Feed = {
     igPostId: string | null;
     error: string | null;
     needsIgFinish: boolean;
+    productId: string | null;
     createdAt: string;
     launches: {
       id: string;
@@ -103,6 +107,17 @@ export default function PublishPanel({
   // حالة الرفع لعرض مؤشّر صغير مع عدّاد مكان الوسيط.
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+  // تأكيد صريح على النشر بلا منتج (يظهر كتحذير داخل النموذج).
+  const [confirmNoProduct, setConfirmNoProduct] = useState(false);
+  // تحديد المنشورات للحذف الجماعي من السجل — مجموعة ids المحددة.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  // حد عرض السجل: 10 منشورات ظاهرة والبقية خلف زر «عرض بقية السجل».
+  const [showAll, setShowAll] = useState(false);
+  const POSTS_PREVIEW_LIMIT = 10;
+  const visiblePosts = showAll
+    ? feed.posts
+    : feed.posts.slice(0, POSTS_PREVIEW_LIMIT);
+  const hiddenCount = feed.posts.length - visiblePosts.length;
 
   const hasVideo = videos.length > 0;
 
@@ -136,7 +151,7 @@ export default function PublishPanel({
     !nonJpegForIg &&
     !pending;
 
-  const onPublish = () =>
+  const onPublish = (confirmNoProduct = false) =>
     startTransition(async () => {
       const r = await publishPost({
         caption,
@@ -144,7 +159,14 @@ export default function PublishPanel({
         videoUrls: videos,
         platforms,
         productId: productId || null,
+        confirmNoProduct,
       });
+      // رفض بلا منتج: رسالة فيها noProductConfirm — لا نُكرّر التوست، الواجهة
+      // تعرض تأكيداً داخلياً بدلها.
+      if ((r as { noProductConfirm?: boolean }).noProductConfirm) {
+        setConfirmNoProduct(true);
+        return;
+      }
       toast({
         description: r.message,
         variant: r.success ? undefined : "destructive",
@@ -155,6 +177,7 @@ export default function PublishPanel({
         setImages([]);
         setVideos([]);
         setProductId("");
+        setConfirmNoProduct(false);
       }
       router.refresh();
     });
@@ -373,7 +396,36 @@ export default function PublishPanel({
           </p>
         )}
 
-        <Button onClick={onPublish} disabled={!canPublish}>
+        {!productId && confirmNoProduct && (
+          <div className="rounded-lg border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-center justify-between gap-2 flex-wrap">
+            <span>
+              ستُنشر دون ربط بمنتج — لن يُربط صرف إعلانها لاحقاً تلقائياً. أنصح
+              باختيار منتج.
+            </span>
+            <span className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setConfirmNoProduct(false)}
+                disabled={pending}
+              >
+                رجوع واختيار منتج
+              </Button>
+              <Button size="sm" onClick={() => onPublish(true)} disabled={pending}>
+                {pending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "تأكيد النشر بلا منتج"
+                )}
+              </Button>
+            </span>
+          </div>
+        )}
+
+        <Button
+          onClick={() => (productId ? onPublish(false) : setConfirmNoProduct(true))}
+          disabled={!canPublish}
+        >
           {pending ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
@@ -386,36 +438,140 @@ export default function PublishPanel({
 
       {/* المنشورات */}
       <div className="space-y-3">
-        <h3 className="font-semibold text-sm">المنشورات ({feed.posts.length})</h3>
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="font-semibold text-sm">المنشورات ({feed.posts.length})</h3>
+          {feed.posts.length > 0 && (
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-primary"
+                  checked={selected.size === feed.posts.length && feed.posts.length > 0}
+                  onChange={(e) =>
+                    setSelected(
+                      e.target.checked
+                        ? new Set(feed.posts.map((p) => p.id))
+                        : new Set(),
+                    )
+                  }
+                />
+                تحديد الكل
+              </label>
+              {selected.size > 0 && (
+                <span className="text-xs text-primary font-medium">
+                  {selected.size} محدد
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* شريط الحذف الجماعي — يظهر فقط عند وجود تحديد */}
+        {selected.size > 0 && (
+          <div className="rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 p-3 flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs text-red-700 dark:text-red-400">
+              سيُحذف السجل المحدد ({selected.size}) من لوحة النشر فقط — المنشورات
+              تبقى على فيسبوك/إنستغرام.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelected(new Set())}
+                disabled={pending}
+              >
+                إلغاء التحديد
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    const r = await deleteSocialPostsBulk([...selected]);
+                    toast({
+                      description: r.message,
+                      variant: r.success ? undefined : "destructive",
+                    });
+                    if (r.success) setSelected(new Set());
+                    router.refresh();
+                  })
+                }
+              >
+                {pending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 ml-1" /> حذف المحدد ({selected.size})
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+
         {feed.posts.length === 0 ? (
           <p className="text-sm text-muted-foreground">لا توجد منشورات بعد.</p>
         ) : (
-          feed.posts.map((post) => (
-            <PostRow
-              key={post.id}
-              post={post}
-              canLaunch={feed.ready.ads}
-              onBoost={() => setBoostFor(post.id)}
-              onDelete={() =>
-                startTransition(async () => {
-                  const r = await deleteSocialPost(post.id);
-                  toast({ description: r.message });
-                  router.refresh();
-                })
-              }
-              onFinishIg={() =>
-                startTransition(async () => {
-                  const r = await finishInstagramVideo(post.id);
-                  toast({
-                    description: r.message,
-                    variant: r.success ? undefined : "destructive",
-                  });
-                  router.refresh();
-                })
-              }
-              pending={pending}
-            />
-          ))
+          <>
+            {visiblePosts.map((post) => (
+              <PostRow
+                key={post.id}
+                post={post}
+                canLaunch={feed.ready.ads}
+                checked={selected.has(post.id)}
+                onCheck={(on) =>
+                  setSelected((prev) => {
+                    const next = new Set(prev);
+                    if (on) next.add(post.id);
+                    else next.delete(post.id);
+                    return next;
+                  })
+                }
+                onBoost={() => setBoostFor(post.id)}
+                onDelete={() =>
+                  startTransition(async () => {
+                    const r = await deleteSocialPost(post.id);
+                    toast({ description: r.message });
+                    router.refresh();
+                  })
+                }
+                onFinishIg={() =>
+                  startTransition(async () => {
+                    const r = await finishInstagramVideo(post.id);
+                    toast({
+                      description: r.message,
+                      variant: r.success ? undefined : "destructive",
+                    });
+                    router.refresh();
+                  })
+                }
+                pending={pending}
+              />
+            ))}
+
+            {/* زر فتح بقية السجل — يظهر فقط عند وجود منشورات مخفية */}
+            {hiddenCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAll(true)}
+                className="w-full py-2.5 text-xs text-primary hover:bg-muted rounded-lg border border-dashed flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ChevronDown className="w-3.5 h-3.5" />
+                عرض بقية السجل ({hiddenCount} منشور)
+              </button>
+            )}
+            {showAll && feed.posts.length > POSTS_PREVIEW_LIMIT && (
+              <button
+                type="button"
+                onClick={() => setShowAll(false)}
+                className="w-full py-2 text-[11px] text-muted-foreground hover:bg-muted rounded-lg border border-dashed flex items-center justify-center gap-1.5 transition-colors"
+              >
+                <ChevronUp className="w-3.5 h-3.5" />
+                إظهار آخر {POSTS_PREVIEW_LIMIT} فقط
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -518,6 +674,8 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
 function PostRow({
   post,
   canLaunch,
+  checked,
+  onCheck,
   onBoost,
   onDelete,
   onFinishIg,
@@ -525,6 +683,8 @@ function PostRow({
 }: {
   post: Feed["posts"][number];
   canLaunch: boolean;
+  checked: boolean;
+  onCheck: (on: boolean) => void;
   onBoost: () => void;
   onDelete: () => void;
   onFinishIg: () => void;
@@ -532,8 +692,35 @@ function PostRow({
 }) {
   const st = STATUS_LABEL[post.status] ?? STATUS_LABEL.draft;
   const isVideo = post.videoUrls.length > 0;
+  // نفس لغة بطاقة إعلان الفيديو: حافة يسرى بلون الحالة (أخضر نجاح / أحمر فشل /
+  // كهرماني جزئي أو معالجة / رمادي مسودة).
+  const failed = post.status === "failed";
+  const partial = post.status === "partial" || post.status === "pending_ig";
+  const edge = failed
+    ? "border-s-red-500"
+    : partial
+      ? "border-s-amber-500"
+      : post.status === "published"
+        ? "border-s-green-500"
+        : "border-s-muted-foreground/40";
+  const hasAnyLaunch = post.launches.length > 0;
+  const primaryLaunch = post.launches[0];
+  const moreLaunches = post.launches.length - 1;
   return (
-    <div className="rounded-lg border bg-card p-3 flex gap-3">
+    <div
+      className={`rounded-lg border bg-card border-s-4 p-3 flex gap-3 transition-all hover:shadow-sm ${
+        edge
+      } ${
+        checked ? "border-primary/60 ring-1 ring-primary/30" : ""
+      }`}
+    >
+      <input
+        type="checkbox"
+        className="w-4 h-4 accent-primary shrink-0 mt-1 cursor-pointer"
+        checked={checked}
+        onChange={(e) => onCheck(e.target.checked)}
+        aria-label="تحديد السجل للحذف الجماعي"
+      />
       {isVideo ? (
         <video
           src={post.videoUrls[0]}
@@ -553,10 +740,46 @@ function PostRow({
         <div className="w-14 h-14 rounded bg-muted shrink-0" />
       )}
 
-      <div className="flex-1 min-w-0 space-y-1">
-        <p className="text-sm line-clamp-2">{post.caption || "—"}</p>
+      <div className="flex-1 min-w-0 space-y-1.5">
+        <div className="flex items-center justify-between gap-2">
+          {/* شارة الحالة بنمط pill مطابق للإعلانات */}
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${
+              failed
+                ? "border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                : partial
+                  ? "border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-500"
+                  : post.status === "published"
+                    ? "border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+                    : "border-border bg-muted text-muted-foreground"
+            }`}
+          >
+            {failed ? (
+              <AlertTriangle className="w-3 h-3" />
+            ) : post.status === "published" ? (
+              <CheckCircle2 className="w-3 h-3" />
+            ) : null}
+            {st.text}
+          </span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {new Date(post.createdAt).toLocaleDateString("ar-IQ")}
+          </span>
+        </div>
+        <p
+          className="text-sm font-medium leading-snug line-clamp-2"
+          title={post.caption || undefined}
+        >
+          {post.caption || "—"}
+        </p>
         <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-          <span className={`font-semibold ${st.cls}`}>{st.text}</span>
+          {!post.productId && (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-500 px-1.5 py-0.5"
+              title="منشور بلا منتج — إعلانه لن يُربط بصرف Meta تلقائياً"
+            >
+              <AlertTriangle className="w-3 h-3" /> بلا منتج
+            </span>
+          )}
           {post.platforms.includes("facebook") && (
             <Facebook className="w-3.5 h-3.5" />
           )}
@@ -573,7 +796,6 @@ function PostRow({
               فيسبوك <ExternalLink className="w-3 h-3" />
             </a>
           )}
-          <span>· {new Date(post.createdAt).toLocaleDateString("ar-IQ")}</span>
         </div>
         {post.error && (
           <p className="text-xs text-red-600 line-clamp-2">{post.error}</p>
@@ -584,23 +806,30 @@ function PostRow({
             إنستغرام» لإتمام النشر (كرّر إن قال «قيد المعالجة»).
           </p>
         )}
-        {post.launches.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {post.launches.map((l) => (
-              <span
-                key={l.id}
-                className="inline-flex items-center gap-1 text-[11px] rounded-full border px-2 py-0.5"
-                title={l.error ?? undefined}
-              >
-                {l.status === "failed" ? (
-                  <AlertTriangle className="w-3 h-3 text-red-600" />
-                ) : (
-                  <CheckCircle2 className="w-3 h-3 text-green-600" />
-                )}
-                إعلان · {fmtAdMoney(l.dailyBudget, l.currency)}/يوم ·{" "}
-                {l.status === "failed" ? "فشل" : "أُنشئ موقوفاً"}
+        {/* سطر الإعلان المُطلق — بنفس بنود بطاقة إعلان الفيديو (الميزانية + الحالة) */}
+        {hasAnyLaunch && primaryLaunch && (
+          <div className="pt-1.5 border-t flex items-center justify-between gap-2 flex-wrap">
+            <span
+              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                primaryLaunch.status === "failed"
+                  ? "border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400"
+                  : "border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400"
+              }`}
+              title={primaryLaunch.error ?? undefined}
+            >
+              {primaryLaunch.status === "failed" ? (
+                <AlertTriangle className="w-3 h-3" />
+              ) : (
+                <Rocket className="w-3 h-3" />
+              )}
+              {fmtAdMoney(primaryLaunch.dailyBudget, primaryLaunch.currency)}/يوم ·{" "}
+              {primaryLaunch.status === "failed" ? "فشل الإطلاق" : "أُنشئ موقوفاً"}
+            </span>
+            {moreLaunches > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                +{moreLaunches} إعلان آخر
               </span>
-            ))}
+            )}
           </div>
         )}
       </div>
