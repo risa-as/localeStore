@@ -276,7 +276,7 @@
     "employee": "Employee",
     "deletedUser": "Deleted User",
     "searchPlaceholder": "Search...",
-    "ordersSearchPlaceholder": "Phone or barcode...",
+    "ordersSearchPlaceholder": "Phone, barcode, or product...",
     "deleteConfirm": "Are You Sure?",
     "deleteDescription": "This action cannot be undone",
     "deleteCancel": "Cancel",

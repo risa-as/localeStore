@@ -276,7 +276,7 @@
     "employee": "موظف",
     "deletedUser": "مستخدم محذوف",
     "searchPlaceholder": "بحث...",
-    "ordersSearchPlaceholder": "هاتف أو باركود...",
+    "ordersSearchPlaceholder": "هاتف أو باركود أو اسم منتج...",
     "deleteConfirm": "هل أنت متأكد؟",
     "deleteDescription": "هذا الإجراء لا يمكن التراجع عنه",
     "deleteCancel": "إلغاء",

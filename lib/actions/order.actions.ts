@@ -14,6 +14,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
 import { buildFefoContexts, saleKey } from "@/lib/fefo-cogs";
+import { computeItemsPriceTotal, computeOrderPricing } from "@/lib/pricing";
 import { sendOrderConfirmation, sendOrderReturned } from "@/lib/whatsapp";
 
 // يبني مدخل التوصيل الموحّد من بيانات الطلب.
@@ -97,6 +98,18 @@ async function getActualShippingCost(governorate: string): Promise<number> {
   return governorate === "Baghdad"
     ? Number(settings.baghdadCost)
     : Number(settings.othersCost);
+}
+
+// عروض المنتجات لعناصر طلب — تُستخدم لتسعير القطعتين فأكثر من حقل «العروض»
+async function getOffersByProductId(
+  client: Pick<typeof prisma, "product">,
+  productIds: string[],
+): Promise<Map<string, string | null | undefined>> {
+  const products = await client.product.findMany({
+    where: { id: { in: productIds } },
+    select: { id: true, offers: true },
+  });
+  return new Map(products.map((p) => [p.id, p.offers]));
 }
 
 // Create Quick Order (Direct from Landing Page)
@@ -198,10 +211,18 @@ export async function createQuickOrder(
           where: { orderId: recentOrder.id },
         });
 
-        // Items Price
-        const itemsPrice = updatedItems.reduce(
-          (acc, item) => acc + Number(item.price) * item.qty,
-          0,
+        // Items Price — بتسعير العروض لكل منتج على حدة
+        const offersByProduct = await getOffersByProductId(
+          tx,
+          updatedItems.map((item) => item.productId),
+        );
+        const itemsPrice = computeItemsPriceTotal(
+          updatedItems.map((item) => ({
+            productId: item.productId,
+            unitPrice: Number(item.price),
+            quantity: item.qty,
+          })),
+          offersByProduct,
         );
 
         // Flat Shipping (Max of items)
@@ -243,10 +264,15 @@ export async function createQuickOrder(
     }
 
     // Create Order
-    // Flat Rate Shipping: (Price * Qty) + Shipping
-    const itemsPrice = Number(product.price) * orderData.quantity;
-    const shippingPrice = Number(product.shippingPrice);
-    const price = itemsPrice + shippingPrice;
+    // السعر من عروض المنتج (سعر القطعتين فما فوق) + كلفة توصيل واحدة
+    const pricing = computeOrderPricing({
+      quantity: orderData.quantity,
+      unitPrice: Number(product.price),
+      shippingPrice: Number(product.shippingPrice),
+      offers: product.offers,
+    });
+    const shippingPrice = pricing.shippingPrice;
+    const price = pricing.totalPrice;
 
     // Capture IP
     const ip = (await headers()).get("x-forwarded-for");
@@ -305,14 +331,20 @@ export async function createQuickOrder(
     if (!insertedOrderId) throw new Error("Order not created");
 
     // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
-    // WhatsApp: رسالة تأكيد الطلب (كانت عبر n8n سابقاً)
+    // WhatsApp: رسالة تأكيد الطلب — السعر من عروض المنتج لا من price × qty
     try {
+      if (pricing.source === "fallback" && orderData.quantity > 1) {
+        console.warn(
+          `⚠️ لا يوجد «سعر القطعتين» في عروض ${product.name} — استُخدم ضرب بسيط في الرسالة`,
+        );
+      }
       await sendOrderConfirmation({
         fullName: orderData.fullName,
         phoneNumber: orderData.phoneNumber,
         product: product.name,
         quantity: orderData.quantity,
-        price: price,
+        itemsPrice: pricing.itemsPrice,
+        shippingPrice: pricing.shippingPrice,
       });
     } catch (err) {
       console.error("❌ WhatsApp order confirmation error:", err);
@@ -347,24 +379,24 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
 
     const orderData = insertOrderSchema.parse(data);
 
+    // Get product offers first — التسعير يعتمد على عرض كل منتج
+    const productIds = cart.items.map((item) => item.productId);
+    const offersByProduct = await getOffersByProductId(prisma, productIds);
+
     // Calculate total price from cart items
-    const itemsPrice = cart.items.reduce(
-      (acc, item) => acc + Number(item.price) * item.qty,
-      0,
+    const itemsPrice = computeItemsPriceTotal(
+      cart.items.map((item: CartItem) => ({
+        productId: item.productId,
+        unitPrice: Number(item.price),
+        quantity: item.qty,
+      })),
+      offersByProduct,
     );
     const shippingPrice =
       cart.items.length > 0
         ? Math.max(...cart.items.map((item) => Number(item.shippingPrice)))
         : 0;
     const price = itemsPrice + shippingPrice;
-
-    // Get product details
-    const productIds = cart.items.map((item) => item.productId);
-    const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
-      select: { id: true },
-    });
-    const productMap = new Map(products.map((p) => [p.id, p]));
 
     const session = await auth();
     const userId = session?.user?.id;
@@ -422,10 +454,18 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
           where: { orderId: recentOrder.id },
         });
 
-        // Items Price
-        const newItemsPrice = updatedItems.reduce(
-          (acc, item) => acc + Number(item.price) * item.qty,
-          0,
+        // Items Price — بتسعير العروض لكل منتج على حدة
+        const mergedOffers = await getOffersByProductId(
+          tx,
+          updatedItems.map((item) => item.productId),
+        );
+        const newItemsPrice = computeItemsPriceTotal(
+          updatedItems.map((item) => ({
+            productId: item.productId,
+            unitPrice: Number(item.price),
+            quantity: item.qty,
+          })),
+          mergedOffers,
         );
 
         // Flat Shipping
@@ -596,22 +636,7 @@ export async function getAllOrders({
   status?: string;
   sort?: string;
 }) {
-  const queryFilter: Prisma.OrderWhereInput =
-    query && query !== "all"
-      ? {
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { phoneNumber: { contains: query, mode: "insensitive" } },
-            { address: { contains: query, mode: "insensitive" } },
-            { governorate: { contains: query, mode: "insensitive" } },
-            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : {};
-
-  if (status && status !== "all") {
-    (queryFilter as any).status = status;
-  }
+  const queryFilter = buildOrdersFilter(query, status);
 
   // Handle Product Sorting
   if (sort === "product") {
@@ -692,6 +717,12 @@ function buildOrdersFilter(query: string, status?: string) {
             { address: { contains: query, mode: "insensitive" } },
             { governorate: { contains: query, mode: "insensitive" } },
             { deliveryTrackingId: { contains: query, mode: "insensitive" } },
+            // اسم المنتج — يطابق أي صنف داخل الطلب
+            {
+              orderitems: {
+                some: { name: { contains: query, mode: "insensitive" } },
+              },
+            },
           ],
         }
       : {};
@@ -750,22 +781,7 @@ export async function getAllOrdersForExport({
   status?: string;
   sort?: string;
 }) {
-  const queryFilter: Prisma.OrderWhereInput =
-    query && query !== "all"
-      ? {
-          OR: [
-            { fullName: { contains: query, mode: "insensitive" } },
-            { phoneNumber: { contains: query, mode: "insensitive" } },
-            { address: { contains: query, mode: "insensitive" } },
-            { governorate: { contains: query, mode: "insensitive" } },
-            { deliveryTrackingId: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : {};
-
-  if (status && status !== "all") {
-    (queryFilter as any).status = status;
-  }
+  const queryFilter = buildOrdersFilter(query, status);
 
   const data = await prisma.order.findMany({
     where: {
@@ -1884,7 +1900,12 @@ export async function importOrders(data: any[]) {
         // If totalPrice from Excel is 0, use calculated.
         // Or just overwrite? The user said "fetch the price ... and add it".
         // I'll prefer the calculated price to ensure it matches the product in DB.
-        const calculatedTotalPrice = itemPrice * qty + shipping;
+        const calculatedTotalPrice = computeOrderPricing({
+          quantity: qty,
+          unitPrice: itemPrice,
+          shippingPrice: shipping,
+          offers: product.offers,
+        }).totalPrice;
 
         const finalTotalPrice =
           totalPrice > 0 ? totalPrice : calculatedTotalPrice;

@@ -8,6 +8,7 @@ import { prisma } from "@/db/prisma";
  *   WHATSAPP_PHONE_NUMBER_ID  معرف رقم الهاتف في Meta (Phone Number ID)
  *   WHATSAPP_VERIFY_TOKEN     كلمة سرية من اختيارك للتحقق من Webhook
  *   WHATSAPP_APP_SECRET       App Secret للتحقق من توقيع Meta (اختياري لكنه مُوصى به)
+ *   WHATSAPP_ORDER_TEMPLATE_NAME  اسم قالب تأكيد الطلب لدى Meta (افتراضياً order_confirmation_utility_1)
  *
  * عند اشتراك أكثر من متجر في نفس WHATSAPP_PHONE_NUMBER_ID تُضاف (انظر
  * lib/whatsapp-tenant.ts):
@@ -17,6 +18,15 @@ import { prisma } from "@/db/prisma";
  */
 
 const GRAPH_VERSION = "v25.0";
+
+/**
+ * اسم قالب تأكيد الطلب في WhatsApp Manager — يجب أن يكون منشأً ومعتمَداً هناك
+ * بخمسة معاملات في المتن بهذا الترتيب الموضعي:
+ *   {{1}} المنتج · {{2}} الكمية · {{3}} سعر المنتج · {{4}} التوصيل · {{5}} اسم الزبون
+ * القالب الأقدم order_confirmation_utility كان بأربعة معاملات وسعر مجموع واحد.
+ */
+const ORDER_TEMPLATE_NAME =
+  process.env.WHATSAPP_ORDER_TEMPLATE_NAME || "order_confirmation_utility_v2";
 
 /**
  * أسماء «وهمية» يكتبها بعض الزبائن بدل اسمهم الحقيقي — لا نرسل لهم قالب تأكيد
@@ -129,13 +139,23 @@ async function recordOutbound(params: {
   }
 }
 
-/** إرسال قالب تأكيد الطلب — يطابق سلوك n8n السابق (خصم 5 عند الكمية > 1) */
+/**
+ * إرسال قالب تأكيد الطلب.
+ *
+ * السعر يصل محسوباً من lib/pricing.ts (سعر القطعتين من حقل العروض، وما زاد
+ * يُضاف له فرق العرض) — هذه الدالة لا تحسب شيئاً، فقط تعبّئ القالب.
+ *
+ * ⚠️ ترتيب المعاملات موضعي وليس بترتيب القراءة في الرسالة:
+ *   {{1}} المنتج · {{2}} الكمية · {{3}} سعر المنتج · {{4}} التوصيل · {{5}} اسم الزبون
+ */
 export async function sendOrderConfirmation(params: {
   fullName: string;
   phoneNumber: string; // بصيغة محلية 07XXXXXXXXX
   product: string;
   quantity: number;
-  price: number;
+  /** سعر المنتج بلا توصيل */
+  itemsPrice: number;
+  shippingPrice: number;
 }) {
   const config = getWaConfig();
   if (!config) return;
@@ -148,23 +168,25 @@ export async function sendOrderConfirmation(params: {
     return;
   }
 
-  const newprice = params.quantity > 1 ? params.price - 5 : params.price;
+  const shippingText =
+    params.shippingPrice > 0 ? params.shippingPrice.toString() : "توصيل مجاني";
 
   const data = await graphPost(config, {
     messaging_product: "whatsapp",
     to: toWaPhone(params.phoneNumber),
     type: "template",
     template: {
-      name: "order_confirmation_utility",
+      name: ORDER_TEMPLATE_NAME,
       language: { code: "ar" },
       components: [
         {
           type: "body",
           parameters: [
-            { type: "text", text: params.fullName || "" },
             { type: "text", text: params.product || "" },
             { type: "text", text: params.quantity?.toString() || "1" },
-            { type: "text", text: newprice?.toString() || "0" },
+            { type: "text", text: params.itemsPrice?.toString() ?? "0" },
+            { type: "text", text: shippingText },
+            { type: "text", text: params.fullName || "" },
           ],
         },
       ],
@@ -175,7 +197,7 @@ export async function sendOrderConfirmation(params: {
     localPhone: toLocalPhone(toWaPhone(params.phoneNumber)),
     waMessageId: data.messages?.[0]?.id,
     type: "template",
-    body: `📦 قالب تأكيد الطلب — ${params.product} × ${params.quantity} بسعر ${newprice}`,
+    body: `📦 قالب تأكيد الطلب — ${params.product} × ${params.quantity} بسعر ${params.itemsPrice} + توصيل ${shippingText}`,
   });
 }
 
