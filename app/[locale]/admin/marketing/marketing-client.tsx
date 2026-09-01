@@ -10,6 +10,7 @@ import {
   selectMetaAdAccount,
   disconnectMeta,
   checkMetaPermissions,
+  getMetaTokenStatus,
 } from "@/lib/actions/meta.actions";
 import {
   Megaphone,
@@ -409,6 +410,117 @@ function AssetRow({
   );
 }
 
+/** يفكّ مدة بالمللي ثانية إلى أيام/ساعات/دقائق/ثوانٍ. */
+function breakdown(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return {
+    days: Math.floor(s / 86400),
+    hours: Math.floor((s % 86400) / 3600),
+    minutes: Math.floor((s % 3600) / 60),
+    seconds: s % 60,
+  };
+}
+
+/**
+ * عدّاد انتهاء الاتصال — يقرأ الحالة الحقيقية من Meta لا من قاعدة البيانات.
+ *
+ * تمييز جوهري: توكن «لا ينتهي» لا يعني اتصالاً أبدياً. Meta تضع
+ * data_access_expires_at وبعده تتوقف البيانات وتفشل النداءات رغم صلاحية التوكن.
+ * لذا العدّاد يعمل على أقرب حدّ فعلي، ونقول صراحةً أيّ حدّ هو.
+ */
+function ConnectionCountdown() {
+  const [info, setInfo] = useState<Awaited<
+    ReturnType<typeof getMetaTokenStatus>
+  > | null>(null);
+  // القيمة الأولى عبر مُهيّئ كسول (لا استدعاء زمن أثناء الرسم)، ثم تُحدَّث بالمؤقّت.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    let alive = true;
+    getMetaTokenStatus().then((r) => alive && setInfo(r));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (!info)
+    return (
+      <p className="text-xs text-muted-foreground flex items-center gap-1">
+        <Loader2 className="w-3 h-3 animate-spin" /> جارٍ قراءة مدة الاتصال…
+      </p>
+    );
+  if (!info.ok)
+    return (
+      <p className="text-xs text-amber-600">
+        تعذّرت قراءة مدة الاتصال: {info.message}
+      </p>
+    );
+
+  const tokenNever = info.expiresAt === null;
+  // الحدّ الفعلي = أقرب تاريخ بين انتهاء التوكن وانتهاء الوصول للبيانات.
+  const limits = [info.expiresAt, info.dataAccessExpiresAt].filter(
+    (x): x is string => !!x,
+  );
+  if (limits.length === 0)
+    return (
+      <p className="text-xs text-green-600 dark:text-green-400">
+        الاتصال دائم — لا تاريخ انتهاء ولا حدّ للوصول للبيانات.
+      </p>
+    );
+
+  const deadlineIso = limits.sort()[0];
+  const deadline = new Date(deadlineIso).getTime();
+  const isDataLimit = deadlineIso === info.dataAccessExpiresAt;
+  const remaining = deadline - nowMs;
+  const b = breakdown(remaining);
+  const urgent = remaining < 7 * 86400000;
+  const expired = remaining <= 0;
+
+  return (
+    <div className="text-xs space-y-0.5">
+      {tokenNever && (
+        <p className="text-green-600 dark:text-green-400">
+          التوكن نفسه دائم (بلا تاريخ انتهاء).
+        </p>
+      )}
+      <p
+        className={
+          expired
+            ? "text-red-600 font-semibold"
+            : urgent
+              ? "text-red-600"
+              : "text-muted-foreground"
+        }
+      >
+        {expired ? (
+          <>
+            {isDataLimit ? "انتهى الوصول للبيانات" : "انتهت صلاحية التوكن"} —
+            أعِد الربط الآن.
+          </>
+        ) : (
+          <>
+            {isDataLimit ? "ينتهي الوصول للبيانات خلال" : "ينتهي التوكن خلال"}{" "}
+            <span className="font-semibold tabular-nums" dir="ltr">
+              {b.days} يوم {String(b.hours).padStart(2, "0")}:
+              {String(b.minutes).padStart(2, "0")}:
+              {String(b.seconds).padStart(2, "0")}
+            </span>
+          </>
+        )}
+      </p>
+      <p className="text-muted-foreground">
+        التاريخ: {new Date(deadlineIso).toLocaleString("ar-IQ")}
+        {isDataLimit && " — بعده تفشل النداءات حتى لو بقي التوكن صالحاً"}
+      </p>
+    </div>
+  );
+}
+
 function Connected({
   status,
   onSelectPage,
@@ -422,13 +534,8 @@ function Connected({
   onDisconnect: () => void;
   pending: boolean;
 }) {
-  // لقطة زمنية مرة واحدة — لا نستدعي Date.now() أثناء الرسم (دالة غير نقية).
-  const [now] = useState(() => Date.now());
-  const expires = status.tokenExpires ? new Date(status.tokenExpires) : null;
-  const daysLeft = expires
-    ? Math.round((expires.getTime() - now) / (24 * 3600 * 1000))
-    : null;
-
+  // مدة الاتصال تُقرأ الآن حيّة من Meta داخل ConnectionCountdown، لا من التاريخ
+  // المخزَّن وقت الربط (كان فارغاً أصلاً لهذا التوكن).
   return (
     <div className="space-y-5">
       {/* شريط الحالة */}
@@ -439,14 +546,7 @@ function Connected({
             <p className="font-semibold text-sm">
               متصل{status.fbUserName ? ` — ${status.fbUserName}` : ""}
             </p>
-            {daysLeft !== null && (
-              <p
-                className={`text-xs ${daysLeft <= 7 ? "text-red-600" : "text-muted-foreground"}`}
-              >
-                صلاحية التوكن تنتهي خلال {daysLeft} يوم
-                {daysLeft <= 7 ? " — أعِد الربط قريباً" : ""}
-              </p>
-            )}
+            <ConnectionCountdown />
           </div>
         </div>
         <Button

@@ -161,3 +161,55 @@ export async function disconnectMeta() {
   revalidatePath("/admin/marketing");
   return { success: true, message: "تم قطع الاتصال" };
 }
+
+/**
+ * عمر التوكن الحقيقي كما تُبلّغ به Meta (لا كما خُزِّن عند الربط).
+ *
+ * تمييز مهم: `expires_at = 0` يعني توكناً لا ينتهي، لكن ذلك **لا** يعني اتصالاً
+ * أبدياً — فـ `data_access_expires_at` هو الحدّ الفعلي: بعده تتوقف Meta عن
+ * إعطاء البيانات وتفشل النداءات رغم أن التوكن «صالح». لذا نعرض العدّاد على هذا
+ * التاريخ تحديداً.
+ */
+export async function getMetaTokenStatus(): Promise<{
+  ok: boolean;
+  message?: string;
+  valid?: boolean;
+  /** ISO — أو null إن كان التوكن بلا انتهاء. */
+  expiresAt?: string | null;
+  /** ISO — أو null إن لم تحدّد Meta حدّاً للوصول للبيانات. */
+  dataAccessExpiresAt?: string | null;
+}> {
+  await requireAdmin();
+  const cfg = getMetaConfig();
+  if (!cfg) return { ok: false, message: "Meta غير مُهيأ" };
+  const conn = await prisma.metaConnection.findUnique({
+    where: { id: "default" },
+  });
+  if (!conn?.userAccessToken) return { ok: false, message: "لا يوجد اتصال" };
+
+  try {
+    // توكن التطبيق (appId|appSecret) هو المخوّل بفحص توكنات هذا التطبيق.
+    const res = await graphGet<{
+      data?: {
+        is_valid?: boolean;
+        expires_at?: number;
+        data_access_expires_at?: number;
+      };
+    }>("debug_token", `${cfg.appId}|${cfg.appSecret}`, {
+      input_token: conn.userAccessToken,
+    });
+    const d = res.data;
+    if (!d) return { ok: false, message: "تعذّر قراءة حالة التوكن" };
+    // القيمة 0 (أو الغياب) تعني «بلا انتهاء».
+    const toIso = (sec?: number) =>
+      sec && sec > 0 ? new Date(sec * 1000).toISOString() : null;
+    return {
+      ok: true,
+      valid: d.is_valid ?? false,
+      expiresAt: toIso(d.expires_at),
+      dataAccessExpiresAt: toIso(d.data_access_expires_at),
+    };
+  } catch (e) {
+    return { ok: false, message: (e as Error).message };
+  }
+}
