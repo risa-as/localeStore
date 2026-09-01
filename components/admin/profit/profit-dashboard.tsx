@@ -85,6 +85,8 @@ export type ProfitDashboardProps = {
     droppedNoFxTotal?: number;
     droppedNoFxCount?: number;
   };
+  /** تحذير صحّة مزامنة الصرف الإعلاني (فشل/تأخّر) — null إن كانت سليمة. */
+  adSyncWarning?: string | null;
   /** Same metrics for the immediately preceding period, for the delta badges. */
   comparison: {
     collected: number;
@@ -129,6 +131,7 @@ export default function ProfitDashboard({
   fefoFallbackQty,
   exportContext,
   expenses,
+  adSyncWarning,
   comparison,
   inconsistentOrders,
   onWhatIfChange,
@@ -485,6 +488,20 @@ export default function ProfitDashboard({
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
       <div className="pa-inner">
+        {/* مزامنة الصرف الإعلاني متوقفة/فاشلة — الربح المعروض أعلى من الحقيقي. */}
+        {adSyncWarning && (
+          <div className="pa-warn" style={{ marginBottom: 12 }}>
+            <div className="pa-warn-toggle" style={{ cursor: "default" }}>
+              <span className="pa-warn-icon" aria-hidden>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+              <span className="pa-warn-title flex-1 text-right">
+                {adSyncWarning}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* إدخالات دولارية سقطت من الحساب لغياب سعر صرف يغطّي تاريخ بدايتها —
             بلا هذا التنبيه يختفي المبلغ من التقرير بلا أثر. */}
         {droppedNoFxCount > 0 && (

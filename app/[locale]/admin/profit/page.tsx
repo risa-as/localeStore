@@ -3,6 +3,7 @@ import ProfitDatePicker from "@/components/admin/profit-date-picker";
 import ProfitDashboard from "@/components/admin/profit/profit-dashboard";
 import { getOrderProfitStats } from "@/lib/actions/order.actions";
 import { getExpenseStatsForPeriod } from "@/lib/actions/expense.actions";
+import { getLastSync } from "@/lib/actions/adspend.actions";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BarChart3 } from "lucide-react";
@@ -47,12 +48,33 @@ const ProfitPage = async (props: {
   const prevTo = new Date(defaultFrom.getTime() - DAY);
   const prevFrom = new Date(prevTo.getTime() - spanMs);
 
-  const [current, expenseStats, previous, prevExpenses] = await Promise.all([
-    getOrderProfitStats({ from: defaultFrom, to: defaultTo }),
-    getExpenseStatsForPeriod(defaultFrom, defaultTo),
-    getOrderProfitStats({ from: prevFrom, to: prevTo }),
-    getExpenseStatsForPeriod(prevFrom, prevTo),
-  ]);
+  const [current, expenseStats, previous, prevExpenses, lastSync] =
+    await Promise.all([
+      getOrderProfitStats({ from: defaultFrom, to: defaultTo }),
+      getExpenseStatsForPeriod(defaultFrom, defaultTo),
+      getOrderProfitStats({ from: prevFrom, to: prevTo }),
+      getExpenseStatsForPeriod(prevFrom, prevTo),
+      // صحّة مزامنة الصرف الإعلاني — مزامنة متوقفة تعني تكلفة إعلانات ناقصة
+      // وبالتالي ربحاً مبالغاً فيه، فيجب أن يُقال صراحةً هنا لا في صفحة أخرى.
+      getLastSync().catch(() => null),
+    ]);
+
+  // «قديمة» = آخر يوم مُزامَن أقدم من يومين (الكرون يومي)، أو آخر تشغيل فشل.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const syncDayMs = lastSync?.date
+    ? new Date(`${lastSync.date}T12:00:00.000Z`).getTime()
+    : null;
+  const staleDays = syncDayMs
+    ? Math.floor((Date.now() - syncDayMs) / DAY_MS)
+    : null;
+  const adSyncWarning =
+    lastSync && lastSync.ranAt === null
+      ? "لم تُشغَّل مزامنة الصرف الإعلاني بعد — تكلفة الإعلانات في هذا التقرير غير مستوردة."
+      : lastSync && !lastSync.ok
+        ? `فشلت آخر مزامنة للصرف الإعلاني (${lastSync.date ?? ""}) — قد تكون تكلفة الإعلانات ناقصة.`
+        : staleDays !== null && staleDays > 2
+          ? `آخر مزامنة للصرف الإعلاني كانت قبل ${staleDays} يوماً (${lastSync?.date}) — قد تكون تكلفة الإعلانات ناقصة.`
+          : null;
 
   const {
     productStats,
@@ -129,6 +151,7 @@ const ProfitPage = async (props: {
           droppedNoFxTotal: expenseStats.droppedNoFxTotal,
           droppedNoFxCount: expenseStats.droppedNoFxCount,
         }}
+        adSyncWarning={adSyncWarning}
         comparison={comparison}
         inconsistentOrders={inconsistentOrders}
         exportContext={{
