@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   getAdInsights,
   setAdActive,
@@ -861,12 +862,24 @@ function CampaignCard({
       >
         {camp.name}
       </p>
-      {camp.productName && (
+      {camp.productName ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1">
           <Package className="w-3 h-3 shrink-0" />
           {camp.productName}
           {camp.productAuto && <span className="opacity-60">(تلقائي)</span>}
         </p>
+      ) : (
+        // بلا منتج = صرف هذه الحملة لا يُنسب لأي منتج في الأرباح. حملات التفاعل
+        // لا تحمل رابط هبوط فلا تُربط تلقائياً — الربط اليدوي من صفحة المصاريف.
+        <Link
+          href="/admin/expenses"
+          className="text-[11px] rounded-md border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-500 px-1.5 py-1 flex items-center gap-1 hover:bg-amber-100 dark:hover:bg-amber-950/50"
+          title="اربط الحملة بمنتج من صفحة المصاريف ← حملات الإعلانات"
+        >
+          <AlertTriangle className="w-3 h-3 shrink-0" />
+          <span className="flex-1">بلا منتج — صرفها لا يُحتسب في الأرباح</span>
+          <span className="underline shrink-0">اربطها</span>
+        </Link>
       )}
       {/* حكم الحالة */}
       <p className={`text-xs font-medium flex items-center gap-1 ${verdict.cls}`}>
