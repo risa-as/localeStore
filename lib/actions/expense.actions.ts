@@ -182,9 +182,23 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
   // ── قاعدة الاستبدال: اليدوي المتقاطع مع نفس المنتج له صفوف Meta داخل مداه
   //    يُستبعد من الحساب ويُوسم (بلا حذف) — Meta هو المرجع.
   const importedDaysByProduct = new Map<string, Set<string>>();
-  const allImported = await prisma.adSpendDaily.findMany({
-    select: { productId: true, date: true },
-  });
+  // يقتصر على مدى تواريخ الإدخالات اليدوية نفسها — كان يجلب الجدول كاملاً بلا
+  // شرط، فينمو مع كل يوم مزامنة ويُنفَّذ عند كل فتح لصفحة الأرباح.
+  const spanFrom = campaignsRaw.reduce<Date | null>(
+    (min, c) => (min === null || c.fromDate < min ? c.fromDate : min),
+    null,
+  );
+  const spanTo = campaignsRaw.reduce<Date | null>(
+    (max, c) => (max === null || c.toDate > max ? c.toDate : max),
+    null,
+  );
+  const allImported =
+    spanFrom && spanTo
+      ? await prisma.adSpendDaily.findMany({
+          where: { date: { gte: spanFrom, lte: spanTo } },
+          select: { productId: true, date: true },
+        })
+      : [];
   for (const r of allImported) {
     let s = importedDaysByProduct.get(r.productId);
     if (!s) {
@@ -244,13 +258,20 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
   const adByProduct = new Map<string, { productId: string; name: string; amount: number }>();
   let totalAdCost = 0;
   let replacedManualTotal = 0;
+  // إدخالات دولارية بلا سعر صرف يغطّي تاريخ بدايتها — تُستبعد من الحساب. كانت
+  // تسقط بصمت؛ نجمعها الآن ونبلّغ عنها بدل أن يختفي المبلغ من التقرير.
+  let droppedNoFxTotal = 0;
+  let droppedNoFxCount = 0;
   for (const c of campaigns) {
     let total   = Number(c.amount);
     const usdFactor = usdToKiqd.get(c.id);
     if (c.currency === "USD") {
       if (usdFactor == null) {
-        // لا سعر صرف يغطي بداية الإدخال — استبعاده من الحساب مع الإبقاء ظاهراً.
-        replacedManualTotal += 0;
+        // لا سعر صرف يغطي بداية الإدخال — يُستبعد من الحساب ويُبلَّغ عنه.
+        const days = campaignDays(c.fromDate, c.toDate);
+        const overlap = overlapDays(c.fromDate, c.toDate, from, to);
+        droppedNoFxTotal += days > 0 ? (total * overlap) / days : 0;
+        droppedNoFxCount += 1;
         continue;
       }
       total = total * usdFactor; // دولار → ألف د.ع
@@ -319,6 +340,9 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     // شفافية التكامل (بوحدة الألف د.ع مثل بقية الحقول):
     importedAdTotalIQD: importedTotalIQD,
     replacedManualTotal,
+    // إدخالات دولارية مستبعدة لغياب سعر الصرف (بالدولار كما أُدخلت).
+    droppedNoFxTotal,
+    droppedNoFxCount,
     // لشارة مصدر الصرف في لوحة الأرباح.
     importedProductIds: [...new Set(importedRows.map((r) => r.productId))],
   };

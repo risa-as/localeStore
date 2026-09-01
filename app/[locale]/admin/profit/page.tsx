@@ -126,6 +126,8 @@ const ProfitPage = async (props: {
           importedAdTotalIQD: expenseStats.importedAdTotalIQD,
           replacedManualTotal: expenseStats.replacedManualTotal,
           importedProductIds: expenseStats.importedProductIds,
+          droppedNoFxTotal: expenseStats.droppedNoFxTotal,
+          droppedNoFxCount: expenseStats.droppedNoFxCount,
         }}
         comparison={comparison}
         inconsistentOrders={inconsistentOrders}

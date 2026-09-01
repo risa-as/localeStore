@@ -81,6 +81,9 @@ export type ProfitDashboardProps = {
     replacedManualTotal?: number;
     /** مُعرّفات المنتجات التي لها صفوف Meta مستوردة في الفترة — لشارة المصدر. */
     importedProductIds?: string[];
+    /** إدخالات دولارية استُبعدت لغياب سعر صرف يغطّي بدايتها (بالدولار). */
+    droppedNoFxTotal?: number;
+    droppedNoFxCount?: number;
   };
   /** Same metrics for the immediately preceding period, for the delta badges. */
   comparison: {
@@ -137,6 +140,9 @@ export default function ProfitDashboard({
   // شفافية التكامل: المستورد من Meta والإدخال اليدوي المستبدل (اختياريان).
   const importedAdTotalIQD = expenses.importedAdTotalIQD ?? 0;
   const replacedManualTotal = expenses.replacedManualTotal ?? 0;
+  // إدخالات دولارية خارج الحساب لغياب سعر الصرف — تُعرض كتحذير صريح.
+  const droppedNoFxTotal = expenses.droppedNoFxTotal ?? 0;
+  const droppedNoFxCount = expenses.droppedNoFxCount ?? 0;
   // إبلاغ الأب بقيم ما-لو للتصدير (مرة عند التركيب ومع كل تغيير).
   useEffect(() => {
     onWhatIfChange?.({ ads: adsExpense, opex: opexExpense });
@@ -459,6 +465,23 @@ export default function ProfitDashboard({
   return (
     <div className={`pa-root ${tajawal.className}`} dir="rtl" lang="ar">
       <div className="pa-inner">
+        {/* إدخالات دولارية سقطت من الحساب لغياب سعر صرف يغطّي تاريخ بدايتها —
+            بلا هذا التنبيه يختفي المبلغ من التقرير بلا أثر. */}
+        {droppedNoFxCount > 0 && (
+          <div className="pa-warn" style={{ marginBottom: 12 }}>
+            <div className="pa-warn-toggle" style={{ cursor: "default" }}>
+              <span className="pa-warn-icon" aria-hidden>
+                <AlertTriangle className="w-3.5 h-3.5" />
+              </span>
+              <span className="pa-warn-title flex-1 text-right">
+                {droppedNoFxCount} إدخال إعلاني بالدولار خارج الحساب — لا سعر صرف
+                يغطّي تاريخ بدايته (بقيمة {droppedNoFxTotal.toLocaleString("en-US")}$).
+                أضِف سعر صرف من صفحة المصاريف ليُحتسب.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* ── Data integrity warning ───────────────────────────────────── */}
         {inconsistentOrders.length > 0 && (
           <div className="pa-warn">
