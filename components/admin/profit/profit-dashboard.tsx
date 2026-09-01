@@ -122,7 +122,7 @@ const marginOf = (p: ProductStat) =>
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function ProfitDashboard({
-  productStats,
+  productStats: rawProductStats,
   dailySeries,
   orderSummary,
   fefoActive,
@@ -155,6 +155,26 @@ export default function ProfitDashboard({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [warnOpen, setWarnOpen] = useState(false);
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  // منتج صُرف عليه إعلانياً ولم يبع شيئاً في الفترة لا صف له في إحصاءات الطلبات،
+  // فيختفي من الجدول رغم أنه خسارة صافية — وهو أول ما يجب أن يُرى. نُلحقه بصفوف
+  // صفرية (لا تغيّر أي إجمالي) ليظهر بتكلفته الإعلانية.
+  const productStats = useMemo(() => {
+    const known = new Set(rawProductStats.map((p) => p.productId));
+    const extra = (expenses.adByProduct ?? [])
+      .filter((a) => a.amount > 0 && !known.has(a.productId))
+      .map((a) => ({
+        productId: a.productId,
+        name: a.name,
+        totalQty: 0,
+        totalRevenue: 0,
+        totalCost: 0,
+        totalProfit: 0,
+        orderCount: 0,
+        returnedQty: 0,
+      }));
+    return extra.length > 0 ? [...rawProductStats, ...extra] : rawProductStats;
+  }, [rawProductStats, expenses.adByProduct]);
 
   const totals = useMemo(
     () =>

@@ -299,11 +299,23 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     }
   }
 
+  // أسماء منتجات الصرف المستورد — تُقرأ من جدول المنتجات مباشرةً. كان الاسم
+  // يُلتمس من الإدخالات اليدوية ويسقط إلى «منتج» عند غيابها (وهي الحالة الغالبة
+  // الآن: لا إدخالات يدوية أصلاً).
+  const importedNames = new Map<string, string>();
+  if (importedIQDByProduct.size > 0) {
+    const prods = await prisma.product.findMany({
+      where: { id: { in: [...importedIQDByProduct.keys()] } },
+      select: { id: true, name: true },
+    });
+    for (const pr of prods) importedNames.set(pr.id, pr.name);
+  }
+
   // المستورد من Meta — يُدمج مع اليدوي (لن يتكرر: اليدوي المتقاطع استُبعد أعلاه).
   // القيم أصلاً حُوّلت إلى وحدة الألف د.ع أعلاه.
   for (const [productId, iqd] of importedIQDByProduct) {
     const camp = campaignsRaw.find((x) => x.productId === productId);
-    const name = camp?.product.name ?? "منتج";
+    const name = importedNames.get(productId) ?? camp?.product.name ?? "منتج";
     totalAdCost += iqd;
     const existing = adByProduct.get(productId);
     if (existing) {
