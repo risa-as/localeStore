@@ -3,7 +3,10 @@ import ProfitDatePicker from "@/components/admin/profit-date-picker";
 import ProfitDashboard from "@/components/admin/profit/profit-dashboard";
 import { getOrderProfitStats } from "@/lib/actions/order.actions";
 import { getExpenseStatsForPeriod } from "@/lib/actions/expense.actions";
-import { getLastSync } from "@/lib/actions/adspend.actions";
+import {
+  getLastSync,
+  getProductCampaignBreakdown,
+} from "@/lib/actions/adspend.actions";
 import { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { BarChart3 } from "lucide-react";
@@ -58,6 +61,12 @@ const ProfitPage = async (props: {
       // وبالتالي ربحاً مبالغاً فيه، فيجب أن يُقال صراحةً هنا لا في صفحة أخرى.
       getLastSync().catch(() => null),
     ]);
+
+  // تفصيل حملات كل منتج — يُفتح تحت صف المنتج فيُعرف مصدر تكلفة الإعلان.
+  const campaignsByProduct = await getProductCampaignBreakdown(
+    defaultFrom,
+    defaultTo,
+  ).catch(() => ({}));
 
   // «قديمة» = آخر يوم مُزامَن أقدم من يومين (الكرون يومي)، أو آخر تشغيل فشل.
   const DAY_MS = 24 * 60 * 60 * 1000;
@@ -153,6 +162,7 @@ const ProfitPage = async (props: {
           droppedNoFxCount: expenseStats.droppedNoFxCount,
         }}
         adSyncWarning={adSyncWarning}
+        campaignsByProduct={campaignsByProduct}
         comparison={comparison}
         inconsistentOrders={inconsistentOrders}
         exportContext={{

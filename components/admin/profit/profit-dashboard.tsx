@@ -87,6 +87,11 @@ export type ProfitDashboardProps = {
   };
   /** تحذير صحّة مزامنة الصرف الإعلاني (فشل/تأخّر) — null إن كانت سليمة. */
   adSyncWarning?: string | null;
+  /** حملات كل منتج ضمن الفترة (بوحدة الألف د.ع) — تُعرض عند فتح صف المنتج. */
+  campaignsByProduct?: Record<
+    string,
+    { campaignId: string; campaignName: string; amount: number; days: number }[]
+  >;
   /** Same metrics for the immediately preceding period, for the delta badges. */
   comparison: {
     collected: number;
@@ -132,6 +137,7 @@ export default function ProfitDashboard({
   exportContext,
   expenses,
   adSyncWarning,
+  campaignsByProduct,
   comparison,
   inconsistentOrders,
   onWhatIfChange,
@@ -1314,6 +1320,34 @@ export default function ProfitDashboard({
                                   value={String(p.returnedQty)}
                                 />
                               </div>
+                              {/* حملات هذا المنتج — من أين جاءت تكلفة الإعلان */}
+                              {(campaignsByProduct?.[p.productId]?.length ?? 0) >
+                                0 && (
+                                <div className="mt-3">
+                                  <div className="pa-meta mb-1.5">
+                                    حملات هذا المنتج في الفترة (
+                                    {campaignsByProduct![p.productId].length})
+                                  </div>
+                                  <div className="flex flex-col gap-1">
+                                    {campaignsByProduct![p.productId].map((c) => (
+                                      <div
+                                        key={c.campaignId}
+                                        className="flex items-center justify-between gap-3 text-[11px] border-b border-dashed pb-1 last:border-0"
+                                      >
+                                        <span className="truncate flex-1" title={c.campaignName}>
+                                          {c.campaignName}
+                                        </span>
+                                        <span className="text-muted-foreground shrink-0">
+                                          {c.days} يوم
+                                        </span>
+                                        <span className="font-semibold shrink-0">
+                                          {formatCurrency(c.amount)}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               <div className="pa-meta mt-2.5">
                                 التكلفة محسوبة حسب الدفعات (الأقدم أولاً) —
                                 FIFO. الإيراد الصافي موزّع نسبياً بعد خصم تكلفة

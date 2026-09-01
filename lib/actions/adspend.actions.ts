@@ -706,3 +706,61 @@ export async function getUnifiedCampaignRows(from: Date, to: Date): Promise<{
 
   return { rows, totalIQD, totalUSD };
 }
+
+/* ─── تفصيل حملات المنتج (لصفحة الأرباح) ─────────────────────────────────── */
+
+export type ProductCampaignRow = {
+  campaignId: string;
+  campaignName: string;
+  /** بوحدة الألف د.ع — نفس وحدة بقية أرقام صفحة الأرباح. */
+  amount: number;
+  days: number;
+};
+
+/**
+ * صرف كل حملة مجمّعاً حسب المنتج ضمن الفترة — ليُفتح تحت صف المنتج في صفحة
+ * الأرباح فيُعرف أي حملة استهلكت المبلغ، بدل رقم إجمالي مبهم.
+ * القسمة على 1000 تطابق وحدة «الألف د.ع» التي تعرضها formatCurrency.
+ */
+export async function getProductCampaignBreakdown(
+  from: Date,
+  to: Date,
+): Promise<Record<string, ProductCampaignRow[]>> {
+  await requireAdmin();
+  const rows = await prisma.adSpendDaily.findMany({
+    where: { date: { gte: from, lte: to } },
+    select: {
+      productId: true,
+      campaignId: true,
+      campaignName: true,
+      amountIQD: true,
+    },
+  });
+
+  const byProduct = new Map<string, Map<string, ProductCampaignRow>>();
+  for (const r of rows) {
+    let camps = byProduct.get(r.productId);
+    if (!camps) {
+      camps = new Map();
+      byProduct.set(r.productId, camps);
+    }
+    const existing = camps.get(r.campaignId);
+    const amount = Number(r.amountIQD) / 1000;
+    if (existing) {
+      existing.amount += amount;
+      existing.days += 1;
+    } else {
+      camps.set(r.campaignId, {
+        campaignId: r.campaignId,
+        campaignName: r.campaignName ?? "حملة",
+        amount,
+        days: 1,
+      });
+    }
+  }
+
+  const out: Record<string, ProductCampaignRow[]> = {};
+  for (const [productId, camps] of byProduct)
+    out[productId] = [...camps.values()].sort((a, b) => b.amount - a.amount);
+  return out;
+}
