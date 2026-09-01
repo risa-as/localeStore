@@ -26,6 +26,17 @@ export async function GET(req: Request) {
 
   const origin = new URL(req.url).origin;
   const redirectUri = getRedirectUri(origin);
+
+  // META_OAUTH_REDIRECT يتجاوز أصل الطلب. إن اختلف نطاقه عن النطاق الذي يتصفّحه
+  // المشرف (مثل apex مقابل www) فسيرفض فيسبوك الحوار برسالة عامة، وحتى لو قَبِله
+  // فقد لا تُرسَل كوكي الجلسة إلى نطاق الـ callback فيفشل بـ 401. نكشفه هنا
+  // برسالة واضحة بدل تركه يظهر كخطأ غامض من فيسبوك.
+  if (new URL(redirectUri).origin !== origin) {
+    return Response.redirect(
+      `${origin}/ar/admin/marketing?meta=redirect_mismatch`,
+      302,
+    );
+  }
   const state = signOAuthState(session.user.id as string);
 
   const dialog = new URL(

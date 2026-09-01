@@ -61,6 +61,11 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
   cancelled: { text: "أُلغيت عملية الربط", ok: false },
   invalid: { text: "طلب ربط غير صالح — حاول من جديد", ok: false },
   failed: { text: "فشل الربط — تحقق من إعدادات التطبيق في Meta", ok: false },
+  redirect_mismatch: {
+    text:
+      "نطاق رابط العودة (META_OAUTH_REDIRECT) يخالف النطاق الذي تتصفّحه — اجعلهما متطابقين (www أو بدونها) ثم أعد المحاولة.",
+    ok: false,
+  },
 };
 
 export default function MarketingClient({
