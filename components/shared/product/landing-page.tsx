@@ -33,6 +33,9 @@ export default function LandingPage({
 }) {
   const t = useTranslations("LandingPage");
   const locale = useLocale();
+  // رقم واتساب التواصل الظاهر في زر الدردشة العائم — يختلف بين النسخ المنشورة،
+  // لذا يأتي من متغيّر البيئة. إن لم يُضبط لا نعرض الزر (خير من رابط لرقم خاطئ).
+  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_CONTACT_NUMBER?.trim();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showSwipeHint, setShowSwipeHint] = useState(true);
   const images =
@@ -358,9 +361,10 @@ export default function LandingPage({
       </footer>
 
       {/* WhatsApp Floating Button */}
+      {whatsappNumber && (
       <div>
         <a
-          href="https://wa.me/9647775203786"
+          href={`https://wa.me/${whatsappNumber}`}
           target="_blank"
           rel="noopener noreferrer"
           aria-label="تواصل معنا على واتساب"
@@ -378,6 +382,7 @@ export default function LandingPage({
           </svg>
         </a>
       </div>
+      )}
     </div>
   );
 }
