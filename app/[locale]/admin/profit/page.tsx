@@ -64,8 +64,9 @@ const ProfitPage = async (props: {
   const syncDayMs = lastSync?.date
     ? new Date(`${lastSync.date}T12:00:00.000Z`).getTime()
     : null;
+  // نعيد استخدام لقطة الوقت المحسوبة أعلاه بدل استدعاء Date.now() أثناء الرسم.
   const staleDays = syncDayMs
-    ? Math.floor((Date.now() - syncDayMs) / DAY_MS)
+    ? Math.floor((now.getTime() - syncDayMs) / DAY_MS)
     : null;
   const adSyncWarning =
     lastSync && lastSync.ranAt === null
