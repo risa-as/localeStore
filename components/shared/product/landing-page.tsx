@@ -360,7 +360,7 @@ export default function LandingPage({
       {/* WhatsApp Floating Button */}
       <div>
         <a
-          href="https://wa.me/9647715205413"
+          href="https://wa.me/9647775203786"
           target="_blank"
           rel="noopener noreferrer"
           aria-label="تواصل معنا على واتساب"
