@@ -27,6 +27,7 @@ import {
   type VideoAdTargeting,
 } from "@/lib/meta/ads";
 import { getAdsBaseUrl, isPublicHttpUrl } from "@/lib/meta/config";
+import { EXCLUDE_INTERNAL_PRODUCTS } from "@/lib/constants/internal-products";
 
 async function requireAdmin() {
   const session = await auth();
@@ -72,6 +73,8 @@ export async function getSocialFeed() {
       },
     }),
     prisma.product.findMany({
+      // بند «غير مصنّف» المحاسبي ليس منتجاً يُنشر عنه.
+      where: EXCLUDE_INTERNAL_PRODUCTS,
       select: { id: true, name: true, images: true, description: true },
       orderBy: { name: "asc" },
     }),
@@ -521,6 +524,8 @@ export async function getAdsTabData() {
       },
     }),
     prisma.product.findMany({
+      // بند «غير مصنّف» المحاسبي ليس منتجاً يُعلَن عنه.
+      where: EXCLUDE_INTERNAL_PRODUCTS,
       select: { id: true, name: true, slug: true },
       orderBy: { name: "asc" },
     }),

@@ -1,5 +1,6 @@
 import { graphGet } from "./graph";
 import { prisma } from "@/db/prisma";
+import { UNLINKED_AD_SPEND_SLUG } from "@/lib/constants/internal-products";
 
 /**
  * طبقة تكامل الصرف الإعلاني:
@@ -17,6 +18,7 @@ export type ResolveMap = Map<string, { productId: string; campaignName: string |
  * إعادة تصنيف صفوفه ببساطة عند الربط اليدوي (upsert بنفس المفتاح يستبدله).
  */
 export const UNLINKED_PRODUCT_NAME = "غير مصنّف (حملات بلا ربط)";
+// الـ slug مصدره ملف الثوابت المشترك — تستورده استعلامات المتجر لاستبعاده.
 
 async function getOrCreateUnlinkedProduct(): Promise<string> {
   const existing = await prisma.product.findFirst({
@@ -27,7 +29,7 @@ async function getOrCreateUnlinkedProduct(): Promise<string> {
   const created = await prisma.product.create({
     data: {
       name: UNLINKED_PRODUCT_NAME,
-      slug: "unlinked-ad-spend",
+      slug: UNLINKED_AD_SPEND_SLUG,
       stock: 0,
       price: 0,
       costPrice: 0,

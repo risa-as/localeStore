@@ -6,11 +6,15 @@ import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { insertProductSchema, updateProductSchema } from "../validators";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { EXCLUDE_INTERNAL_PRODUCTS } from "../constants/internal-products";
 
 // Get latest products
 export const getLatestProducts = unstable_cache(
   async () => {
     const data = await prisma.product.findMany({
+      // بند «غير مصنّف» المحاسبي أحدث المنتجات إنشاءً — بلا استبعاده يتصدّر
+      // الصفحة الرئيسية للزبائن بسعر صفر.
+      where: EXCLUDE_INTERNAL_PRODUCTS,
       take: LATEST_PRODUCTS_LIMIT,
       orderBy: { createdAt: "desc" },
     });
@@ -97,13 +101,17 @@ export async function getAllProducts({
       }
       : {};
 
+  // نفس الشرط للصفوف والعدّ — كان العدّ يتجاهل الفلاتر فتخرج ترقيمة صفحات خاطئة.
+  const where: Prisma.ProductWhereInput = {
+    ...EXCLUDE_INTERNAL_PRODUCTS,
+    ...queryFilter,
+    ...categoryFilter,
+    ...priceFilter,
+    ...ratingFilter,
+  };
+
   const data = await prisma.product.findMany({
-    where: {
-      ...queryFilter,
-      ...categoryFilter,
-      ...priceFilter,
-      ...ratingFilter,
-    },
+    where,
     orderBy:
       sort === "lowest"
         ? { price: "asc" }
@@ -116,7 +124,7 @@ export async function getAllProducts({
     take: limit,
   });
 
-  const dataCount = await prisma.product.count();
+  const dataCount = await prisma.product.count({ where });
 
   return {
     data: convertToPlainObject(data) as any,
