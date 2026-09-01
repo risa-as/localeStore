@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
-import { Loader2, Plus, Pencil, Trash2, Megaphone, Receipt } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Megaphone, Receipt, CopyPlus } from "lucide-react";
 import AdSpendSection from "./adspend-client";
 import {
   createExpense, updateExpense, deleteExpense,
@@ -148,6 +148,57 @@ function DeleteBtn({ onDelete }: { onDelete: () => Promise<{ success: boolean; m
   );
 }
 
+// ─── تكرار مصروف للشهر التالي ─────────────────────────────────────────────────
+/** يزيح تاريخاً شهراً واحداً مع تثبيت آخر يوم في الأشهر الأقصر (31 → 28/30). */
+function addMonth(d: Date): Date {
+  const day = d.getUTCDate();
+  const shifted = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 12),
+  );
+  const lastDay = new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  shifted.setUTCDate(Math.min(day, lastDay));
+  return shifted;
+}
+
+/** المصاريف الثابتة (إيجار/رواتب) تتكرّر شهرياً — زر ينسخها للشهر التالي. */
+function RepeatBtn({ row }: { row: ServerRow }) {
+  const { toast } = useToast();
+  const [isPending, start] = useTransition();
+  return (
+    <Button
+      size="icon"
+      variant="ghost"
+      title="تكرار للشهر التالي"
+      disabled={isPending}
+      onClick={() =>
+        start(async () => {
+          const res = await createExpense({
+            category: row.category ?? "other",
+            description: row.description ?? "",
+            fromDate: addMonth(new Date(row.fromDate)).toISOString().split("T")[0],
+            toDate: addMonth(new Date(row.toDate)).toISOString().split("T")[0],
+            amount: String(row.amount),
+            notes: row.notes ?? "",
+          } as never);
+          toast(
+            res.success
+              ? { title: "أُضيف نفس المصروف للشهر التالي" }
+              : { variant: "destructive", title: res.message },
+          );
+        })
+      }
+    >
+      {isPending ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <CopyPlus className="w-4 h-4" />
+      )}
+    </Button>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function ExpensesClient({
   expenses,
@@ -158,6 +209,38 @@ export default function ExpensesClient({
 }) {
   const [expenseOpen, setExpenseOpen]   = useState(false);
   const [editExpense,  setEditExpense]  = useState<ServerRow | null>(null);
+  // فلتر فترة — الجدول كان يعرض كل المصاريف منذ البداية، فيصعب مطابقته بصفحة
+  // الأرباح التي توزّع المصروف على الفترة المختارة. فارغ = الكل.
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const shown = useMemo(() => {
+    if (!from && !to) return expenses;
+    const f = from ? new Date(`${from}T00:00:00.000Z`) : null;
+    const t = to ? new Date(`${to}T23:59:59.999Z`) : null;
+    // يُعرض المصروف إن تقاطع مداه مع الفترة (لا اشتراط الاحتواء الكامل).
+    return expenses.filter((e) => {
+      const ef = new Date(e.fromDate);
+      const et = new Date(e.toDate);
+      if (f && et < f) return false;
+      if (t && ef > t) return false;
+      return true;
+    });
+  }, [expenses, from, to]);
+
+  const shownTotal = useMemo(
+    () => shown.reduce((sum, e) => sum + Number(e.amount), 0),
+    [shown],
+  );
+
+  const thisMonth = () => {
+    const now = new Date();
+    const y = now.getUTCFullYear();
+    const m = String(now.getUTCMonth() + 1).padStart(2, "0");
+    const last = new Date(Date.UTC(y, now.getUTCMonth() + 1, 0)).getUTCDate();
+    setFrom(`${y}-${m}-01`);
+    setTo(`${y}-${m}-${String(last).padStart(2, "0")}`);
+  };
 
   return (
     <Tabs defaultValue="expenses" dir="rtl">
@@ -172,7 +255,24 @@ export default function ExpensesClient({
 
       {/* ── Expenses Tab ── */}
       <TabsContent value="expenses">
-        <div className="flex justify-end mb-4">
+        <div className="flex flex-wrap items-end gap-2 mb-4">
+          <div>
+            <label className="text-xs text-muted-foreground">من</label>
+            <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 h-9 w-40" />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">إلى</label>
+            <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 h-9 w-40" />
+          </div>
+          <Button variant="outline" size="sm" className="h-9" onClick={thisMonth}>هذا الشهر</Button>
+          {(from || to) && (
+            <Button variant="ghost" size="sm" className="h-9" onClick={() => { setFrom(""); setTo(""); }}>
+              الكل
+            </Button>
+          )}
+          <span className="text-sm text-muted-foreground ms-auto">
+            {shown.length} مصروف · الإجمالي {formatCurrency(shownTotal)}
+          </span>
           <Dialog open={expenseOpen} onOpenChange={(o) => { setExpenseOpen(o); if (!o) setEditExpense(null); }}>
             <DialogTrigger asChild>
               <Button onClick={() => setEditExpense(null)}>
@@ -188,8 +288,10 @@ export default function ExpensesClient({
           </Dialog>
         </div>
 
-        {expenses.length === 0 ? (
-          <p className="text-center text-muted-foreground py-12">لا توجد مصاريف مسجلة</p>
+        {shown.length === 0 ? (
+          <p className="text-center text-muted-foreground py-12">
+            {expenses.length === 0 ? "لا توجد مصاريف مسجلة" : "لا مصاريف ضمن هذه الفترة"}
+          </p>
         ) : (
           <div className="rounded-xl border overflow-hidden">
             <Table>
@@ -205,7 +307,7 @@ export default function ExpensesClient({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {expenses.map((e, index) => (
+                {shown.map((e, index) => (
                   <TableRow key={e.id}>
                     <TableCell className="text-center text-muted-foreground text-sm">{index + 1}</TableCell>
                     <TableCell>
@@ -236,6 +338,7 @@ export default function ExpensesClient({
                             <ExpenseForm initial={e} onDone={() => { setExpenseOpen(false); setEditExpense(null); }} />
                           </DialogContent>
                         </Dialog>
+                        <RepeatBtn row={e} />
                         <DeleteBtn onDelete={() => deleteExpense(e.id)} />
                       </div>
                     </TableCell>
