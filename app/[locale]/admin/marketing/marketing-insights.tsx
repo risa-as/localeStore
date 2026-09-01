@@ -663,6 +663,7 @@ function AccountCard({
                 key={camp.id}
                 camp={camp}
                 currency={acc.currency}
+                accountId={acc.accountId}
                 onCampaignStatus={(status) =>
                   onCampaignStatus(camp.id, status)
                 }
@@ -788,11 +789,14 @@ function StatusBadge({ status }: { status: string }) {
 function CampaignCard({
   camp,
   currency,
+  accountId,
   onCampaignStatus,
   onAdStatus,
 }: {
   camp: CampaignRow;
   currency: string | null;
+  /** رقم الحساب الإعلاني (بلا act_) — لبناء رابط مدير الإعلانات. */
+  accountId: string;
   onCampaignStatus: (status: string) => void;
   onAdStatus: (adId: string, status: string) => void;
 }) {
@@ -855,13 +859,16 @@ function CampaignCard({
           </span>
         )}
       </div>
-      {/* اسم الحملة + المنتج المرتبط */}
-      <p
-        className="font-semibold text-sm leading-snug line-clamp-2"
-        title={camp.name}
+      {/* اسم الحملة + المنتج المرتبط — الاسم يفتح الحملة في مدير إعلانات Meta */}
+      <a
+        href={`https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${accountId}&selected_campaign_ids=${camp.id}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-semibold text-sm leading-snug line-clamp-2 hover:text-primary hover:underline"
+        title={`${camp.name} — فتح في مدير الإعلانات`}
       >
         {camp.name}
-      </p>
+      </a>
       {camp.productName ? (
         <p className="text-[11px] text-muted-foreground flex items-center gap-1">
           <Package className="w-3 h-3 shrink-0" />
