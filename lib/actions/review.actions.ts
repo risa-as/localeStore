@@ -4,6 +4,7 @@ import { z } from "zod";
 import { insertReviewSchema } from "../validators";
 import { formatError } from "../utils";
 import { auth } from "@/auth";
+import { requireUser } from "@/lib/authorization";
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
 import { getTranslations } from "next-intl/server";
@@ -14,7 +15,7 @@ export async function createUpdateReview(
 ) {
   try {
     const t = await getTranslations("Toast");
-    const session = await auth();
+    const session = await requireUser();
     if (!session) throw new Error(t("userNotAuthenticated"));
 
     // Validate and store the review
@@ -29,6 +30,8 @@ export async function createUpdateReview(
     });
 
     if (!product) throw new Error(t("productNotFound"));
+    const purchase = await prisma.orderItem.findFirst({ where: { productId: review.productId, order: { userId: session.user.id, status: { in: ["completed", "completedAccountant"] } } }, select: { orderId: true } });
+    const verified = Boolean(purchase);
 
     // Check if user already reviewed
     const reviewExists = await prisma.review.findFirst({
@@ -47,11 +50,12 @@ export async function createUpdateReview(
             title: review.title,
             description: review.description,
             rating: review.rating,
+            isVerifiedPurchase: verified,
           },
         });
       } else {
         // Create review
-        await tx.review.create({ data: review });
+        await tx.review.create({ data: { ...review, isVerifiedPurchase: verified } });
       }
 
       // Get avg rating

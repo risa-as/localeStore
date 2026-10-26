@@ -1,17 +1,18 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { AccessibleImage } from "@/components/ui/accessible-image";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
 import { useTranslations } from "next-intl";
 import { Star } from "lucide-react";
 
-const ProductCard = ({ product, priority = false }: { product: Product; priority?: boolean }) => {
+const ProductCard = ({ product, priority = false, returnTo }: { product: Product; priority?: boolean; returnTo?: string }) => {
   const t = useTranslations("Product");
+  const href = `/product/${product.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 
   return (
     <article className="group flex flex-col rounded-2xl border bg-card overflow-hidden hover:shadow-lg hover:border-primary/20 transition-all duration-300 hover:-translate-y-0.5">
       {/* Image */}
-      <Link href={`/product/${product.slug}`} className="block relative overflow-hidden">
+      <Link href={href} className="block relative overflow-hidden">
         <div className="aspect-square bg-muted/30 relative overflow-hidden">
           <AccessibleImage
             src={product.images[0]}
@@ -39,7 +40,7 @@ const ProductCard = ({ product, priority = false }: { product: Product; priority
           </span>
         )}
 
-        <Link href={`/product/${product.slug}`} className="flex-1">
+        <Link href={href} className="flex-1">
           <h2 className="text-sm sm:text-base font-semibold leading-snug line-clamp-2 hover:text-primary transition-colors">
             {product.name}
           </h2>
@@ -47,12 +48,12 @@ const ProductCard = ({ product, priority = false }: { product: Product; priority
 
         <div className="flex items-center justify-between mt-auto pt-1">
           {/* Rating */}
-          <div className="flex items-center gap-1">
+          {product.numReviews > 0 ? <div className="flex items-center gap-1">
             <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
             <span className="text-xs text-muted-foreground font-medium">
               {Number(product.rating).toFixed(1)}
             </span>
-          </div>
+          </div> : <span />}
 
           {/* Price */}
           {product.stock > 0 ? (

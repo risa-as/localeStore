@@ -4,12 +4,14 @@ import {
   getAllProducts,
   getAllCategories,
 } from "@/lib/actions/product.actions";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { getTranslations } from "next-intl/server";
 import SearchFilters from "@/components/shared/product/search-filters";
 import { Product } from "@/types";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
+import { getSoldQuantities } from "@/lib/inventory";
+import { prisma } from "@/db/prisma";
 
 const MobileFilters = dynamic(
   () => import("@/components/shared/product/mobile-filters"),
@@ -102,6 +104,12 @@ const SearchPage = async (props: {
   });
 
   const categories = await getAllCategories();
+  const ids = products.data.map((product: Product) => product.id);
+  const [sold, held] = await Promise.all([
+    ids.length ? getSoldQuantities(ids) : Promise.resolve(new Map<string, number>()),
+    prisma.orderItem.groupBy({ by: ["productId"], where: { productId: { in: ids }, order: { status: "home", reservationExpiresAt: { gt: new Date() } } }, _sum: { qty: true } }),
+  ]);
+  const reserved = new Map(held.map(item => [item.productId, item._sum.qty ?? 0]));
 
   const prices = [
     { name: `1,000 - 50,000 د.ع`, value: "1-50" },
@@ -217,7 +225,7 @@ const SearchPage = async (props: {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
             {products.data.map((product: Product, index: number) => (
-              <ProductCard key={product.id} product={product} priority={index < 4} />
+              <ProductCard key={product.id} product={{ ...product, stock: Math.max(0, product.stock - (sold.get(product.id) ?? 0) - (reserved.get(product.id) ?? 0)) }} priority={index < 4} returnTo={getFilterUrl({})} />
             ))}
           </div>
         )}

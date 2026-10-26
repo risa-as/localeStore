@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 type PixelProps = {
     eventName: "PageView" | "ViewContent" | "Purchase";
     eventId: string;
-    data?: any;
+    data?: Record<string, unknown>;
 };
 
 export default function FbPixel({ eventName, eventId, data = {} }: PixelProps) {
@@ -17,8 +17,8 @@ export default function FbPixel({ eventName, eventId, data = {} }: PixelProps) {
         }
 
         const sendEvent = () => {
-            if (typeof window !== 'undefined' && (window as any).fbq) {
-                (window as any).fbq("track", eventName, data, { eventID: eventId });
+            if (typeof window !== 'undefined' && window.fbq) {
+                window.fbq("track", eventName, data, { eventID: eventId });
                 hasSentRef.current = true;
                 return true;
             }
@@ -39,6 +39,8 @@ export default function FbPixel({ eventName, eventId, data = {} }: PixelProps) {
         }, 1000);
 
         return () => clearInterval(interval);
+        // `data` مُستثنى عمداً: الحدث يُرسَل مرة واحدة ولا يُعاد عند تغيّر مرجع الكائن.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [eventName, eventId]);
 
     return null;

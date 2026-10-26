@@ -1,11 +1,11 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { requireStaff } from "@/lib/authorization";
 
 export async function requireAdmin() {
-  const session = await auth();
-
-  if (session?.user?.role !== "admin" && session?.user?.role !== "employee") {
+  try {
+    return await requireStaff();
+  } catch {
     redirect("/unauthorized");
   }
-  return session;
 }

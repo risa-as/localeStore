@@ -1,0 +1,83 @@
+{
+  "createdAt": "2026-10-23T19:25:57.662Z",
+  "reason": "Inclusive FX period end date omitted October 5",
+  "fxRate": 1370,
+  "before": [],
+  "planned": [
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": 9.96,
+      "currency": "USD",
+      "amountIQD": 13645.2,
+      "fxRate": 1370,
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": 18.22,
+      "currency": "USD",
+      "amountIQD": 24961.4,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": 6.36,
+      "currency": "USD",
+      "amountIQD": 8713.2,
+      "fxRate": 1370,
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily"
+    }
+  ],
+  "applied": true,
+  "after": [
+    {
+      "id": "1c6a606a-f209-49f9-be98-5615a3919b37",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "9.96",
+      "currency": "USD",
+      "amountIQD": "13645.2",
+      "fxRate": "1370",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.787Z"
+    },
+    {
+      "id": "d28f0893-3cf4-43fa-8796-b0b4bc7c8ac1",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "18.22",
+      "currency": "USD",
+      "amountIQD": "24961.4",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.885Z"
+    },
+    {
+      "id": "716f40a3-8589-4289-aa3d-960a78801147",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "6.36",
+      "currency": "USD",
+      "amountIQD": "8713.2",
+      "fxRate": "1370",
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.992Z"
+    }
+  ]
+}

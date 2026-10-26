@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 // useState is used for the one-time "now" snapshot in Connected.
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useLocale } from "next-intl";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -25,6 +27,9 @@ import {
   Send,
   BarChart3,
   CircleDot,
+  MessageSquare,
+  Wallet,
+  Settings2,
 } from "lucide-react";
 import PublishPanel, { type Feed, type AdMeta } from "./marketing-publish";
 import AdsPanel, { type AdsData } from "./marketing-ads";
@@ -58,6 +63,7 @@ type Status =
 
 const FLASH: Record<string, { text: string; ok: boolean }> = {
   connected: { text: "تم ربط حساب Meta بنجاح", ok: true },
+  connected_partial: { text: "تم ربط الحساب؛ تعذر جلب بعض الأصول. راجع الصلاحيات واختر الصفحات والحسابات المتاحة.", ok: false },
   cancelled: { text: "أُلغيت عملية الربط", ok: false },
   invalid: { text: "طلب ربط غير صالح — حاول من جديد", ok: false },
   failed: { text: "فشل الربط — تحقق من إعدادات التطبيق في Meta", ok: false },
@@ -67,6 +73,8 @@ const FLASH: Record<string, { text: string; ok: boolean }> = {
     ok: false,
   },
 };
+
+type MarketingTab = "connection" | "publish" | "ads" | "insights";
 
 export default function MarketingClient({
   status,
@@ -83,12 +91,26 @@ export default function MarketingClient({
 }) {
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = useLocale();
   const [pending, startTransition] = useTransition();
-  const [tab, setTab] = useState<
-    "connection" | "publish" | "ads" | "insights"
-  >(status.connected ? "publish" : "connection");
+  const [tab, setCurrentTab] = useState<MarketingTab>(status.connected ? "publish" : "connection");
+  const [hasOpenedAds, setHasOpenedAds] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const setTab = (next: MarketingTab) => {
+    setCurrentTab(next);
+    if (next === "ads") setHasOpenedAds(true);
+  };
+  const assetKey = status.connected
+    ? `${status.selected.pageId}:${status.selected.igId}:${status.selected.adAccountId}`
+    : "disconnected";
   // نبضة حالة الإعلانات القادمة من تبويب الأداء — نقطة على التبويب أينما كنت.
   const [insightsHealth, setInsightsHealth] = useState<InsightsHealth>(null);
+
+  useEffect(() => {
+    // Hidden drafts stay mounted; their media must not keep playing in another tab.
+    workspaceRef.current?.querySelectorAll<HTMLMediaElement>('[role="tabpanel"][hidden] video, [role="tabpanel"][hidden] audio').forEach(media => media.pause());
+  }, [tab]);
 
   useEffect(() => {
     if (flash && FLASH[flash]) {
@@ -97,24 +119,43 @@ export default function MarketingClient({
         variant: FLASH[flash].ok ? undefined : "destructive",
       });
       // نظّف المعامل من الرابط
-      router.replace("/admin/marketing");
+      const params = new URLSearchParams(window.location.search);
+      params.delete("meta");
+      const query = params.toString();
+      router.replace(`${pathname}${query ? `?${query}` : ""}`, { scroll: false });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flash]);
 
   return (
-    <div className="space-y-6 w-full">
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Megaphone className="w-6 h-6 text-primary" />
+    <div ref={workspaceRef} data-admin-wide data-admin-rounded data-marketing-workspace className="min-w-0 w-full space-y-5" dir="rtl">
+      <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] border bg-card">
+            <Megaphone className="h-5 w-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h1 className="text-2xl font-bold">التسويق</h1>
+              <span className={`inline-flex items-center gap-1.5 rounded-[10px] border px-2 py-1 text-[11px] ${status.configured && status.connected ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400" : "border-amber-500/20 bg-amber-500/5 text-amber-700 dark:text-amber-400"}`}>
+                {status.configured && status.connected ? <CheckCircle2 className="h-3.5 w-3.5" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                {!status.configured ? "الاتصال يحتاج تهيئة" : status.connected ? "حساب Meta مرتبط" : "حساب Meta غير مرتبط"}
+              </span>
+            </div>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              إدارة المحتوى والإعلانات ومتابعة نتائج الحملات من مكان واحد.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl font-bold">التسويق</h1>
-          <p className="text-sm text-muted-foreground">
-            النشر على فيسبوك وإنستغرام وإطلاق الإعلانات من مكان واحد
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 bg-card">
+            <Link href={`/${locale}/admin/social-inbox`}><MessageSquare className="h-4 w-4" /> الرسائل والتعليقات</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="gap-1.5 bg-card">
+            <Link href={`/${locale}/admin/expenses`}><Wallet className="h-4 w-4" /> إدارة المصاريف</Link>
+          </Button>
         </div>
-      </div>
+      </header>
 
       {!status.configured ? (
         <NotConfigured />
@@ -122,21 +163,49 @@ export default function MarketingClient({
         <NotConnected pending={pending} />
       ) : (
         <>
-          {/* تبويبات */}
-          <div className="flex gap-1 border-b">
+          <section aria-label="الحسابات المختارة للتسويق" className="rounded-[10px] border bg-card p-3 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold text-muted-foreground">النشر والإعلانات باستخدام</p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setTab("connection")} className="h-7 gap-1.5 px-2 text-xs">
+                <Settings2 className="h-3.5 w-3.5" /> إعدادات الربط
+              </Button>
+            </div>
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <AssetSummary label="صفحة فيسبوك" value={status.selected.pageName || (status.selected.pageId ? "صفحة محددة" : "لم تُحدد صفحة")} icon={<Facebook className="h-4 w-4" />} />
+              <AssetSummary label="إنستغرام" value={status.selected.igUsername ? `@${status.selected.igUsername}` : status.selected.igId ? "حساب مرتبط" : "غير مرتبط"} icon={<Instagram className="h-4 w-4" />} />
+              <AssetSummary label="الحساب الإعلاني" value={status.selected.adAccountName || (status.selected.adAccountId ? "حساب محدد" : "لم يُحدد حساب")} icon={<Target className="h-4 w-4" />} />
+            </dl>
+          </section>
+
+          <div role="tablist" aria-label="أقسام التسويق" className="grid grid-cols-2 gap-1.5 rounded-[10px] border bg-muted/30 p-1.5 sm:grid-cols-4" onKeyDown={event => {
+            const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+            const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            if (current < 0) return;
+            const step = event.key === "ArrowLeft" ? 1 : event.key === "ArrowRight" ? -1 : 0;
+            const next = event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : step ? (current + step + buttons.length) % buttons.length : -1;
+            if (next < 0) return;
+            event.preventDefault();
+            buttons[next].focus();
+            buttons[next].click();
+          }}>
             <TabButton
+              id="publish"
               active={tab === "publish"}
               onClick={() => setTab("publish")}
               icon={<Send className="w-4 h-4" />}
               label="النشر"
+              description="المنشورات والوسائط"
             />
             <TabButton
+              id="ads"
               active={tab === "ads"}
               onClick={() => setTab("ads")}
               icon={<Megaphone className="w-4 h-4" />}
               label="الإعلانات"
+              description="إعداد الإعلانات وإطلاقها"
             />
             <TabButton
+              id="insights"
               active={tab === "insights"}
               onClick={() => setTab("insights")}
               icon={<BarChart3 className="w-4 h-4" />}
@@ -152,30 +221,43 @@ export default function MarketingClient({
                 />
               }
               label="الأداء"
+              description="الحملات والنتائج"
             />
             <TabButton
+              id="connection"
               active={tab === "connection"}
               onClick={() => setTab("connection")}
               icon={<LinkIcon className="w-4 h-4" />}
               label="الاتصال"
+              description="الصفحات والصلاحيات"
             />
           </div>
 
-          {tab === "publish" ? (
+          {/* Keep local drafts when switching tabs; reset them when the target assets change. */}
+          <section role="tabpanel" id="marketing-panel-publish" aria-labelledby="marketing-tab-publish" hidden={tab !== "publish"} className="min-w-0" tabIndex={0}>
+          <p className="mb-3 text-xs leading-5 text-muted-foreground">تبقى مسودة المنشور وإعدادات الإعلان عند تبديل التبويبات داخل هذه الصفحة.</p>
+          {
             feed && adMeta ? (
-              <PublishPanel feed={feed} adMeta={adMeta} />
+              <PublishPanel key={assetKey} feed={feed} adMeta={adMeta} />
             ) : (
-              <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
+              <PanelUnavailable message="بيانات النشر غير متاحة حالياً." onRetry={() => router.refresh()} />
             )
-          ) : tab === "ads" ? (
+          }
+          </section>
+          <section role="tabpanel" id="marketing-panel-ads" aria-labelledby="marketing-tab-ads" hidden={tab !== "ads"} className="min-w-0" tabIndex={0}>
+          {(tab === "ads" || hasOpenedAds) && (
             adsData ? (
-              <AdsPanel data={adsData} />
+              <AdsPanel key={assetKey} data={adsData} />
             ) : (
-              <p className="text-sm text-muted-foreground">جارٍ التحميل…</p>
+              <PanelUnavailable message="بيانات إعداد الإعلانات غير متاحة حالياً." onRetry={() => router.refresh()} />
             )
-          ) : tab === "insights" ? (
-            <InsightsPanel onHealth={setInsightsHealth} />
-          ) : (
+          )}
+          </section>
+          <section role="tabpanel" id="marketing-panel-insights" aria-labelledby="marketing-tab-insights" hidden={tab !== "insights"} className="min-w-0" tabIndex={0}>
+            {tab === "insights" && <InsightsPanel onHealth={setInsightsHealth} />}
+          </section>
+          <section role="tabpanel" id="marketing-panel-connection" aria-labelledby="marketing-tab-connection" hidden={tab !== "connection"} className="min-w-0" tabIndex={0}>
+          {tab === "connection" && (
             <Connected
               status={status}
               onSelectPage={(id) =>
@@ -208,6 +290,7 @@ export default function MarketingClient({
               pending={pending}
             />
           )}
+          </section>
         </>
       )}
     </div>
@@ -215,33 +298,56 @@ export default function MarketingClient({
 }
 
 function TabButton({
+  id,
   active,
   onClick,
   icon,
   label,
+  description,
   pulse,
 }: {
+  id: MarketingTab;
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
+  description: string;
   pulse?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
+      id={`marketing-tab-${id}`}
+      role="tab"
+      aria-selected={active}
+      aria-controls={`marketing-panel-${id}`}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
-      className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+      className={`flex min-w-0 items-center gap-2.5 rounded-[10px] border px-3 py-3 text-right transition-colors ${
         active
-          ? "border-primary text-primary"
-          : "border-transparent text-muted-foreground hover:text-foreground"
+          ? "border-border bg-card text-foreground shadow-sm"
+          : "border-transparent text-muted-foreground hover:bg-card/60 hover:text-foreground"
       }`}
     >
-      {icon}
-      {label}
-      {pulse}
+      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] ${active ? "bg-primary/10 text-primary" : "bg-muted"}`}>{icon}</span>
+      <span className="min-w-0 flex-1"><span className="flex items-center gap-1.5 text-sm font-semibold">{label}{pulse}</span><span className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">{description}</span></span>
     </button>
   );
+}
+
+function AssetSummary({ label, value, icon }: { label: string; value: string; icon: React.ReactNode }) {
+  return <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-2.5 rounded-[10px] bg-muted/35 px-3 py-2.5">
+    <span className="row-span-2 shrink-0 text-muted-foreground" aria-hidden="true">{icon}</span>
+    <dt className="text-[11px] text-muted-foreground">{label}</dt>
+    <dd className="mt-0.5 truncate text-sm font-semibold" title={value}>{value}</dd>
+  </div>;
+}
+
+function PanelUnavailable({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border bg-card p-4">
+    <p className="flex items-center gap-2 text-sm text-muted-foreground"><AlertTriangle className="h-4 w-4 shrink-0" />{message}</p>
+    <Button type="button" variant="outline" size="sm" onClick={onRetry}>إعادة التحميل</Button>
+  </div>;
 }
 
 function PermissionsCheck() {
@@ -394,6 +500,7 @@ function AssetRow({
     <button
       type="button"
       disabled={pending || active}
+      title={subtitle ? `${title} — ${subtitle}` : title}
       onClick={onSelect}
       className={`w-full flex items-center gap-3 rounded-lg border p-3 text-right transition-colors ${
         active
@@ -571,17 +678,19 @@ function Connected({
       {/* فحص الصلاحيات */}
       <PermissionsCheck />
 
+      <p className="text-xs leading-5 text-muted-foreground">تغيير الصفحة أو الحساب الإعلاني يعيد تهيئة مسودة النشر وإعدادات الإعلان لتطابق الاختيار الجديد.</p>
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
       {/* الصفحات */}
-      <section className="space-y-2">
+      <section className="space-y-3 rounded-[10px] border bg-card p-4">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
-          <Facebook className="w-4 h-4" /> صفحة فيسبوك للنشر
+          <Facebook className="w-4 h-4" /> صفحة فيسبوك للنشر <span className="ms-auto text-xs font-normal text-muted-foreground">{status.pages.length} صفحة</span>
         </h3>
         {status.pages.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             لا توجد صفحات — تأكد أن لديك دوراً على صفحة فيسبوك.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-2 xl:grid-cols-2">
             {status.pages.map((p) => (
               <AssetRow
                 key={p.id}
@@ -608,16 +717,16 @@ function Connected({
       </section>
 
       {/* الحسابات الإعلانية */}
-      <section className="space-y-2">
+      <section className="space-y-3 rounded-[10px] border bg-card p-4">
         <h3 className="text-sm font-semibold flex items-center gap-1.5">
-          <Target className="w-4 h-4" /> الحساب الإعلاني
+          <Target className="w-4 h-4" /> الحساب الإعلاني <span className="ms-auto text-xs font-normal text-muted-foreground">{status.adAccounts.length} حساب</span>
         </h3>
         {status.adAccounts.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             لا توجد حسابات إعلانية على هذا الحساب.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="grid gap-2 xl:grid-cols-2">
             {status.adAccounts.map((a) => (
               <AssetRow
                 key={a.id}
@@ -632,10 +741,10 @@ function Connected({
           </div>
         )}
       </section>
+      </div>
 
       <p className="text-xs text-muted-foreground border-t pt-3">
-        النشر وإطلاق الإعلانات (المرحلتان التاليتان) سيستخدمان الصفحة والحساب
-        المختارَين أعلاه.
+        تُستخدم الصفحة والحساب المحددان أعلاه في النشر وإطلاق الإعلانات.
       </p>
     </div>
   );

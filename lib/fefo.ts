@@ -80,6 +80,8 @@ export function computeFefo(
 
     while (need > 0 && batchIdx < sortedBatches.length) {
       const b = sortedBatches[batchIdx];
+      // A future receipt cannot supply an earlier sale. Leave it for later sales.
+      if (b.createdAt.getTime() > sale.date.getTime()) break;
       const rem = batchRemaining.get(b.id)!;
       if (rem <= 0) {
         batchIdx++;

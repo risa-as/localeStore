@@ -325,6 +325,12 @@
     "marketing": "Marketing"
   },
   "Categories": {
+    "edit": "Edit",
+    "editTitle": "Edit category",
+    "editDescription": "Update the name and slug. Renaming also updates the category on its associated products.",
+    "save": "Save changes",
+    "cancel": "Cancel",
+    "back": "Back to categories",
     "selectCategory": "Select a Category",
     "name": "Name",
     "slug": "Slug",
@@ -406,9 +412,11 @@
   },
   "ThankYou": {
     "title": "Order Confirmed",
+    "receivedTitle": "Order received",
     "description": "Thank you for your refined choice.",
     "orderReference": "Order Reference",
     "message": "We've received your order and are meticulously preparing it for shipment.",
+    "receivedMessage": "Your order was recorded successfully. We will contact you to confirm the details before sending it to the courier.",
     "continueShopping": "Continue Shopping",
     "redirecting": "Redirecting in"
   },

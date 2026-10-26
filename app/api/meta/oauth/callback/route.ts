@@ -1,7 +1,7 @@
-import { auth } from "@/auth";
+import { requireAdministrator } from "@/lib/authorization";
 import { prisma } from "@/db/prisma";
 import { getMetaConfig, getRedirectUri, verifyOAuthState } from "@/lib/meta/config";
-import { oauthExchange, graphGet } from "@/lib/meta/graph";
+import { oauthExchange, graphGet, graphGetAll } from "@/lib/meta/graph";
 
 /**
  * نهاية تسجيل الدخول: يبادل الـ code بتوكن طويل العمر، يكتشف الصفحات وحسابات
@@ -25,8 +25,8 @@ export async function GET(req: Request) {
   const origin = new URL(req.url).origin;
   const url = new URL(req.url);
 
-  const session = await auth();
-  if (session?.user?.role !== "admin") {
+  let session: Awaited<ReturnType<typeof requireAdministrator>>;
+  try { session = await requireAdministrator(); } catch {
     return new Response("Unauthorized", { status: 401 });
   }
 
@@ -74,30 +74,41 @@ export async function GET(req: Request) {
       fields: "id,name",
     });
 
-    const pagesRes = await graphGet<{ data: FbPage[] }>("me/accounts", userToken, {
-      fields: "id,name,access_token,instagram_business_account{id,username}",
-      limit: "100",
-    });
-    const pages = pagesRes.data ?? [];
-
-    const adRes = await graphGet<{
-      data: { id: string; account_id: string; name: string }[];
-    }>("me/adaccounts", userToken, {
-      fields: "id,account_id,name",
-      limit: "100",
-    });
-    const adAccounts = adRes.data ?? [];
-
-    // اختيار افتراضي: أول صفحة / حساب إعلاني إن وُجد واحد فقط
-    const firstPage = pages[0];
-    const firstAd = adAccounts[0];
+    // Page, Instagram and ad access are independent. One missing permission
+    // must not discard a successful authorization for the other capabilities.
+    const [pageResult, adResult, permissionResult] = await Promise.allSettled([
+      graphGetAll<FbPage>("me/accounts", userToken, { fields: "id,name,access_token" }),
+      graphGetAll<{ id: string; account_id: string; name: string }>("me/adaccounts", userToken, { fields: "id,account_id,name" }),
+      graphGetAll<{ permission: string; status: string }>("me/permissions", userToken),
+    ]);
+    let partial = [pageResult, adResult, permissionResult].some(r => r.status === "rejected");
+    const pages = pageResult.status === "fulfilled" ? pageResult.value : [];
+    const adAccounts = adResult.status === "fulfilled" ? adResult.value : [];
+    const scopes = permissionResult.status === "fulfilled"
+      ? permissionResult.value.filter(p => p.status === "granted").map(p => p.permission) : [];
+    if (scopes.includes("instagram_basic")) {
+      for (let start = 0; start < pages.length; start += 5) {
+        await Promise.all(pages.slice(start, start + 5).map(async page => {
+          try {
+            const ig = await graphGet<Pick<FbPage, "instagram_business_account">>(page.id, userToken,
+              { fields: "instagram_business_account{id,username}" });
+            page.instagram_business_account = ig.instagram_business_account;
+          } catch { partial = true; }
+        }));
+      }
+    }
+    const previous = await prisma.metaConnection.findUnique({ where: { id: "default" } });
+    // Keep an explicit previous choice only if still authorized. Never select
+    // another project's Page/Instagram/ad account by its position in a list.
+    const firstPage = pages.find(p => p.id === previous?.selectedPageId);
+    const firstAd = adAccounts.find(a => a.id === previous?.selectedAdAccountId);
 
     const data = {
       fbUserId: me.id,
       fbUserName: me.name ?? null,
       userAccessToken: userToken,
       userTokenExpires: expiresAt,
-      scopes: [],
+      scopes,
       pages: pages as unknown as object,
       adAccounts: adAccounts as unknown as object,
       selectedPageId: firstPage?.id ?? null,
@@ -116,9 +127,10 @@ export async function GET(req: Request) {
       update: data,
     });
 
-    return redirectTo(origin, "connected");
+    return redirectTo(origin, partial ? "connected_partial" : "connected");
   } catch (err) {
-    console.error("❌ Meta OAuth callback error:", err);
+    // OAuth exceptions may include credentials in URLs; log no raw exception.
+    console.error("Meta OAuth callback failed", err instanceof Error ? err.name : "UnknownError");
     return redirectTo(origin, "failed");
   }
 }

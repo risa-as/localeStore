@@ -7,9 +7,10 @@ type PaginationProps = {
   page: number | string;
   totalPages: number;
   urlParamName?: string;
+  labels?: { previous: string; next: string };
 };
 
-const Pagination = ({ page, totalPages, urlParamName }: PaginationProps) => {
+const Pagination = ({ page, totalPages, urlParamName, labels = { previous: "Previous", next: "Next" } }: PaginationProps) => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -33,7 +34,7 @@ const Pagination = ({ page, totalPages, urlParamName }: PaginationProps) => {
         disabled={Number(page) <= 1}
         onClick={() => handleClick("prev")}
       >
-        Previous
+        {labels.previous}
       </Button>
 
       <span className="text-sm text-muted-foreground px-2">
@@ -47,7 +48,7 @@ const Pagination = ({ page, totalPages, urlParamName }: PaginationProps) => {
         disabled={Number(page) >= totalPages}
         onClick={() => handleClick("next")}
       >
-        Next
+        {labels.next}
       </Button>
     </div>
   );

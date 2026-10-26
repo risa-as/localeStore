@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
+import { advanceWaStatus } from "@/lib/whatsapp-status";
+import { RETURN_INQUIRY_STATUSES } from "@/lib/orders/return-inquiry";
 import { prisma } from "@/db/prisma";
 import { getWaConfig, toLocalPhone } from "@/lib/whatsapp";
 import {
@@ -58,8 +60,9 @@ type WaInboundMessage = {
   audio?: { id: string };
   document?: { id: string; filename?: string; caption?: string };
   sticker?: { id: string };
-  button?: { text: string };
-  interactive?: { button_reply?: { title: string }; list_reply?: { title: string } };
+  context?: { id?: string };
+  button?: { text: string; payload?: string };
+  interactive?: { button_reply?: { title: string; id?: string }; list_reply?: { title: string; id?: string } };
   location?: {
     latitude: number;
     longitude: number;
@@ -231,7 +234,15 @@ async function handleInboundMessage(
     : new Date();
   const windowExpiresAt = new Date(sentAt.getTime() + 24 * 60 * 60 * 1000);
 
-  const conversation = await prisma.waConversation.upsert({
+  await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${msg.id}))`;
+    if (await tx.waMessage.findUnique({ where: { waMessageId: msg.id }, select: { id: true } })) return;
+    let reply = msg.context?.id ? await tx.waMessage.findFirst({ where: { waMessageId: msg.context.id, direction: "out", conversation: { phone: localPhone } }, select: { orderId: true } }) : null;
+    if (!msg.context?.id) {
+      const candidates = await tx.messageOutbox.findMany({ where: { template: "order_returned", status: { in: ["accepted", "sent", "delivered", "read"] }, createdAt: { gte: new Date(sentAt.getTime() - 48 * 3600000), lte: sentAt }, order: { phoneNumber: localPhone, status: { in: RETURN_INQUIRY_STATUSES } } }, select: { orderId: true }, take: 2 });
+      if (candidates.length === 1) reply = { orderId: candidates[0].orderId };
+    }
+  const conversation = await tx.waConversation.upsert({
     where: { phone: localPhone },
     create: {
       phone: localPhone,
@@ -251,11 +262,14 @@ async function handleInboundMessage(
   });
 
   // waMessageId فريد — إعادة إرسال Meta لنفس الحدث لن تُنشئ تكراراً
-  await prisma.waMessage
+  await tx.waMessage
     .create({
       data: {
         conversationId: conversation.id,
         waMessageId: msg.id,
+        orderId: reply?.orderId,
+        replyToMessageId: msg.context?.id,
+        buttonPayload: msg.button?.payload ?? msg.interactive?.button_reply?.id ?? msg.interactive?.list_reply?.id,
         direction: "in",
         type,
         body,
@@ -264,9 +278,9 @@ async function handleInboundMessage(
         timestamp: sentAt,
       },
     })
-    .catch((err: { code?: string }) => {
-      if (err?.code !== "P2002") throw err; // P2002 = رسالة مكررة، نتجاهلها
-    });
+;
+    if (reply?.orderId && body) await tx.order.updateMany({ where: { id: reply.orderId, status: { in: RETURN_INQUIRY_STATUSES } }, data: { returnReasonText: body } });
+  });
 }
 
 // ترتيب تصاعدي للحالات حتى لا تتراجع "قُرئت" إلى "وصلت" عند تأخر الأحداث
@@ -275,7 +289,7 @@ const STATUS_RANK: Record<string, number> = {
   sent: 1,
   delivered: 2,
   read: 3,
-  failed: 4,
+  failed: 1,
 };
 
 async function handleStatus(status: WaStatus) {
@@ -297,17 +311,23 @@ async function handleStatus(status: WaStatus) {
   if (existing) {
     const newRank = STATUS_RANK[status.status] ?? 0;
     const oldRank = STATUS_RANK[existing.status] ?? 0;
-    if (newRank > oldRank) {
-      await prisma.waMessage.update({
-        where: { id: existing.id },
+    if (newRank > oldRank || (status.status === "failed" && oldRank < 2)) {
+      await prisma.waMessage.updateMany({
+        where: { id: existing.id, status: existing.status },
         data: { status: status.status, errorCode },
       });
     }
   }
 
-  // سلوك n8n السابق كما هو: الفشل يسجَّل والنجاح يمسح سجلات الرقم
-  if (status.status === "failed") {
-    await prisma.whatsAppFailedDelivery.create({
+  const outbox = await prisma.messageOutbox.findUnique({ where: { waMessageId: status.id } });
+  if (outbox) {
+    const next = advanceWaStatus(outbox.status, status.status);
+    await prisma.messageOutbox.updateMany({ where: { id: outbox.id, status: outbox.status }, data: { status: next, ...(next === status.status ? { lastError: errorCode } : {}) } });
+  }
+  // Keep failures scoped to the same message; unrelated successes must not hide them.
+  if (status.status === "failed" && (!existing || advanceWaStatus(existing.status, "failed") === "failed")) {
+    const duplicate = await prisma.whatsAppFailedDelivery.findFirst({ where: { messageId: status.id } });
+    if (!duplicate) await prisma.whatsAppFailedDelivery.create({
       data: {
         phone: localPhone,
         status: status.status,
@@ -315,9 +335,9 @@ async function handleStatus(status: WaStatus) {
         errorCode,
       },
     });
-  } else {
+  } else if (["delivered", "read"].includes(status.status)) {
     await prisma.whatsAppFailedDelivery.deleteMany({
-      where: { phone: localPhone },
+      where: { messageId: status.id },
     });
   }
 }
@@ -326,7 +346,8 @@ export async function POST(req: Request) {
   const config = getWaConfig();
   const rawBody = await req.text();
 
-  if (config?.appSecret) {
+  if (!config?.appSecret) return new Response("Webhook secret is not configured", { status: 503 });
+  if (config.appSecret) {
     const ok = verifySignature(
       config.appSecret,
       rawBody,
@@ -372,6 +393,7 @@ export async function POST(req: Request) {
   } catch (err) {
     // نرجع 200 دائماً حتى لا تعيد Meta الإرسال بلا نهاية — الخطأ يُسجَّل فقط
     console.error("❌ WhatsApp webhook error:", err);
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

@@ -1,4 +1,5 @@
 "use server";
+import { requireAdministrator, requireUser } from "@/lib/authorization";
 import {
   paymentMethodSchema,
   shippingAddressSchema,
@@ -18,6 +19,7 @@ import { PAGE_SIZE } from "../constants";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { safeRedirect } from "../safe-redirect";
 // Sign In The User with credentials
 export async function signInWithCredentials(
   prevState: unknown,
@@ -28,7 +30,7 @@ export async function signInWithCredentials(
       email: formData.get("email"),
       password: formData.get("password"),
     });
-    const callbackUrl = (formData.get("callbackUrl") as string) || "/";
+    const callbackUrl = safeRedirect(formData.get("callbackUrl"));
     await signIn("credentials", {
       email: user.email,
       password: user.password,
@@ -63,7 +65,7 @@ export async function signUpUser(prevState: unknown, formData: FormData) {
       password: formData.get("password"),
       confirmPassword: formData.get("confirmPassword"),
     });
-    const callbackUrl = (formData.get("callbackUrl") as string) || "/";
+    const callbackUrl = safeRedirect(formData.get("callbackUrl"));
     const hashPassword = hashSync(user.password);
 
     await prisma.user.create({
@@ -90,10 +92,12 @@ export async function signUpUser(prevState: unknown, formData: FormData) {
 
 // Get User By the Id
 export async function getUserById(userId: string) {
+  await requireAdministrator();
   const user = await prisma.user.findFirst({
     where: {
       id: userId,
     },
+    select: { id: true, name: true, email: true, role: true },
   });
   if (!user) throw new Error("User Not Found");
   return user;
@@ -101,6 +105,7 @@ export async function getUserById(userId: string) {
 
 // Update the user address
 export async function updateUserAddress(data: ShippingAddress) {
+  await requireUser();
   try {
     const session = await auth();
     const currentUser = await prisma.user.findFirst({
@@ -132,6 +137,7 @@ export async function updateUserAddress(data: ShippingAddress) {
 export async function updateUserPaymentMethod(
   data: z.infer<typeof paymentMethodSchema>
 ) {
+  await requireUser();
   try {
     const session = await auth();
     const currentUser = await prisma.user.findFirst({
@@ -158,6 +164,7 @@ export async function updateUserPaymentMethod(
 
 // Update the user profile
 export async function updateProfile(user: { name: string; email: string }) {
+  await requireUser();
   try {
     const session = await auth();
 
@@ -201,6 +208,7 @@ export async function getAllUsers({
   page: number;
   query: string;
 }) {
+  await requireAdministrator();
   const queryFilter: Prisma.UserWhereInput =
     query && query !== "all"
       ? {
@@ -229,15 +237,15 @@ export async function getAllUsers({
 
 // Delete User
 export async function deleteUser(id: string) {
+  await requireAdministrator();
   try {
-    await prisma.user.delete({
-      where: {
-        id,
-      },
-    });
+    const session = await requireAdministrator();
+    if (id === session.user.id) throw new Error("لا يمكنك تعطيل حسابك الحالي");
+    await prisma.user.update({ where: { id }, data: { role: "disabled", password: null } });
+    await prisma.session.deleteMany({ where: { userId: id } });
     revalidatePath("/admin/users");
 
-    return { success: true, message: "User Deleted Successfully" };
+    return { success: true, message: "تم تعطيل المستخدم مع الاحتفاظ بطلباته" };
   } catch (error) {
     const { formError } = formatError(error);
     return { success: false, message: formError };
@@ -246,7 +254,9 @@ export async function deleteUser(id: string) {
 
 // Update user
 export async function updateUser(user: z.infer<typeof updateUserSchema>) {
+  await requireAdministrator();
   try {
+    user = updateUserSchema.parse(user);
     await prisma.user.update({
       where: { id: user.id },
       data: {
@@ -267,6 +277,7 @@ export async function updateUser(user: z.infer<typeof updateUserSchema>) {
 
 // Create User (Admin)
 export async function createUser(data: z.infer<typeof signUpFormSchema> & { role: string }) {
+  await requireAdministrator();
   try {
     const user = signUpFormSchema.parse(data);
     const hashPassword = hashSync(user.password);
@@ -284,7 +295,7 @@ export async function createUser(data: z.infer<typeof signUpFormSchema> & { role
         name: user.name,
         email: user.email,
         password: hashPassword,
-        role: data.role,
+        role: z.enum(["admin", "employee", "user"]).parse(data.role),
       },
     });
 

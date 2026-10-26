@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.audit-private/
 /.pnp
 .pnp.*
 .yarn/*

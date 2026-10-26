@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-09-12T08:48:06.510Z",
+  "readOnly": true,
+  "unavailable": {
+    "http": 400,
+    "code": 100,
+    "type": "OAuthException"
+  }
+}

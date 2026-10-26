@@ -1,11 +1,11 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
-import { v4 as uuidv4 } from "uuid";
 import { motion } from "framer-motion";
-import { CheckCircle2, ShoppingBag, ArrowRight } from "lucide-react";
+import { CheckCircle2, ShoppingBag, Loader2 } from "lucide-react";
 import Link from "next/link";
+import OrderSuggestions from "@/components/shared/order-suggestions";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -19,128 +19,144 @@ import {
 } from "@/components/ui/card";
 
 // Pixel Integrations
-import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
 import FbPixel from "@/components/shared/facebook-pixel";
+
+/** ما تُعيده صفحة الشكر من الخادم — بلا أي بيانات شخصية. */
+type PurchaseEvent = {
+  eventId: string;
+  value: number;
+  currency: string;
+  contentIds: string[];
+  numItems: number;
+  redirectCategory: string;
+  /** ملخّص يراه الزبون ليطمئنّ أن طلبه سُجّل — بلا أي بيانات شخصية. */
+  summary: {
+    orderNo: string;
+    status: string;
+    totalPrice: number;
+    shippingPrice: number;
+    items: { name: string; qty: number }[];
+  };
+};
+
+const fmtIqd = (n: number) => `${n.toLocaleString("en-US")} د.ع`;
 
 // مكون فرعي لاستخدام useSearchParams بأمان
 function ThankYouContent() {
   const t = useTranslations("ThankYou");
-  const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
-  const [timeLeft, setTimeLeft] = useState(5);
+  // طلب مكرّر: الزبون أعاد طلب منتج موجود أصلاً في طلب قيد التجهيز. نُبقيه على
+  // الصفحة (بلا تحويل تلقائي) حتى يقرأ التوضيح — وهذا ما يمنع محاولة ثالثة.
+  const isDuplicate = searchParams.get("dup") === "1";
 
   // --- إعدادات التتبع ---
-  const [eventId] = useState(() => uuidv4());
-  const [orderData, setOrderData] = useState<any>(null);
+  // الخادم يُرسل حدث Conversions API ويُعيد بيانات البكسل فقط: لا اسم ولا هاتف
+  // ولا بريد يصل المتصفح. ومعرّف الحدث ثابت (purchase-<orderId>) فتحديث الصفحة
+  // لا يُسجَّل شراءً ثانياً عند ميتا، والنسختان (متصفح/خادم) تُدمجان.
+  const [purchase, setPurchase] = useState<PurchaseEvent | null>(null);
+  const [loading, setLoading] = useState(Boolean(orderId));
+  const [loadError, setLoadError] = useState(false);
   const [redirectCategory, setRedirectCategory] = useState("");
-  const redirectCategoryRef = useRef("");
 
-  // جلب البيانات (يحدث مرة واحد)
+  // جلب البيانات (يحدث مرة واحدة)
   useEffect(() => {
-    if (orderId) {
-      import("@/lib/actions/order.actions").then(({ getOrderById }) => {
-        getOrderById(orderId)
-          .then((order) => {
-            if (order) {
-              setOrderData(order);
+    let cancelled = false;
+    setLoadError(false);
+    setLoading(Boolean(orderId));
+    if (!orderId) {
+      setLoading(false);
+      return;
+    }
 
-              // قراءة فئة المنتج الذي اشتراه الزبون مباشرةً من بيانات الطلب
-              console.log("[DEBUG] orderitems[0]:", order.orderitems?.[0]);
-              console.log("[DEBUG] product:", order.orderitems?.[0]?.product);
-              console.log(
-                "[DEBUG] categories:",
-                order.orderitems?.[0]?.product?.categories,
-              );
-              const cat = order.orderitems?.[0]?.product?.categories?.[0] ?? "";
-              console.log("[DEBUG] cat:", cat);
-              redirectCategoryRef.current = cat;
-              setRedirectCategory(cat);
-
-              // Send CAPI Event with Real Data
-              sendCAPIEvent("Purchase", eventId, {
-                eventSourceUrl: window.location.href,
-                value: Number(order.totalPrice),
-                currency: "USD",
-                // Add User Data
-                email: order.user?.email,
-                phone: order.phoneNumber,
-                firstName: order.fullName?.split(" ")[0],
-                lastName: order.fullName?.split(" ").slice(1).join(" "),
-                city: order.governorate, // Assuming governorate maps to city/region
-                country: "IQ", // Assuming Iraq based on context
-                externalId: order.id, // Add External ID
-              }).catch(() => {});
-            } else {
+    import("@/lib/actions/order.actions").then(
+      ({ getThankYouPurchaseData }) => {
+        getThankYouPurchaseData(orderId)
+          .then((data) => {
+            if (cancelled) return;
+            if (!data) {
               console.error("Order not found or null returned");
+              setLoadError(true);
+              return;
             }
+            setPurchase(data);
+            setRedirectCategory(data.redirectCategory);
           })
-          .catch((err) => console.error("Error fetching order:", err));
-      });
-    }
-  }, [orderId, eventId]);
+          .catch((err) => {
+            if (cancelled) return;
+            console.error("Error fetching order:", err);
+            setLoadError(true);
+          })
+          .finally(() => { if (!cancelled) setLoading(false); });
+      },
+    ).catch(() => { if (!cancelled) { setLoadError(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [orderId]);
 
-  // 2. تجهيز بيانات البكسل (يتم إنشاؤها فقط عند توفر الطلب)
-  // استخدام useMemo يمنع إعادة إنشاء الكائن عند تغير العداد timeLeft
-  const pixelData = useMemo(() => {
-    // إذا لم تتوفر البيانات بعد، نرجع null
-    if (!orderData) return null;
+  if (loading) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-white p-6"
+        dir="rtl"
+      >
+        <div className="flex flex-col items-center gap-3 rounded-2xl border bg-white px-10 py-8 text-center shadow-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="font-semibold text-slate-700">
+            جارٍ تحميل تفاصيل طلبك…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
-    return {
-      value: Number(orderData.totalPrice),
-      currency: "USD",
-      content_name: "Order " + orderData.id,
-      content_type: "product",
-      content_ids:
-        orderData.orderitems?.map((item: any) => item.productId) || [],
-      num_items: orderData.orderitems?.length || 0,
-    };
-  }, [orderData]); // <--- يراقب orderData فقط
+  if (loadError || (orderId && !purchase)) {
+    return (
+      <div
+        className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-white p-6"
+        dir="rtl"
+      >
+        <Card className="w-full max-w-md p-8 text-center">
+          <CardTitle className="text-xl">تعذر عرض تفاصيل الطلب</CardTitle>
+          <CardDescription className="mt-3">
+            حدّث الصفحة، وإذا استمرت المشكلة تواصل معنا مع رقم الطلب.
+          </CardDescription>
+          <Button asChild className="mt-6">
+            <Link href="/ar">العودة إلى المتجر</Link>
+          </Button>
+        </Card>
+      </div>
+    );
+  }
+
+  // بيانات حدث البكسل — جاهزة كما أتت من الخادم
+  const pixelData = purchase
+    ? {
+        value: purchase.value,
+        currency: purchase.currency,
+        content_type: "product",
+        content_ids: purchase.contentIds,
+        num_items: purchase.numItems,
+      }
+    : null;
   // End API Code
-
-  // 3. العداد التنازلي — يعمل interval واحد فقط طوال عمر المكوّن
-  const routerRef = useRef(router);
-  useEffect(() => {
-    routerRef.current = router;
-  }, [router]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(intervalId);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    return () => clearInterval(intervalId);
-  }, []);
-
-  useEffect(() => {
-    if (timeLeft === 0) {
-      const cat = redirectCategoryRef.current;
-      const url = cat
-        ? `/ar/search?category=${encodeURIComponent(cat)}`
-        : "/ar";
-      routerRef.current.push(url);
-    }
-  }, [timeLeft]);
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-gray-50 to-white p-6">
       {/* Start Pixel Code */}
 
-      {orderData && pixelData && (
-        <FbPixel eventName="Purchase" eventId={eventId} data={pixelData} />
+      {purchase && pixelData && (
+        <FbPixel
+          eventName="Purchase"
+          eventId={purchase.eventId}
+          data={pixelData}
+        />
       )}
       {/* End Pixel Code */}
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md relative"
+        className="w-full max-w-3xl relative"
       >
         {/* Decorative Blur Background */}
         <div className="absolute -inset-4 bg-gradient-to-r from-primary/10 to-blue-50/50 rounded-full blur-3xl -z-10 opacity-70"></div>
@@ -164,27 +180,98 @@ function ThankYouContent() {
               </div>
             </motion.div>
             <CardTitle className="text-3xl font-serif font-bold text-slate-800">
-              {t("title")}
+              {purchase?.summary.status === "home"
+                ? t("receivedTitle")
+                : t("title")}
             </CardTitle>
             <CardDescription className="text-lg text-slate-500 mt-2">
               {t("description")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6 px-8">
-            {orderId && (
-              <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col items-center justify-center">
-                <p className="text-xs uppercase tracking-wider text-slate-400 font-medium mb-1">
-                  {t("orderReference")}
+          <CardContent className="space-y-5 px-8">
+            {/* تنبيه الطلب المكرّر — يجيب على سؤال الزبون الحقيقي: هل نجح طلبي؟ */}
+            {isDuplicate && (
+              <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-right">
+                <p className="font-bold text-amber-900 text-sm mb-1">
+                  طلبك السابق ما زال قيد التجهيز
                 </p>
-                <p className="font-mono font-bold text-xl text-slate-900 tracking-wide">
-                  {orderId}
+                <p className="text-amber-800 text-sm leading-relaxed">
+                  هذا المنتج موجود أصلاً في طلبك أدناه، فلم نُضِف نسخة ثانية
+                  منه. إن كنت تريد قطعة إضافية فعلاً أخبرنا عند اتصال موظّف
+                  التأكيد.
                 </p>
               </div>
             )}
+
+            {purchase?.summary ? (
+              <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl text-right space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs tracking-wider text-slate-400 font-medium">
+                    {t("orderReference")}
+                  </span>
+                  <span className="font-mono font-bold text-lg text-slate-900">
+                    #{purchase.summary.orderNo}
+                  </span>
+                </div>
+
+                <div className="border-t border-slate-200 pt-3 space-y-1.5">
+                  {purchase.summary.items.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between text-sm text-slate-600 gap-3"
+                    >
+                      <span className="truncate">{item.name}</span>
+                      <span className="shrink-0 font-semibold text-slate-800">
+                        × {item.qty}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-slate-200 pt-3 flex items-center justify-between">
+                  <span className="text-sm font-bold text-slate-700">
+                    الإجمالي مع التوصيل
+                  </span>
+                  <span className="font-bold text-lg text-primary">
+                    {fmtIqd(purchase.summary.totalPrice)}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              orderId && (
+                <div className="bg-slate-50 border border-slate-100 p-4 rounded-xl flex flex-col items-center justify-center">
+                  <p className="text-xs uppercase tracking-wider text-slate-400 font-medium mb-1">
+                    {t("orderReference")}
+                  </p>
+                  <p className="font-mono font-bold text-xl text-slate-900 tracking-wide">
+                    {orderId}
+                  </p>
+                </div>
+              )
+            )}
+
             <p className="text-slate-600 leading-relaxed text-sm">
-              {t("message")}
+              {purchase?.summary.status === "home"
+                ? t("receivedMessage")
+                : t("message")}
             </p>
           </CardContent>
+          {orderId && purchase && (
+            <div className="px-6 pb-6">
+              <OrderSuggestions
+                orderId={orderId}
+                onAdded={() => {
+                  import("@/lib/actions/upsell.actions")
+                    .then(({ getOrderReceipt }) => getOrderReceipt(orderId))
+                    .then((summary) =>
+                      setPurchase((previous) =>
+                        previous ? { ...previous, summary } : previous,
+                      ),
+                    );
+                }}
+              />
+            </div>
+          )}
           <CardFooter className="flex flex-col gap-5 pb-8 px-8">
             <Button
               asChild
@@ -202,11 +289,6 @@ function ThankYouContent() {
                 {t("continueShopping")}
               </Link>
             </Button>
-            <div className="text-xs font-medium text-slate-400 animate-pulse flex items-center justify-center gap-1">
-              {t("redirecting")}{" "}
-              <span className="text-primary font-bold">{timeLeft}s</span>{" "}
-              <ArrowRight className="w-3 h-3" />
-            </div>
           </CardFooter>
         </Card>
       </motion.div>
@@ -216,7 +298,13 @@ function ThankYouContent() {
 
 export default function ThankYouPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-gray-50 to-white p-6">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      }
+    >
       <ThankYouContent />
     </Suspense>
   );

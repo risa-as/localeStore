@@ -1,25 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Script from "next/script";
 
 export function FacebookPixelProvider() {
     const pathname = usePathname();
-    const [loaded, setLoaded] = useState(false);
+
     // تتبع التنقل بين الصفحات (PageView)
     useEffect(() => {
-        if (!loaded) return;
-
         // لا تقم بإرسال PageView في صفحة شكرا (لأننا نرسل Purchase فقط حسب الطلب)
         if (pathname?.includes('/thank-you')) {
             return;
         }
 
-        if ((window as any).fbq) {
-            (window as any).fbq('track', 'PageView');
+        // صفحات الهبوط ترسل PageView بنفسها مقترناً بحدث Conversions API بنفس
+        // eventID (فيُدمجان عند ميتا). إرسال PageView إضافي من هنا يُنتج حدثاً
+        // ثانياً بلا معرّف فتُحتسب زيارة واحدة زيارتين.
+        if (pathname?.includes('/landing')) {
+            return;
         }
-    }, [pathname, loaded]);
+
+        // ننتظر جاهزية fbq بالفحص لا بـ onLoad: الأخير لا يُطلَق أبداً مع سكربت
+        // سطري — Next يستمع لحدث load، وعنصر <script> بلا src لا يُطلقه إطلاقاً
+        // (راجع next/dist/client/script.js). كان ذلك يُعطّل PageView في كل
+        // صفحات الموقع. الفحص يعمل كذلك عند العودة لصفحة سبق تحميل السكربت فيها.
+        const fire = () => {
+            const fbq = window.fbq;
+            if (!fbq) return false;
+            fbq('track', 'PageView');
+            return true;
+        };
+        if (fire()) return;
+
+        let attempts = 0;
+        const interval = setInterval(() => {
+            attempts += 1;
+            if (fire() || attempts >= 10) clearInterval(interval);
+        }, 300);
+
+        return () => clearInterval(interval);
+    }, [pathname]);
 
     const pixelId = process.env.NEXT_PUBLIC_FACEBOOK_PIXEL_ID;
 
@@ -34,9 +55,6 @@ export function FacebookPixelProvider() {
             <Script
                 id="fb-pixel"
                 strategy="afterInteractive"
-                onLoad={() => {
-                    setLoaded(true);
-                }}
                 dangerouslySetInnerHTML={{
                     __html: `
                     !function(f,b,e,v,n,t,s)

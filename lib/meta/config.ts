@@ -7,6 +7,7 @@ import crypto from "crypto";
  *
  *   META_APP_ID          معرّف تطبيق Meta
  *   META_APP_SECRET      السر الخاص بالتطبيق (يوقّع الطلبات ويُبادل التوكنات)
+ *   META_LOGIN_CONFIG_ID (اختياري) معرّف تكوين Facebook Login for Business
  *   META_OAUTH_REDIRECT  (اختياري) رابط الـ callback؛ إن غاب نشتقّه من الطلب
  *   META_GRAPH_VERSION   (اختياري) نسخة Graph API، الافتراضي v25.0
  *
@@ -21,8 +22,9 @@ export const META_GRAPH_VERSION = process.env.META_GRAPH_VERSION || "v25.0";
  *
  * قابلة للضبط من البيئة عبر META_SCOPES (مفصولة بفواصل) حتى تُعدَّل بسهولة دون
  * تغيير الكود — مفيد لأن Meta ترفض أي صلاحية لم يُضَف منتجها/حالة استخدامها في
- * لوحة التطبيق («Invalid Scopes»)، وأسماء صلاحيات إنستغرام في مرحلة انتقال
- * (instagram_basic ← instagram_business_basic).
+ * لوحة التطبيق («Invalid Scopes»). هذا التكامل يستخدم Facebook Login، لذلك
+ * يستخدم instagram_basic؛ أسماء instagram_business_* تخص مسار Instagram Login
+ * المختلف ولا تُستبدل هنا دون تغيير التكامل.
  *
  * للاتصال فوراً بأقل مجموعة تعمل عادةً بلا إعداد إضافي، ضع في .env:
  *   META_SCOPES=pages_show_list,pages_read_engagement,business_management,ads_management,ads_read
@@ -37,6 +39,12 @@ const DEFAULT_META_SCOPES = [
   "instagram_content_publish",
   "ads_management",
   "ads_read",
+  "pages_messaging",
+  "pages_manage_metadata",
+  "pages_read_user_content",
+  "pages_manage_engagement",
+  "instagram_manage_messages",
+  "instagram_manage_comments",
 ];
 
 export const META_SCOPES = process.env.META_SCOPES
@@ -49,6 +57,7 @@ export type MetaConfig = {
   appId: string;
   appSecret: string;
   redirectOverride?: string;
+  loginConfigId?: string;
 };
 
 export function getMetaConfig(): MetaConfig | null {
@@ -59,6 +68,7 @@ export function getMetaConfig(): MetaConfig | null {
     appId,
     appSecret,
     redirectOverride: process.env.META_OAUTH_REDIRECT,
+    loginConfigId: process.env.META_LOGIN_CONFIG_ID?.trim() || undefined,
   };
 }
 

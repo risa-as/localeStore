@@ -1,21 +1,23 @@
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, Link } from "@/i18n/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { useTransition } from "react";
 import { addItemToCart, removeItemFromCart } from "@/lib/actions/cart.actions";
 import { Cart } from "@/types";
 import { ArrowLeft, Loader2, Minus, Plus, ShoppingCart, Trash2 } from "lucide-react";
-import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { computeOrderPricing } from "@/lib/pricing";
 
 const CartTable = ({ cart }: { cart?: Cart }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const t = useTranslations("Cart");
+  const checkout = useTranslations("Checkout");
+  const locale = useLocale();
 
   if (!cart || cart.items.length === 0) {
     return (
@@ -28,7 +30,7 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
           <p className="text-muted-foreground text-base">ابدأ بإضافة منتجات تعجبك</p>
         </div>
         <Button asChild size="lg" className="h-14 px-10 text-base font-bold rounded-2xl gap-2">
-          <Link href="/">
+          <Link href="/search">
             {t("goShopping")}
             <ArrowLeft className="w-4 h-4" />
           </Link>
@@ -87,6 +89,7 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={locale === "ar" ? `تقليل كمية ${item.name}` : `Decrease ${item.name} quantity`}
                     onClick={() =>
                       startTransition(async () => {
                         const res = await removeItemFromCart(item.productId);
@@ -102,6 +105,7 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                     variant="ghost"
                     size="icon"
                     className="h-9 w-9 rounded-lg hover:bg-primary/10 hover:text-primary"
+                    aria-label={locale === "ar" ? `زيادة كمية ${item.name}` : `Increase ${item.name} quantity`}
                     onClick={() =>
                       startTransition(async () => {
                         const res = await addItemToCart(item);
@@ -113,7 +117,7 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                   </Button>
                 </div>
                 <p className="text-sm font-bold text-muted-foreground">
-                  = {formatCurrency(Number(item.price) * item.qty)}
+                  = {formatCurrency(computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice)}
                 </p>
               </div>
             </div>
@@ -135,9 +139,11 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
                 <span className="font-medium text-foreground">{cart.items.reduce((a, c) => a + c.qty, 0)}</span>
               </div>
               <div className="flex justify-between border-t-2 pt-3 font-extrabold text-lg">
-                <span>{t("subtotal")}</span>
+                <span>{checkout("items")}</span>
                 <span className="text-primary text-xl">{formatCurrency(cart.itemsPrice)}</span>
               </div>
+              <div className="flex justify-between text-muted-foreground"><span>{checkout("shipping")}</span><span>{formatCurrency(cart.shippingPrice)}</span></div>
+              <div className="flex justify-between border-t pt-3 font-bold"><span>{checkout("total")}</span><span>{formatCurrency(cart.totalPrice)}</span></div>
             </div>
 
             <Button
@@ -149,7 +155,7 @@ const CartTable = ({ cart }: { cart?: Cart }) => {
               {t("proceedToCheckout")}
             </Button>
 
-            <Link href="/" className="block text-center text-base text-primary font-semibold hover:underline">
+            <Link href="/search" className="block text-center text-base text-primary font-semibold hover:underline">
               {t("goShopping")}
             </Link>
           </div>

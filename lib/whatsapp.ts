@@ -29,6 +29,17 @@ const ORDER_TEMPLATE_NAME =
   process.env.WHATSAPP_ORDER_TEMPLATE_NAME || "order_confirmation_utility_v2";
 
 /**
+ * بادئة نص القالب كما يُحفظ في سجل المحادثة. فلتر صفحة المحادثات يطابق عليها
+ * (لا يوجد عمود لاسم القالب)، لذلك أي تغيير هنا يُسقط الرسائل القديمة من الفلتر.
+ */
+export const WA_TEMPLATE_BODY_PREFIX = {
+  confirmation: "📦 قالب تأكيد الطلب",
+  returned: "↩️ قالب الطلب الراجع",
+} as const;
+
+export type WaTemplateKind = keyof typeof WA_TEMPLATE_BODY_PREFIX;
+
+/**
  * أسماء «وهمية» يكتبها بعض الزبائن بدل اسمهم الحقيقي — لا نرسل لهم قالب تأكيد
  * الطلب لأن الرسالة تظهر باسم بلا معنى. أضف أي صيغة أخرى هنا (مثل "الزبون").
  */
@@ -105,6 +116,7 @@ async function graphPost(config: WaConfig, body: unknown) {
 
 /** حفظ رسالة صادرة في سجل المحادثة (حتى تظهر القوالب والردود في صفحة المحادثات) */
 async function recordOutbound(params: {
+  orderId?: string;
   localPhone: string;
   waMessageId?: string;
   type: string;
@@ -126,6 +138,7 @@ async function recordOutbound(params: {
     await prisma.waMessage.create({
       data: {
         conversationId: conversation.id,
+        orderId: params.orderId,
         waMessageId: params.waMessageId,
         direction: "out",
         type: params.type,
@@ -197,19 +210,20 @@ export async function sendOrderConfirmation(params: {
     localPhone: toLocalPhone(toWaPhone(params.phoneNumber)),
     waMessageId: data.messages?.[0]?.id,
     type: "template",
-    body: `📦 قالب تأكيد الطلب — ${params.product} × ${params.quantity} بسعر ${params.itemsPrice} + توصيل ${shippingText}`,
+    body: `${WA_TEMPLATE_BODY_PREFIX.confirmation} — ${params.product} × ${params.quantity} بسعر ${params.itemsPrice} + توصيل ${shippingText}`,
   });
 }
 
 /** إرسال قالب الطلب الراجع — يطابق سلوك n8n السابق */
 export async function sendOrderReturned(params: {
+  orderId?: string;
   fullName: string;
   phoneNumber: string; // بصيغة محلية 07XXXXXXXXX
   product: string;
   price: string;
 }) {
   const config = getWaConfig();
-  if (!config) return;
+  if (!config) throw new Error("WhatsApp غير مهيأ");
 
   const data = await graphPost(config, {
     messaging_product: "whatsapp",
@@ -235,8 +249,10 @@ export async function sendOrderReturned(params: {
     localPhone: toLocalPhone(toWaPhone(params.phoneNumber)),
     waMessageId: data.messages?.[0]?.id,
     type: "template",
-    body: `↩️ قالب الطلب الراجع — ${params.product}`,
+    body: `${WA_TEMPLATE_BODY_PREFIX.returned} — ${params.product}`,
+    orderId: params.orderId,
   });
+  return data.messages?.[0]?.id;
 }
 
 /**

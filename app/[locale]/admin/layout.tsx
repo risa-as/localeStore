@@ -4,16 +4,16 @@ import Link from "next/link";
 import Menu from "@/components/shared/header/menu";
 import MainNav from "./main-nav";
 import { getLogoUrl } from "@/lib/get-logo";
-import { auth } from "@/auth";
+import { requireAdmin } from "@/lib/auth-guard";
 
 export default async function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  const session = await auth();
+  const session = await requireAdmin();
   const logoUrl = await getLogoUrl();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen [&:has([data-admin-products])>header>div]:max-w-none [&:has([data-admin-profit])>header>div]:max-w-none [&:has([data-admin-wide])>header>div]:max-w-none">
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="container mx-auto">
@@ -51,7 +51,7 @@ export default async function AdminLayout({
       </header>
 
       {/* Page content */}
-      <main className="flex-1 container mx-auto p-4 md:p-8 pt-6">
+      <main className="flex-1 container mx-auto p-4 md:p-8 pt-6 [&:has([data-social-inbox])]:max-w-none [&:has([data-social-inbox])]:p-3 [&:has([data-wa-inbox])]:max-w-none [&:has([data-wa-inbox])]:p-3 [&:has([data-admin-products])]:max-w-none [&:has([data-admin-products])]:p-4 [&:has([data-admin-profit])]:max-w-none [&:has([data-admin-wide])]:max-w-none">
         {children}
       </main>
     </div>

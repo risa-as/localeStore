@@ -2,6 +2,7 @@
 
 import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
+import { requireAdministrator } from "@/lib/authorization";
 import {
   getAllAdAccounts,
   getAccountInsight,
@@ -12,8 +13,7 @@ import {
 } from "@/lib/meta/insights";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+  await requireAdministrator();
 }
 
 /**

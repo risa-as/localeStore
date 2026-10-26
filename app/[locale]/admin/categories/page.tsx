@@ -7,10 +7,10 @@ import {
 import { getAllCategories } from "@/lib/actions/category.actions";
 import { requireAdmin } from "@/lib/auth-guard";
 import { formatDateTime } from "@/lib/utils";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 import Link from "next/link";
 import DeleteCategoryButton from "./delete-category-button";
-import { Tag, Plus } from "lucide-react";
+import { Tag, Plus, Pencil } from "lucide-react";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -22,6 +22,7 @@ const AdminCategoriesPage = async () => {
   await requireAdmin();
   const categories = await getAllCategories();
   const t = await getTranslations("Categories");
+  const locale = await getLocale();
 
   return (
     <div className="space-y-6">
@@ -64,7 +65,7 @@ const AdminCategoriesPage = async () => {
                 <TableHead className="font-semibold">{t("name")}</TableHead>
                 <TableHead className="font-semibold">{t("slug")}</TableHead>
                 <TableHead className="font-semibold">{t("createdAt")}</TableHead>
-                <TableHead className="text-center font-semibold w-[100px]">إجراءات</TableHead>
+                <TableHead className="text-center font-semibold w-[160px]">{t("actions")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -81,7 +82,14 @@ const AdminCategoriesPage = async () => {
                     {formatDateTime(category.createdAt).dateTime}
                   </TableCell>
                   <TableCell className="text-center">
-                    <DeleteCategoryButton id={category.id} />
+                    <div className="flex items-center justify-center gap-2">
+                      <Button asChild variant="outline" size="sm" className="gap-1.5 rounded-[10px]">
+                        <Link href={`/${locale}/admin/categories/${category.id}`} aria-label={`${t("edit")}: ${category.name}`}>
+                          <Pencil className="h-3.5 w-3.5" />{t("edit")}
+                        </Link>
+                      </Button>
+                      <DeleteCategoryButton id={category.id} />
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

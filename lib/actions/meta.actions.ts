@@ -2,14 +2,13 @@
 
 import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
+import { requireAdministrator } from "@/lib/authorization";
 import { revalidatePath } from "next/cache";
 import { getMetaConfig, META_SCOPES } from "@/lib/meta/config";
 import { graphGet } from "@/lib/meta/graph";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
-  return session;
+  return requireAdministrator();
 }
 
 type PageAsset = {

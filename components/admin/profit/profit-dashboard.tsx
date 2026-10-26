@@ -236,9 +236,9 @@ export default function ProfitDashboard({
   const ranked = useMemo(
     () =>
       [...productStats]
-        .sort((a, b) => b.totalProfit - a.totalProfit)
+        .sort((a, b) => (b.totalProfit - (adByProduct.get(b.productId) ?? 0)) - (a.totalProfit - (adByProduct.get(a.productId) ?? 0)))
         .map((p, i) => ({ ...p, rank: i + 1 })),
-    [productStats],
+    [productStats, adByProduct],
   );
 
   const visibleProducts = useMemo(() => {
@@ -463,17 +463,17 @@ export default function ProfitDashboard({
       .sort((a, b) => marginOf(a) - marginOf(b))[0];
     const avgPerOrder =
       orderSummary.totalOrderCount > 0
-        ? netProfit / orderSummary.totalOrderCount
+        ? realProfit / orderSummary.totalOrderCount
         : 0;
     return [
       {
-        label: "أعلى منتج ربحاً",
+        label: "أعلى منتج ربحاً بعد الإعلان",
         value: top.name,
-        meta: `${formatCurrency(top.totalProfit)} صافي ربح`,
+        meta: `${formatCurrency(top.totalProfit - (adByProduct.get(top.productId) ?? 0))} قبل المصاريف العامة`,
         color: "var(--pa-green)",
       },
       {
-        label: "أقل هامش ربح",
+        label: "أقل هامش قبل الإعلان",
         value: worst?.name ?? "—",
         meta: worst ? `هامش ${marginOf(worst).toFixed(1)}%` : "—",
         color: "var(--pa-danger)",
@@ -485,7 +485,7 @@ export default function ProfitDashboard({
         color: "var(--pa-blue)",
       },
     ];
-  }, [ranked, netProfit, orderSummary.totalOrderCount]);
+  }, [ranked, realProfit, adByProduct, orderSummary.totalOrderCount]);
 
   // 13 fixed columns: #, name, qty, returned, revenue, cost, profit,
   // margin, the 4 ad columns, and profit share.
@@ -721,9 +721,11 @@ export default function ProfitDashboard({
             </div>
 
             <Kpi
-              label="مصاريف الإعلانات المستبدلة"
+              label="منها مستورد من Meta"
               value={formatCurrency(importedAdTotalIQD)}
-              meta={`مستورد من Meta — استبدل ${formatCurrency(replacedManualTotal)} يدوي`}
+              meta={replacedManualTotal > 0
+                ? `ضمن إجمالي الإعلانات؛ لا يُخصم مرة ثانية. استُبعد ${formatCurrency(replacedManualTotal)} من الإدخال اليدوي المتداخل لمنع التكرار.`
+                : "ضمن إجمالي الإعلانات؛ لا يُخصم مرة ثانية."}
             />
             <Kpi
               label="صافي الربح الحقيقي"
@@ -781,7 +783,7 @@ export default function ProfitDashboard({
                   return (
                     <div
                       key={c.label}
-                      className="rounded-xl px-3 py-2"
+                      className="rounded-[10px] px-3 py-2"
                       style={{
                         background: "var(--pa-bg-page)",
                         border: "1px solid var(--pa-border)",
@@ -1220,7 +1222,7 @@ export default function ProfitDashboard({
                                 {formatCurrency(adCost)}
                                 {adCostSource === "meta" && (
                                   <span
-                                    className="text-[9px] rounded-full border px-1.5 py-0.5 text-muted-foreground"
+                                    className="text-[9px] rounded-[10px] border px-1.5 py-0.5 text-muted-foreground"
                                     title="صرف Meta المستورد فعلياً — لهذا المنتج في هذه الفترة"
                                   >
                                     Meta
@@ -1409,7 +1411,7 @@ export default function ProfitDashboard({
 
       {/* ── Sticky summary footer ──────────────────────────────────────── */}
       <div className="pa-footer pa-no-print">
-        <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-4 flex-wrap">
+        <div className="w-full flex items-center justify-between gap-4 flex-wrap">
           <div className="flex gap-7 flex-wrap">
             <div>
               <div className="pa-footer-label">إجمالي ما حُصِّل</div>

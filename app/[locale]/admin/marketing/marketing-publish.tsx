@@ -215,8 +215,9 @@ export default function PublishPanel({
         />
       </div>
 
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
       {/* المؤلّف */}
-      <div className="rounded-xl border bg-card p-4 space-y-4">
+      <div className="min-w-0 rounded-xl border bg-card p-4 space-y-4">
         <h3 className="font-semibold text-sm">منشور جديد</h3>
 
         <div className="grid sm:grid-cols-2 gap-3">
@@ -437,7 +438,7 @@ export default function PublishPanel({
       </div>
 
       {/* المنشورات */}
-      <div className="space-y-3">
+      <div className="min-w-0 space-y-3 rounded-[10px] border bg-card p-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h3 className="font-semibold text-sm">المنشورات ({feed.posts.length})</h3>
           {feed.posts.length > 0 && (
@@ -573,6 +574,7 @@ export default function PublishPanel({
             )}
           </>
         )}
+      </div>
       </div>
 
       {boostFor && (

@@ -4,6 +4,7 @@ import { prisma } from "@/db/prisma";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { requireAdministrator } from "@/lib/authorization";
 
 const updateShippingSettingsSchema = z.object({
   baghdadCost: z.coerce.number().positive(),
@@ -14,12 +15,13 @@ const updateShippingSettingsSchema = z.object({
 export async function getShippingSettings() {
   return prisma.shippingSettings.upsert({
     where: { id: "default" },
-    create: { id: "default", baghdadCost: 4000, othersCost: 5000 },
+    create: { id: "default", baghdadCost: 4, othersCost: 5 },
     update: {},
   });
 }
 
 export async function updateShippingSettings(data: { baghdadCost: number; othersCost: number }) {
+  await requireAdministrator();
   const session = await auth();
   if (session?.user?.role !== "admin") {
     return { success: false, message: "Unauthorized" };

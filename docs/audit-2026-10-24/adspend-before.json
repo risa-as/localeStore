@@ -1,0 +1,3139 @@
+{
+  "createdAt": "2026-10-24T09:54:00.177Z",
+  "from": "2026-10-01",
+  "to": "2026-10-24",
+  "accounts": [
+    {
+      "id": "act_1184066667137819",
+      "name": "A3",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_3410597772594040",
+      "name": "فواز علي",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1386328595534463",
+      "name": "R51",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_223289150282628",
+      "name": "R53",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_740644367721261",
+      "name": "R52",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_853292029457836",
+      "name": "F11",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1071215794456597",
+      "name": "R54",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1158134896010464",
+      "name": "R56",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_944806876987803",
+      "name": "R58",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_900966701756549",
+      "name": "F12",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1268605194477103",
+      "name": "R55",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1707545473139083",
+      "name": "R57",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_558325023583485",
+      "name": "F13",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1446575432981255",
+      "name": "A1",
+      "currency": "USD",
+      "status": 1
+    },
+    {
+      "id": "act_1820920635236895",
+      "name": "A2",
+      "currency": "USD",
+      "status": 1
+    }
+  ],
+  "errors": [],
+  "live": [
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120246915589010037",
+      "campaignName": "‏كابسة قفايص 35‏ - نسخة",
+      "date": "2026-10-01",
+      "amount": 16.89,
+      "productId": "40df6a66-047a-466e-870d-5b66ae7cd623"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-05",
+      "amount": 9.96,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-06",
+      "amount": 16.56,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-07",
+      "amount": 27.35,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-08",
+      "amount": 36.27,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-09",
+      "amount": 35.29,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-10",
+      "amount": 37.7,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-11",
+      "amount": 26.34,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-12",
+      "amount": 29.61,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-13",
+      "amount": 30.64,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-14",
+      "amount": 29.94,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-15",
+      "amount": 27.12,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247087554310037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-16",
+      "amount": 20.81,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247259950870037",
+      "campaignName": "‏مفتاح تمديد 30‏ - نسخة",
+      "date": "2026-10-16",
+      "amount": 8.37,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247269742480037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-17",
+      "amount": 16.9,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247269742480037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-18",
+      "amount": 28.55,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247269742480037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-19",
+      "amount": 38.68,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247269742480037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-20",
+      "amount": 27.59,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247269742480037",
+      "campaignName": "مفتاح تمديد 30",
+      "date": "2026-10-21",
+      "amount": 1.23,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247329739060037",
+      "campaignName": "سيت تركيب المكابس 20",
+      "date": "2026-10-23",
+      "amount": 10.68,
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9"
+    },
+    {
+      "accountId": "act_1386328595534463",
+      "accountName": "R51",
+      "currency": "USD",
+      "campaignId": "120247329739060037",
+      "campaignName": "سيت تركيب المكابس 20",
+      "date": "2026-10-24",
+      "amount": 2.48,
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-14",
+      "amount": 17.74,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-15",
+      "amount": 26.58,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-16",
+      "amount": 30.76,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-17",
+      "amount": 29.14,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-18",
+      "amount": 28.54,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-19",
+      "amount": 30.61,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-20",
+      "amount": 29.58,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-21",
+      "amount": 32.45,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-22",
+      "amount": 29.61,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-23",
+      "amount": 29.35,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_740644367721261",
+      "accountName": "R52",
+      "currency": "USD",
+      "campaignId": "120250396232720691",
+      "campaignName": "قاعدة كوسيرة 30",
+      "date": "2026-10-24",
+      "amount": 2.17,
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb"
+    },
+    {
+      "accountId": "act_1158134896010464",
+      "accountName": "R56",
+      "currency": "USD",
+      "campaignId": "120248940470390027",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-13",
+      "amount": 3.72,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1158134896010464",
+      "accountName": "R56",
+      "currency": "USD",
+      "campaignId": "120248940470390027",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-14",
+      "amount": 13.45,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1158134896010464",
+      "accountName": "R56",
+      "currency": "USD",
+      "campaignId": "120249105397800027",
+      "campaignName": "سيت ارجاع الفرامل - 30",
+      "date": "2026-10-23",
+      "amount": 2.87,
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4"
+    },
+    {
+      "accountId": "act_1158134896010464",
+      "accountName": "R56",
+      "currency": "USD",
+      "campaignId": "120249105397800027",
+      "campaignName": "سيت ارجاع الفرامل - 30",
+      "date": "2026-10-24",
+      "amount": 13.64,
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-01",
+      "amount": 17.25,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-02",
+      "amount": 21.27,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-03",
+      "amount": 18.92,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-04",
+      "amount": 20.91,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-05",
+      "amount": 18.22,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-06",
+      "amount": 11.18,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248243531640570",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "date": "2026-10-07",
+      "amount": 24.83,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_1071215794456597",
+      "accountName": "R54",
+      "currency": "USD",
+      "campaignId": "120248409371960570",
+      "campaignName": "حقنة سوائل 30‏ - نسخة",
+      "date": "2026-10-08",
+      "amount": 12.28,
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde"
+    },
+    {
+      "accountId": "act_944806876987803",
+      "accountName": "R58",
+      "currency": "USD",
+      "campaignId": "120253489251600508",
+      "campaignName": "سكويرة - 20",
+      "date": "2026-10-24",
+      "amount": 9.5,
+      "productId": "9981ffff-fffb-47b4-9a43-012a83a75454"
+    },
+    {
+      "accountId": "act_1707545473139083",
+      "accountName": "R57",
+      "currency": "USD",
+      "campaignId": "120251499871400308",
+      "campaignName": "مخرطة فولاذية 30",
+      "date": "2026-10-05",
+      "amount": 6.36,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_1707545473139083",
+      "accountName": "R57",
+      "currency": "USD",
+      "campaignId": "120251499871400308",
+      "campaignName": "مخرطة فولاذية 30",
+      "date": "2026-10-06",
+      "amount": 37.74,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_1707545473139083",
+      "accountName": "R57",
+      "currency": "USD",
+      "campaignId": "120251898043260308",
+      "campaignName": "مفتاح تمديد - 20",
+      "date": "2026-10-23",
+      "amount": 0.63,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1707545473139083",
+      "accountName": "R57",
+      "currency": "USD",
+      "campaignId": "120251898043260308",
+      "campaignName": "مفتاح تمديد - 20",
+      "date": "2026-10-24",
+      "amount": 9.96,
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252296090660100",
+      "campaignName": "سيت مكابس 30",
+      "date": "2026-10-01",
+      "amount": 26.39,
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252395749850100",
+      "campaignName": "سيت ارجاع الديسكات 30",
+      "date": "2026-10-05",
+      "amount": 4.9,
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252395749850100",
+      "campaignName": "سيت ارجاع الديسكات 30",
+      "date": "2026-10-06",
+      "amount": 35.4,
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252395749850100",
+      "campaignName": "سيت ارجاع الديسكات 30",
+      "date": "2026-10-07",
+      "amount": 26.97,
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-14",
+      "amount": 12.35,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-15",
+      "amount": 30.21,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-16",
+      "amount": 21.38,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-17",
+      "amount": 27.74,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-18",
+      "amount": 33.39,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-19",
+      "amount": 30.53,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-20",
+      "amount": 30.1,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-21",
+      "amount": 31.93,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-22",
+      "amount": 30.21,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-23",
+      "amount": 28.91,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_1268605194477103",
+      "accountName": "R55",
+      "currency": "USD",
+      "campaignId": "120252522279270100",
+      "campaignName": "حامل مغناطيسي 30",
+      "date": "2026-10-24",
+      "amount": 10.66,
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250686320120731",
+      "campaignName": "مخرطة فولاذية 30",
+      "date": "2026-10-13",
+      "amount": 2.19,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250686320120731",
+      "campaignName": "مخرطة فولاذية 30",
+      "date": "2026-10-14",
+      "amount": 23.88,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-17",
+      "amount": 2.29,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-18",
+      "amount": 30.96,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-19",
+      "amount": 30.81,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-20",
+      "amount": 12.83,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-21",
+      "amount": 5.25,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    },
+    {
+      "accountId": "act_900966701756549",
+      "accountName": "F12",
+      "currency": "USD",
+      "campaignId": "120250751089600731",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "date": "2026-10-22",
+      "amount": 42.36,
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a"
+    }
+  ],
+  "stored": [
+    {
+      "id": "218261d6-80eb-4ba1-8ea2-c2d0c92b2ccd",
+      "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+      "campaignId": "120246915589010037",
+      "date": "2026-10-01T00:00:00.000Z",
+      "amount": "16.89",
+      "currency": "USD",
+      "amountIQD": "23139.3",
+      "fxRate": "1370",
+      "campaignName": "‏كابسة قفايص 35‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:55:58.388Z",
+      "product": {
+        "name": "كابسة حلقات",
+        "slug": "kabsh-hlqat"
+      }
+    },
+    {
+      "id": "2d21d631-0085-4a50-b0bf-188f7f86f7c4",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-01T00:00:00.000Z",
+      "amount": "17.25",
+      "currency": "USD",
+      "amountIQD": "23632.5",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:01.631Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "96b9ef60-5561-4a15-93d8-1e1b8b618c49",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-02T00:00:00.000Z",
+      "amount": "21.27",
+      "currency": "USD",
+      "amountIQD": "29139.9",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:05.432Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "0e5f5360-54d5-4525-8bd1-974264d21e9e",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-03T00:00:00.000Z",
+      "amount": "18.92",
+      "currency": "USD",
+      "amountIQD": "25920.4",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:08.910Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "03fee500-86a8-4454-b6b2-267fa473e528",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-04T00:00:00.000Z",
+      "amount": "20.91",
+      "currency": "USD",
+      "amountIQD": "28646.7",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:12.575Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "c3ea5217-c1e5-4989-b7c5-a90f8d43cb2e",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-06T00:00:00.000Z",
+      "amount": "16.56",
+      "currency": "USD",
+      "amountIQD": "26115.12",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:20.750Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "4746b2b2-4f04-4a08-bdce-b405a13169c9",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-06T00:00:00.000Z",
+      "amount": "11.18",
+      "currency": "USD",
+      "amountIQD": "17630.86",
+      "fxRate": "1577",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:21.594Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "2583bbdc-0c41-422f-b0b4-f1a5f5ac2bdb",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-06T00:00:00.000Z",
+      "amount": "37.74",
+      "currency": "USD",
+      "amountIQD": "59515.98",
+      "fxRate": "1577",
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:22.684Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "938dc703-ff46-4049-bd2c-9a40f90c673f",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-07T00:00:00.000Z",
+      "amount": "27.35",
+      "currency": "USD",
+      "amountIQD": "43130.95",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:25.862Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "d7cf4285-e35a-45f8-80ca-e9bc38e5c8aa",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-07T00:00:00.000Z",
+      "amount": "24.83",
+      "currency": "USD",
+      "amountIQD": "39156.91",
+      "fxRate": "1577",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:27.101Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "b6d12ed8-8b50-4015-85b2-baa281d12b17",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-08T00:00:00.000Z",
+      "amount": "36.27",
+      "currency": "USD",
+      "amountIQD": "57197.79",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:31.104Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "10aa4062-62e8-497e-b8c4-c42d69f39d41",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248409371960570",
+      "date": "2026-10-08T00:00:00.000Z",
+      "amount": "12.28",
+      "currency": "USD",
+      "amountIQD": "19365.56",
+      "fxRate": "1577",
+      "campaignName": "حقنة سوائل 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:32.141Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "f35b5e94-3d71-49e4-b1d0-5f32ba2a96bf",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-09T00:00:00.000Z",
+      "amount": "35.29",
+      "currency": "USD",
+      "amountIQD": "55652.33",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:36.040Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "d415c3f8-c522-4494-b50f-7653f62080db",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-10T00:00:00.000Z",
+      "amount": "37.7",
+      "currency": "USD",
+      "amountIQD": "59452.9",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:39.738Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "505f2c8e-fd06-460d-a2cb-5217df490ade",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-11T00:00:00.000Z",
+      "amount": "26.34",
+      "currency": "USD",
+      "amountIQD": "41538.18",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:43.257Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "d373615f-741e-4a7d-a9e3-6b9dfb33f5c3",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-12T00:00:00.000Z",
+      "amount": "29.61",
+      "currency": "USD",
+      "amountIQD": "46694.97",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:46.782Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "7067ff59-1cd4-4023-b558-f486a59efc2d",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-13T00:00:00.000Z",
+      "amount": "30.64",
+      "currency": "USD",
+      "amountIQD": "48319.28",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:52.684Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "d0b4a238-dc5b-43ee-be0c-66664534243c",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248940470390027",
+      "date": "2026-10-13T00:00:00.000Z",
+      "amount": "3.72",
+      "currency": "USD",
+      "amountIQD": "5866.44",
+      "fxRate": "1577",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:53.943Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "92e6d889-2aa5-4113-a91c-ee1496b7020a",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250686320120731",
+      "date": "2026-10-13T00:00:00.000Z",
+      "amount": "2.19",
+      "currency": "USD",
+      "amountIQD": "3453.63",
+      "fxRate": "1577",
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:54.531Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "b8cb48b8-92b7-41cd-9e3a-709509ecc461",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-14T00:00:00.000Z",
+      "amount": "29.94",
+      "currency": "USD",
+      "amountIQD": "47215.38",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:57.975Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "9a86ba7c-bc05-4a21-8757-0268936b26ee",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-14T00:00:00.000Z",
+      "amount": "17.74",
+      "currency": "USD",
+      "amountIQD": "27975.98",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:58.657Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "af15f2e1-c70d-4a62-9a01-6759c562746a",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248940470390027",
+      "date": "2026-10-14T00:00:00.000Z",
+      "amount": "13.45",
+      "currency": "USD",
+      "amountIQD": "21210.65",
+      "fxRate": "1577",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:56:59.744Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "702a1879-7e78-47f2-95f1-3af4fc3959fc",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250686320120731",
+      "date": "2026-10-14T00:00:00.000Z",
+      "amount": "23.88",
+      "currency": "USD",
+      "amountIQD": "37658.76",
+      "fxRate": "1577",
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:01.069Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "cc652d7e-04ac-4b47-a385-6352a8bb30db",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-15T00:00:00.000Z",
+      "amount": "27.12",
+      "currency": "USD",
+      "amountIQD": "42768.24",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:03.540Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "72ccc6c9-a197-4e02-a3d0-690ef42a08b0",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-15T00:00:00.000Z",
+      "amount": "26.58",
+      "currency": "USD",
+      "amountIQD": "41916.66",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:04.103Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "144e2ee8-a341-44de-b5ff-a26419c7cfab",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-16T00:00:00.000Z",
+      "amount": "20.81",
+      "currency": "USD",
+      "amountIQD": "32817.37",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:07.294Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "06b9a07c-651a-4fcc-9de9-7a7c6c9a8d53",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247259950870037",
+      "date": "2026-10-16T00:00:00.000Z",
+      "amount": "8.37",
+      "currency": "USD",
+      "amountIQD": "13199.49",
+      "fxRate": "1577",
+      "campaignName": "‏مفتاح تمديد 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:07.389Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "8802b31e-311d-43cc-a72e-d30e50fc3c2d",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-16T00:00:00.000Z",
+      "amount": "30.76",
+      "currency": "USD",
+      "amountIQD": "48508.52",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:08.201Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "42f05a8d-eced-4ddc-b573-86382f12b7da",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-17T00:00:00.000Z",
+      "amount": "16.9",
+      "currency": "USD",
+      "amountIQD": "26651.3",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:11.435Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "3492d383-e0a5-4843-bffd-f9f35d4ef6c7",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-17T00:00:00.000Z",
+      "amount": "29.14",
+      "currency": "USD",
+      "amountIQD": "45953.78",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:12.081Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "e1da686b-4ebd-4e1e-9a55-65c3944b1c13",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-17T00:00:00.000Z",
+      "amount": "2.29",
+      "currency": "USD",
+      "amountIQD": "3611.33",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:13.184Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "d5341145-2225-4305-a806-aa567f65356f",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-18T00:00:00.000Z",
+      "amount": "28.55",
+      "currency": "USD",
+      "amountIQD": "45023.35",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:15.520Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "010c5fc4-de09-4823-ac2b-1342311e065a",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-18T00:00:00.000Z",
+      "amount": "28.54",
+      "currency": "USD",
+      "amountIQD": "45007.58",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:16.200Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "942b0b47-de7a-4fba-bd38-f425094cad1b",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-18T00:00:00.000Z",
+      "amount": "30.96",
+      "currency": "USD",
+      "amountIQD": "48823.92",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:18.468Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "b4c0a47b-52fa-4b34-9b44-ba0f2df8345a",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-19T00:00:00.000Z",
+      "amount": "38.68",
+      "currency": "USD",
+      "amountIQD": "60998.36",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:21.086Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "a99b57be-b9f8-4fda-882a-4c654295a4be",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-19T00:00:00.000Z",
+      "amount": "30.61",
+      "currency": "USD",
+      "amountIQD": "48271.97",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:21.871Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "3f546bbf-bdee-4aa1-ae95-21b2719ccf38",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-19T00:00:00.000Z",
+      "amount": "30.81",
+      "currency": "USD",
+      "amountIQD": "48587.37",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:23.447Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "0ce8478a-6f35-455b-afc5-95647c869806",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-20T00:00:00.000Z",
+      "amount": "27.59",
+      "currency": "USD",
+      "amountIQD": "43509.43",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:26.028Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "5e4cac85-faf1-44c7-b758-ad770bbc6acb",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-20T00:00:00.000Z",
+      "amount": "29.58",
+      "currency": "USD",
+      "amountIQD": "46647.66",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:26.716Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "d623ee20-ebcc-4062-b025-11a1c4ae1c39",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-20T00:00:00.000Z",
+      "amount": "12.83",
+      "currency": "USD",
+      "amountIQD": "20232.91",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:29.879Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "18bdcb2d-2a5b-497d-9f5d-f291f8a5dbf5",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-21T00:00:00.000Z",
+      "amount": "1.23",
+      "currency": "USD",
+      "amountIQD": "1939.71",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:32.487Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "0b8cdbfd-a512-4519-ae81-16040f31fb14",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-21T00:00:00.000Z",
+      "amount": "32.45",
+      "currency": "USD",
+      "amountIQD": "51173.65",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:33.288Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "37be65c4-6dd0-4ff8-8d8b-1ef004aedf93",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-21T00:00:00.000Z",
+      "amount": "5.25",
+      "currency": "USD",
+      "amountIQD": "8279.25",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:35.426Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "9c2a2826-1f64-4c9f-8192-2f1b90bc38bc",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-22T00:00:00.000Z",
+      "amount": "29.6",
+      "currency": "USD",
+      "amountIQD": "46679.2",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:39.170Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "d1e12478-f03d-4cdf-b1fc-8ff1fba5298f",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-22T00:00:00.000Z",
+      "amount": "42.36",
+      "currency": "USD",
+      "amountIQD": "66801.72",
+      "fxRate": "1577",
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:40.944Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "875ee79d-cf62-4d22-a816-64a176376738",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-23T00:00:00.000Z",
+      "amount": "29.1",
+      "currency": "USD",
+      "amountIQD": "45890.7",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T18:57:44.428Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "1c6a606a-f209-49f9-be98-5615a3919b37",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "9.96",
+      "currency": "USD",
+      "amountIQD": "13645.2",
+      "fxRate": "1370",
+      "campaignName": "مفتاح تمديد 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.787Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    },
+    {
+      "id": "d28f0893-3cf4-43fa-8796-b0b4bc7c8ac1",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "18.22",
+      "currency": "USD",
+      "amountIQD": "24961.4",
+      "fxRate": "1370",
+      "campaignName": "حقنة تفريغ السوائل 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.885Z",
+      "product": {
+        "name": "حقنة تفريغ وملء سوائل",
+        "slug": "hqnh-tfrygh-wmla-swael"
+      }
+    },
+    {
+      "id": "716f40a3-8589-4289-aa3d-960a78801147",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-05T00:00:00.000Z",
+      "amount": "6.36",
+      "currency": "USD",
+      "amountIQD": "8713.2",
+      "fxRate": "1370",
+      "campaignName": "مخرطة فولاذية 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-23T19:25:57.992Z",
+      "product": {
+        "name": "مخرطة فولاذية",
+        "slug": "mkhrth-fwlathyh"
+      }
+    },
+    {
+      "id": "1ab933e4-2a47-4806-b02d-323e8adcbdf1",
+      "productId": "b1e9d7ef-50d5-401a-a79d-2747eee7b25e",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-23T00:00:00.000Z",
+      "amount": "10.47",
+      "currency": "USD",
+      "amountIQD": "16511.19",
+      "fxRate": "1577",
+      "campaignName": "سيت تركيب المكابس 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T02:00:28.974Z",
+      "product": {
+        "name": "غير مصنّف (حملات بلا ربط)",
+        "slug": "unlinked-ad-spend"
+      }
+    },
+    {
+      "id": "51c73abc-d818-4d60-ab37-3705efc06d11",
+      "productId": "b1e9d7ef-50d5-401a-a79d-2747eee7b25e",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-23T00:00:00.000Z",
+      "amount": "2.86",
+      "currency": "USD",
+      "amountIQD": "4510.22",
+      "fxRate": "1577",
+      "campaignName": "سيت ارجاع الفرامل - 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T02:00:31.014Z",
+      "product": {
+        "name": "غير مصنّف (حملات بلا ربط)",
+        "slug": "unlinked-ad-spend"
+      }
+    },
+    {
+      "id": "4195560e-d2c9-4e77-a911-c4e4fabc6ba7",
+      "productId": "b1e9d7ef-50d5-401a-a79d-2747eee7b25e",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-23T00:00:00.000Z",
+      "amount": "0.63",
+      "currency": "USD",
+      "amountIQD": "993.51",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد - 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T02:00:32.506Z",
+      "product": {
+        "name": "غير مصنّف (حملات بلا ربط)",
+        "slug": "unlinked-ad-spend"
+      }
+    },
+    {
+      "id": "ca25408f-04c2-4d54-b4bf-575b38754237",
+      "productId": "b1e9d7ef-50d5-401a-a79d-2747eee7b25e",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-23T00:00:00.000Z",
+      "amount": "28.91",
+      "currency": "USD",
+      "amountIQD": "45591.07",
+      "fxRate": "1577",
+      "campaignName": "حامل مغناطيسي 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T06:58:26.585Z",
+      "product": {
+        "name": "غير مصنّف (حملات بلا ربط)",
+        "slug": "unlinked-ad-spend"
+      }
+    },
+    {
+      "id": "ae9b78c5-6782-4051-80ae-c5c33f8bb465",
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "2.36",
+      "currency": "USD",
+      "amountIQD": "3721.72",
+      "fxRate": "1577",
+      "campaignName": "سيت تركيب المكابس 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:27.314Z",
+      "product": {
+        "name": "سيت تركيب المكبس ",
+        "slug": "syt-trkyb-almkbs"
+      }
+    },
+    {
+      "id": "96104bdf-1baa-4935-be83-b3e5bc5b1c7e",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "2.07",
+      "currency": "USD",
+      "amountIQD": "3264.39",
+      "fxRate": "1577",
+      "campaignName": "قاعدة كوسيرة 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:27.960Z",
+      "product": {
+        "name": "قاعدة كوسرة زاوية",
+        "slug": "qaadh-kwsrh-zawyh"
+      }
+    },
+    {
+      "id": "660846ed-a364-47cb-8da5-5427c508a4b5",
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "13.52",
+      "currency": "USD",
+      "amountIQD": "21321.04",
+      "fxRate": "1577",
+      "campaignName": "سيت ارجاع الفرامل - 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:28.771Z",
+      "product": {
+        "name": "مجموعة أدوات إرجاع مكابس الفرامل ",
+        "slug": "mjmwah-adwat-irjaa-mkabs-alframl"
+      }
+    },
+    {
+      "id": "b830265a-e042-4091-902c-cf1f4d2b29c6",
+      "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+      "campaignId": "120253489251600508",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "9.36",
+      "currency": "USD",
+      "amountIQD": "14760.72",
+      "fxRate": "1577",
+      "campaignName": "سكويرة - 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:29.406Z",
+      "product": {
+        "name": "تحويلة دريل لسكويرة",
+        "slug": "thwylh-dryl-lskwyrh"
+      }
+    },
+    {
+      "id": "b5f12463-85c4-447f-89c1-0a74eaca5eb4",
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "10.56",
+      "currency": "USD",
+      "amountIQD": "16653.12",
+      "fxRate": "1577",
+      "campaignName": "حامل مغناطيسي 30",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:30.189Z",
+      "product": {
+        "name": "حامل مغناطيسي جداري",
+        "slug": "haml-mghnatysy-jdary"
+      }
+    },
+    {
+      "id": "9fab6b2a-1a7f-40e8-a84b-919692a06fa3",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-24T00:00:00.000Z",
+      "amount": "9.74",
+      "currency": "USD",
+      "amountIQD": "15359.98",
+      "fxRate": "1577",
+      "campaignName": "مفتاح تمديد - 20",
+      "source": "meta-daily",
+      "createdAt": "2026-10-24T09:47:31.035Z",
+      "product": {
+        "name": "مفتاح تمديد",
+        "slug": "mftah-tmdyd"
+      }
+    }
+  ],
+  "rates": [
+    {
+      "id": "aa48df00-6d4c-423b-b0f4-78e1b26a4347",
+      "rate": "1577",
+      "fromDate": "2026-10-06T00:00:00.000Z",
+      "toDate": null,
+      "note": null,
+      "createdAt": "2026-10-23T17:34:35.783Z"
+    },
+    {
+      "id": "fe5da3b0-727a-451c-a36d-b52e965e0cf0",
+      "rate": "1370",
+      "fromDate": "2026-02-08T00:00:00.000Z",
+      "toDate": "2026-10-05T00:00:00.000Z",
+      "note": null,
+      "createdAt": "2026-10-23T17:33:10.459Z"
+    }
+  ],
+  "logs": [
+    {
+      "id": "0c1b0927-2ef8-440d-a41f-58e662df169d",
+      "date": "2026-10-24T00:00:00.000Z",
+      "ok": true,
+      "accountsOk": 15,
+      "accountsErr": 0,
+      "rows": 6,
+      "unlinked": 0,
+      "message": null,
+      "createdAt": "2026-10-24T09:47:31.971Z"
+    },
+    {
+      "id": "d921ddd0-7ab3-4eac-a0b0-3589810c63f3",
+      "date": "2026-10-23T00:00:00.000Z",
+      "ok": true,
+      "accountsOk": 15,
+      "accountsErr": 0,
+      "rows": 5,
+      "unlinked": 4,
+      "message": null,
+      "createdAt": "2026-10-24T06:58:28.031Z"
+    },
+    {
+      "id": "66df42ea-3388-41e3-a9e4-57fbc7db30d2",
+      "date": "2026-10-23T00:00:00.000Z",
+      "ok": true,
+      "accountsOk": 14,
+      "accountsErr": 0,
+      "rows": 4,
+      "unlinked": 3,
+      "message": null,
+      "createdAt": "2026-10-24T02:00:33.651Z"
+    }
+  ],
+  "manualCount": 0,
+  "mapping": [
+    [
+      "120247087554310037",
+      {
+        "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+        "campaignName": "مفتاح تمديد 30"
+      }
+    ],
+    [
+      "120246422317500037",
+      {
+        "productId": "f70577f9-32cf-4553-988e-9ec21353f57d",
+        "campaignName": "قناع لحيم 50"
+      }
+    ],
+    [
+      "120246915589010037",
+      {
+        "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+        "campaignName": "‏كابسة قفايص 35‏ - نسخة"
+      }
+    ],
+    [
+      "120249045340900617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة 35‏ - نسخة"
+      }
+    ],
+    [
+      "120249712936780731",
+      {
+        "productId": "09a28ed1-aa10-4211-9c72-e622a058bfd8",
+        "campaignName": "‏محد سكاكين يدوي 35‏ - نسخة"
+      }
+    ],
+    [
+      "120249578848820731",
+      {
+        "productId": "09a28ed1-aa10-4211-9c72-e622a058bfd8",
+        "campaignName": "محد سكاكين يدوي 35"
+      }
+    ],
+    [
+      "120246772254940037",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس تنظيف 30"
+      }
+    ],
+    [
+      "120246591368490037",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل 30"
+      }
+    ],
+    [
+      "120246135290990037",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "‏فخة بولبرين 30‏ - نسخة"
+      }
+    ],
+    [
+      "120246703571020037",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل 30"
+      }
+    ],
+    [
+      "120250751089600731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+      }
+    ],
+    [
+      "120247269742480037",
+      {
+        "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+        "campaignName": "مفتاح تمديد 30"
+      }
+    ],
+    [
+      "120248799844090617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 35 - نسخة"
+      }
+    ],
+    [
+      "120248973621160617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة 35"
+      }
+    ],
+    [
+      "120249496203950731",
+      {
+        "productId": "09a28ed1-aa10-4211-9c72-e622a058bfd8",
+        "campaignName": "محد يدوي 35"
+      }
+    ],
+    [
+      "120248895244150617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 35 - نسخة"
+      }
+    ],
+    [
+      "120248725180180617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏‏مخرطة فولاذية 35- نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120250686320120731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 30"
+      }
+    ],
+    [
+      "120249544295360617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 30"
+      }
+    ],
+    [
+      "120249621100690617",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "‏حقنة تفريغ السوائل 20‏ - نسخة"
+      }
+    ],
+    [
+      "120249717088730617",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل 30"
+      }
+    ],
+    [
+      "120250049297450731",
+      {
+        "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+        "campaignName": "تحويلة دريل لجلاية 30"
+      }
+    ],
+    [
+      "120248887936730617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 35- نسخة"
+      }
+    ],
+    [
+      "120247680045700570",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس مي 30"
+      }
+    ],
+    [
+      "120251040236710308",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 35"
+      }
+    ],
+    [
+      "120247865592710027",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة دهن 30"
+      }
+    ],
+    [
+      "120250396232720691",
+      {
+        "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+        "campaignName": "قاعدة كوسيرة 30"
+      }
+    ],
+    [
+      "120248243531640570",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة تفريغ السوائل 20"
+      }
+    ],
+    [
+      "120252637474740508",
+      {
+        "productId": "4e5bbb5d-eefc-43b6-a324-43344d143881",
+        "campaignName": "سيت مفكات 30"
+      }
+    ],
+    [
+      "120251229479830308",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 35‏ - نسخة"
+      }
+    ],
+    [
+      "120252275871580127",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت مكابس 35"
+      }
+    ],
+    [
+      "120247983167530570",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "‏مسدس مي 30‏ - نسخة"
+      }
+    ],
+    [
+      "120248058770300570",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت مكابس 30"
+      }
+    ],
+    [
+      "120250115467440308",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس بريكات 35"
+      }
+    ],
+    [
+      "120248395752100027",
+      {
+        "productId": "5ba639ed-93c3-4d03-a8fb-8c4d17cdf62c",
+        "campaignName": "تحويلة كوسرة لمحد 30"
+      }
+    ],
+    [
+      "120248559992690027",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت تركيب المكابس 20"
+      }
+    ],
+    [
+      "120247676634800027",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس تنظيف 30"
+      }
+    ],
+    [
+      "120252813198930508",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل 30"
+      }
+    ],
+    [
+      "120245944003530037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏‏‏سيت مكابس 35‏  new‏ - نسخة"
+      }
+    ],
+    [
+      "120249322436950691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "‏‏مضخة تنفيس الفرامل 20‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120251499871400308",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 30"
+      }
+    ],
+    [
+      "120246019863020037",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "فخة بولبرين 20"
+      }
+    ],
+    [
+      "120248200238710027",
+      {
+        "productId": "09a28ed1-aa10-4211-9c72-e622a058bfd8",
+        "campaignName": "محد يدوي 30"
+      }
+    ],
+    [
+      "120248493920340027",
+      {
+        "productId": "4e5bbb5d-eefc-43b6-a324-43344d143881",
+        "campaignName": "سيت النكيات 20"
+      }
+    ],
+    [
+      "120248081757750027",
+      {
+        "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+        "campaignName": "سكويرة 20"
+      }
+    ],
+    [
+      "120246877910790037",
+      {
+        "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+        "campaignName": "كابسة قفايص 35"
+      }
+    ],
+    [
+      "120249493648380691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس الفرامل 30"
+      }
+    ],
+    [
+      "120250928040710308",
+      {
+        "productId": "3613c2bf-ce08-40b8-9d51-8b737b63700f",
+        "campaignName": "يدة ضاغط بريكات 30"
+      }
+    ],
+    [
+      "120246518440300037",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس 20"
+      }
+    ],
+    [
+      "120249666386010691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس 20"
+      }
+    ],
+    [
+      "120246400345350037",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس الفرامل 20"
+      }
+    ],
+    [
+      "120249641895620691",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "رافعة 20"
+      }
+    ],
+    [
+      "120249279668590691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "‏مضخة تنفيس الفرامل 20‏ - نسخة"
+      }
+    ],
+    [
+      "120246122557970037",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "فخة بولبرين 30"
+      }
+    ],
+    [
+      "120250884854470308",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس تنظيف 30"
+      }
+    ],
+    [
+      "120249625861700691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس 30"
+      }
+    ],
+    [
+      "120245880762830037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏‏سيت مكابس 35‏  new"
+      }
+    ],
+    [
+      "120249446629740691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "‏‏‏مضخة تنفيس الفرامل 20‏ - نسخة‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120248940470390027",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة تفريغ السوائل 20"
+      }
+    ],
+    [
+      "120250618970450308",
+      {
+        "productId": "1a09effe-7802-476a-bc20-827708c9b3cd",
+        "campaignName": "شاحن باتري سيارة 10"
+      }
+    ],
+    [
+      "120246380341280037",
+      {
+        "productId": "09a28ed1-aa10-4211-9c72-e622a058bfd8",
+        "campaignName": "محد يدوي 20"
+      }
+    ],
+    [
+      "120248409371960570",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة سوائل 30‏ - نسخة"
+      }
+    ],
+    [
+      "120249258171550691",
+      {
+        "productId": "4af7752d-f1db-4d5f-997d-4408ca9924a0",
+        "campaignName": "مضخة تنفيس الفرامل 20"
+      }
+    ],
+    [
+      "120246516214050037",
+      {
+        "productId": "f70577f9-32cf-4553-988e-9ec21353f57d",
+        "campaignName": "‏قناع لحيم 50‏ - نسخة"
+      }
+    ],
+    [
+      "120247259950870037",
+      {
+        "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+        "campaignName": "‏مفتاح تمديد 30‏ - نسخة"
+      }
+    ],
+    [
+      "120250077957590691",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 20"
+      }
+    ],
+    [
+      "120251572077010127",
+      {
+        "productId": "e0f30630-c968-49fa-a534-cfb3b67ef605",
+        "campaignName": "خالع ويل سيار 35"
+      }
+    ],
+    [
+      "120247303590230027",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "‏مسدس تنظيف 35‏ - نسخة"
+      }
+    ],
+    [
+      "120250173307720531",
+      {
+        "productId": "14c5f77d-be73-43c1-b4b6-9bf3fac0894d",
+        "campaignName": "فيت بام امريكي 30"
+      }
+    ],
+    [
+      "120248529600200617",
+      {
+        "productId": "3613c2bf-ce08-40b8-9d51-8b737b63700f",
+        "campaignName": "ضاغط بريكات 30"
+      }
+    ],
+    [
+      "120248851811140691",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "‏فخة بولبرين 20‏ - نسخة"
+      }
+    ],
+    [
+      "120249163109930731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏‏‏مخرطة 35‏ - نسخة‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120248634951150617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة فولاذية 50- نسخة"
+      }
+    ],
+    [
+      "120249252007080731",
+      {
+        "productId": "3613c2bf-ce08-40b8-9d51-8b737b63700f",
+        "campaignName": "ضاغط بريكات 35"
+      }
+    ],
+    [
+      "120245757241800037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏سيت مكابس 35‏ - نسخة"
+      }
+    ],
+    [
+      "120245612617850037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت مكابس 35"
+      }
+    ],
+    [
+      "120248986349960691",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "‏‏فخة بولبرين 20‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120245702982160037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏سيت مكابس 35‏ - نسخة"
+      }
+    ],
+    [
+      "120245651549090037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت مكابس 35"
+      }
+    ],
+    [
+      "120245789651020037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏‏‏سيت مكابس 35‏ - نسخة‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120249098677520731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة 35"
+      }
+    ],
+    [
+      "120248489491530617",
+      {
+        "productId": "f70577f9-32cf-4553-988e-9ec21353f57d",
+        "campaignName": "قناع لحيم 20"
+      }
+    ],
+    [
+      "120250286228950531",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة تفريغ سوائل 35"
+      }
+    ],
+    [
+      "120251486978980127",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "‏حقنة سوائل 30‏ - نسخة"
+      }
+    ],
+    [
+      "120248630461930617",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "مخرطة فولاذية 70"
+      }
+    ],
+    [
+      "120245785074290037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "‏‏سيت مكابس 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120247420666470027",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "‏‏مسدس تنظيف 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120249142712010731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏مخرطة 35‏ - نسخة"
+      }
+    ],
+    [
+      "120249152903860731",
+      {
+        "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+        "campaignName": "‏‏مخرطة 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120245208660870037",
+      {
+        "productId": "b4a9c311-a4f1-4de3-a3fb-ebe32079f0a3",
+        "campaignName": "كتر مع فاحص 10"
+      }
+    ],
+    [
+      "120247298444250027",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس تنظيف 35"
+      }
+    ],
+    [
+      "120251477876240127",
+      {
+        "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+        "campaignName": "حقنة سوائل 30"
+      }
+    ],
+    [
+      "120248850702330691",
+      {
+        "productId": "52ae954b-564d-4670-9361-27bbd0c0f64a",
+        "campaignName": "فخة بولبرين 20"
+      }
+    ],
+    [
+      "120251231570950100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏‏‏رافعة فولاذية 35‏ - نسخة"
+      }
+    ],
+    [
+      "120251193416000100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏‏رافعة فولاذية جديد 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120251105496900100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏رافعة فولاذية جديد 35‏ - نسخة"
+      }
+    ],
+    [
+      "120251047289090100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏‏‏رافعة فولاذية 35‏ - نسخة"
+      }
+    ],
+    [
+      "120251149867170100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏‏‏رافعة فولاذية 35‏ - نسخة"
+      }
+    ],
+    [
+      "120250692788080100",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "‏فاتح مفاصل 20‏ - نسخة"
+      }
+    ],
+    [
+      "120251083527910100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "رافعة فولاذية جديد 35"
+      }
+    ],
+    [
+      "120251041873060100",
+      {
+        "productId": "5b2a1031-221a-49df-8e0f-47d02a25629d",
+        "campaignName": "‏‏رافعة فولاذية 35"
+      }
+    ],
+    [
+      "120250405815380100",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "فاتح مفاصل 35"
+      }
+    ],
+    [
+      "120252522279270100",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "حامل مغناطيسي 30"
+      }
+    ],
+    [
+      "120252395749850100",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الديسكات 30"
+      }
+    ],
+    [
+      "120252296090660100",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت مكابس 30"
+      }
+    ],
+    [
+      "120249105397800027",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل - 30"
+      }
+    ],
+    [
+      "120247329739060037",
+      {
+        "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+        "campaignName": "سيت تركيب المكابس 20"
+      }
+    ],
+    [
+      "120251898043260308",
+      {
+        "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+        "campaignName": "مفتاح تمديد - 20"
+      }
+    ],
+    [
+      "120253489251600508",
+      {
+        "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+        "campaignName": "سكويرة - 20"
+      }
+    ],
+    [
+      "120247444584820617",
+      {
+        "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+        "campaignName": "‏كابسة قفايص 35‏ - نسخة"
+      }
+    ],
+    [
+      "120249738432890127",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "ستاند مغناطيسي 50"
+      }
+    ],
+    [
+      "120245580456340027",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "حامل مغناطيسي 50"
+      }
+    ],
+    [
+      "120246865337530691",
+      {
+        "productId": "8e2c8bbd-21c9-4c1a-988a-80b22c92f3cf",
+        "campaignName": "كاسر نتات 20"
+      }
+    ],
+    [
+      "120249992772110127",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "‏ستاند مغناطيسي 35‏ - نسخة"
+      }
+    ],
+    [
+      "120245784407560027",
+      {
+        "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+        "campaignName": "قاعدة كوسرة 35- نسخة"
+      }
+    ],
+    [
+      "120242998933350037",
+      {
+        "productId": "1eeb57b9-a477-4d45-b28e-7e1cb61dabcd",
+        "campaignName": "سيت مطبخ طعام 20"
+      }
+    ],
+    [
+      "120248869153770100",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "‏سيت فاتح مفاصل 35‏ - نسخة"
+      }
+    ],
+    [
+      "120247763856760691",
+      {
+        "productId": "8e2c8bbd-21c9-4c1a-988a-80b22c92f3cf",
+        "campaignName": "‏كاسر نتات 20‏ - نسخة"
+      }
+    ],
+    [
+      "120249050374770100",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "‏‏سيت فاتح مفاصل 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120250199275340127",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "‏‏ستاند مغناطيسي 35‏ - نسخة‏ - نسخة"
+      }
+    ],
+    [
+      "120243740878590037",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "سيت مفاصل قديم 35"
+      }
+    ],
+    [
+      "120247385514130617",
+      {
+        "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+        "campaignName": "كابسة قفايص 35"
+      }
+    ],
+    [
+      "120244535583270037",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "حامل مغناطيسي 20"
+      }
+    ],
+    [
+      "120244451524470570",
+      {
+        "productId": "89307bf1-65b3-44ec-b687-ec1fa72276b5",
+        "campaignName": "مقص طوارئ 15"
+      }
+    ],
+    [
+      "120247919169320531",
+      {
+        "productId": "4b4745db-d25d-4f37-821b-d8794d36f92b",
+        "campaignName": "ستاند ملابس 10"
+      }
+    ],
+    [
+      "120250179086640100",
+      {
+        "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+        "campaignName": "ستاند مغناطيسي 20"
+      }
+    ],
+    [
+      "120245853662110617",
+      {
+        "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+        "campaignName": "سيت ارجاع الفرامل 15"
+      }
+    ],
+    [
+      "120244639493510027",
+      {
+        "productId": "844944e6-3d26-4358-85e3-610bc8015e24",
+        "campaignName": "‏مفتاح تمديد راجز 20‏ - نسخة"
+      }
+    ],
+    [
+      "120244902112620037",
+      {
+        "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+        "campaignName": "قاعدة كوسرة 15"
+      }
+    ],
+    [
+      "120244288537230570",
+      {
+        "productId": "29805b9b-7be5-4fe9-81e4-8cacb80ecd6d",
+        "campaignName": "موسع انابيب 15"
+      }
+    ],
+    [
+      "120248859871150100",
+      {
+        "productId": "0772163e-97a9-4993-bc6a-924aeb0a9f0a",
+        "campaignName": "سيت فاتح مفاصل 35"
+      }
+    ],
+    [
+      "120248771055700100",
+      {
+        "productId": "794475b3-a03d-4013-ba03-6992fda78c66",
+        "campaignName": "حافظة صابون 15"
+      }
+    ],
+    [
+      "120244149817930570",
+      {
+        "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+        "campaignName": "مفتاح تمديد 15"
+      }
+    ],
+    [
+      "120244486333530027",
+      {
+        "productId": "1046ad80-3c11-4bd0-b51f-01392aa770fa",
+        "campaignName": "فيت بام 15"
+      }
+    ],
+    [
+      "120242893698110037",
+      {
+        "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+        "campaignName": "كابسة قفايص 10"
+      }
+    ],
+    [
+      "120248699348940100",
+      {
+        "productId": "7b6f97e7-dd00-453e-80c3-1c05bf561887",
+        "campaignName": "سيت فخات 15"
+      }
+    ],
+    [
+      "120244610486940027",
+      {
+        "productId": "844944e6-3d26-4358-85e3-610bc8015e24",
+        "campaignName": "مفتاح تمديد راجز 20"
+      }
+    ],
+    [
+      "120242807650350037",
+      {
+        "productId": "dfad2bc0-6804-4d14-a02c-2fa5f51fbd48",
+        "campaignName": "مسدس ماء 15"
+      }
+    ],
+    [
+      "120245968358280691",
+      {
+        "productId": "030b4519-63c0-4068-acab-b66a6b919f9e",
+        "campaignName": "قفل زاوي 15"
+      }
+    ],
+    [
+      "120245633196400691",
+      {
+        "productId": "bbac0cd8-2ad8-4688-8afd-ca8a95d490da",
+        "campaignName": "برينة 15"
+      }
+    ],
+    [
+      "120244666049300570",
+      {
+        "productId": "89307bf1-65b3-44ec-b687-ec1fa72276b5",
+        "campaignName": "‏مقص طوارئ 15‏ - نسخة"
+      }
+    ]
+  ],
+  "summary": [
+    {
+      "campaignId": "120246915589010037",
+      "name": "‏كابسة قفايص 35‏ - نسخة",
+      "account": "R51",
+      "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+      "live": 16.89,
+      "stored": 16.89,
+      "liveDays": 1,
+      "storedDays": 1,
+      "storedProducts": [
+        "كابسة حلقات"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120247087554310037",
+      "name": "مفتاح تمديد 30",
+      "account": "R51",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "live": 327.59,
+      "stored": 327.59,
+      "liveDays": 12,
+      "storedDays": 12,
+      "storedProducts": [
+        "مفتاح تمديد"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120247259950870037",
+      "name": "‏مفتاح تمديد 30‏ - نسخة",
+      "account": "R51",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "live": 8.37,
+      "stored": 8.37,
+      "liveDays": 1,
+      "storedDays": 1,
+      "storedProducts": [
+        "مفتاح تمديد"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120247269742480037",
+      "name": "مفتاح تمديد 30",
+      "account": "R51",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "live": 112.95,
+      "stored": 112.95,
+      "liveDays": 5,
+      "storedDays": 5,
+      "storedProducts": [
+        "مفتاح تمديد"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120247329739060037",
+      "name": "سيت تركيب المكابس 20",
+      "account": "R51",
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "live": 13.16,
+      "stored": 12.83,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "غير مصنّف (حملات بلا ربط)",
+        "سيت تركيب المكبس "
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120250396232720691",
+      "name": "قاعدة كوسيرة 30",
+      "account": "R52",
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "live": 286.53,
+      "stored": 286.17,
+      "liveDays": 11,
+      "storedDays": 11,
+      "storedProducts": [
+        "قاعدة كوسرة زاوية"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120248940470390027",
+      "name": "حقنة تفريغ السوائل 20",
+      "account": "R56",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "live": 17.17,
+      "stored": 17.17,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "حقنة تفريغ وملء سوائل"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120249105397800027",
+      "name": "سيت ارجاع الفرامل - 30",
+      "account": "R56",
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "live": 16.51,
+      "stored": 16.38,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "غير مصنّف (حملات بلا ربط)",
+        "مجموعة أدوات إرجاع مكابس الفرامل "
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120248243531640570",
+      "name": "حقنة تفريغ السوائل 20",
+      "account": "R54",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "live": 132.58,
+      "stored": 132.58,
+      "liveDays": 7,
+      "storedDays": 7,
+      "storedProducts": [
+        "حقنة تفريغ وملء سوائل"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120248409371960570",
+      "name": "حقنة سوائل 30‏ - نسخة",
+      "account": "R54",
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "live": 12.28,
+      "stored": 12.28,
+      "liveDays": 1,
+      "storedDays": 1,
+      "storedProducts": [
+        "حقنة تفريغ وملء سوائل"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120253489251600508",
+      "name": "سكويرة - 20",
+      "account": "R58",
+      "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+      "live": 9.5,
+      "stored": 9.36,
+      "liveDays": 1,
+      "storedDays": 1,
+      "storedProducts": [
+        "تحويلة دريل لسكويرة"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120251499871400308",
+      "name": "مخرطة فولاذية 30",
+      "account": "R57",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "live": 44.1,
+      "stored": 44.1,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "مخرطة فولاذية"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120251898043260308",
+      "name": "مفتاح تمديد - 20",
+      "account": "R57",
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "live": 10.59,
+      "stored": 10.37,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "غير مصنّف (حملات بلا ربط)",
+        "مفتاح تمديد"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120252296090660100",
+      "name": "سيت مكابس 30",
+      "account": "R55",
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "live": 26.39,
+      "stored": 0,
+      "liveDays": 1,
+      "storedDays": 0,
+      "storedProducts": [],
+      "missingDates": [
+        "2026-10-01"
+      ]
+    },
+    {
+      "campaignId": "120252395749850100",
+      "name": "سيت ارجاع الديسكات 30",
+      "account": "R55",
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "live": 67.27,
+      "stored": 0,
+      "liveDays": 3,
+      "storedDays": 0,
+      "storedProducts": [],
+      "missingDates": [
+        "2026-10-05",
+        "2026-10-06",
+        "2026-10-07"
+      ]
+    },
+    {
+      "campaignId": "120252522279270100",
+      "name": "حامل مغناطيسي 30",
+      "account": "R55",
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "live": 287.41,
+      "stored": 39.47,
+      "liveDays": 11,
+      "storedDays": 2,
+      "storedProducts": [
+        "غير مصنّف (حملات بلا ربط)",
+        "حامل مغناطيسي جداري"
+      ],
+      "missingDates": [
+        "2026-10-14",
+        "2026-10-15",
+        "2026-10-16",
+        "2026-10-17",
+        "2026-10-18",
+        "2026-10-19",
+        "2026-10-20",
+        "2026-10-21",
+        "2026-10-22"
+      ]
+    },
+    {
+      "campaignId": "120250686320120731",
+      "name": "مخرطة فولاذية 30",
+      "account": "F12",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "live": 26.07,
+      "stored": 26.07,
+      "liveDays": 2,
+      "storedDays": 2,
+      "storedProducts": [
+        "مخرطة فولاذية"
+      ],
+      "missingDates": []
+    },
+    {
+      "campaignId": "120250751089600731",
+      "name": "‏مخرطة فولاذية 30‏ - نسخة",
+      "account": "F12",
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "live": 124.5,
+      "stored": 124.5,
+      "liveDays": 6,
+      "storedDays": 6,
+      "storedProducts": [
+        "مخرطة فولاذية"
+      ],
+      "missingDates": []
+    }
+  ],
+  "duplicateKeys": []
+}

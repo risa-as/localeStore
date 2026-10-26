@@ -42,7 +42,7 @@ const ProfitPage = async (props: {
     ? parseDate(searchParams.from)
     : parseDate(`${iraqYear}-${iraqMonth}-01`);
   const defaultTo = searchParams.to
-    ? parseDate(`${iraqYear}-${iraqMonth}-${iraqDay}`)
+    ? parseDate(searchParams.to)
     : parseDate(`${iraqYear}-${iraqMonth}-${iraqDay}`);
 
   // Immediately preceding window of the same length, for the delta badges.
@@ -114,31 +114,32 @@ const ProfitPage = async (props: {
         }
       : null;
 
-  const fromLabel = searchParams.from || defaultFrom.toISOString().split("T")[0];
-  const toLabel = searchParams.to || defaultTo.toISOString().split("T")[0];
+  const fromLabel = defaultFrom.toISOString().split("T")[0];
+  const toLabel = defaultTo.toISOString().split("T")[0];
 
   return (
-    <div className="space-y-0">
+    <div data-admin-profit className="min-w-0 w-full space-y-0 [&_button]:rounded-[10px] [&_input]:rounded-[10px] [&_select]:rounded-[10px]">
       {/* Header — folded into the content area since the admin shell already
           provides the top nav bar. */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10">
+          <div className="p-2 rounded-[10px] bg-primary/10">
             <BarChart3 className="w-6 h-6 text-primary" />
           </div>
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <h1 className="text-2xl font-bold">تحليل الأرباح</h1>
-              <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-500/15 text-green-600 dark:text-green-400">
+              <span className="text-xs font-bold px-3 py-1 rounded-[10px] bg-green-500/15 text-green-600 dark:text-green-400">
                 {orderSummary.totalOrderCount} طلب مكتمل
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
-              نظرة شاملة على الإيرادات، التكاليف، وصافي الربح للفترة المحددة
+              أرباح الطلبات المكتملة بحسب تاريخ إنشاء الطلب، بعد التوصيل والتكاليف والمصاريف. الراجع بلا كلفة مالية وفق سياسة المتجر. هذا التقرير لا يمثل كشف تسويات نقدية يومياً.
             </p>
+            <p className="mt-2 text-sm font-semibold">الفترة المطبقة على أرقام التقرير: <bdi>{fromLabel}</bdi> إلى <bdi>{toLabel}</bdi></p>
           </div>
         </div>
-        <ProfitDatePicker defaultFrom={fromLabel} defaultTo={toLabel} />
+        <ProfitDatePicker key={`${fromLabel}:${toLabel}`} defaultFrom={fromLabel} defaultTo={toLabel} />
       </div>
 
       {/* Export lives INSIDE the client dashboard so the Excel file reflects the

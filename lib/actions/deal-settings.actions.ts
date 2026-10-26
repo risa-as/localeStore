@@ -1,4 +1,5 @@
 "use server";
+import { requireAdministrator } from "@/lib/authorization";
 
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
@@ -23,6 +24,7 @@ export async function updateDealSettings(data: {
   productId?: string | null;
   title?: string;
 }) {
+  await requireAdministrator();
   try {
     await prisma.dealSettings.upsert({
       where: { id: "default" },

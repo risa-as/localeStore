@@ -1,0 +1,10 @@
+const fs = require('node:fs');
+const { execFileSync } = require('node:child_process');
+const baseline = 'docs/audit-2026-09-12/schema-before.prisma';
+fs.writeFileSync(baseline, execFileSync('git', ['show', 'HEAD:prisma/schema.prisma']));
+const dir = 'prisma/migrations/202609120001_audit_foundations';
+fs.mkdirSync(dir, { recursive: true });
+const cli = require.resolve('prisma/build/index.js');
+const sql = execFileSync(process.execPath, [cli, 'migrate', 'diff', '--from-schema', baseline, '--to-schema', 'prisma/schema.prisma', '--script'], { encoding: 'utf8' });
+fs.writeFileSync(dir + '/migration.sql', sql);
+console.log('Prepared additive schema migration; no database connection or changes.');

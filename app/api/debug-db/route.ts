@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/db/prisma";
 
 export async function GET() {
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+  /* Disabled: database diagnostics must never be exposed over HTTP.
   try {
     const rawUrl = process.env.DATABASE_URL || "";
     // Mask password in database URL for security
@@ -39,4 +41,5 @@ export async function GET() {
       stack: error.stack,
     }, { status: 500 });
   }
+  */
 }

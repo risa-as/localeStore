@@ -5,10 +5,13 @@ import { Metadata } from "next";
 import Image from "next/image";
 import { redirect } from "next/navigation";
 import PlaceOrderForm from "./place-order-form";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
+import { Link } from "@/i18n/navigation";
 import { cookies } from "next/headers";
 import { ShippingAddress } from "@/types";
 import { ShoppingBag, MapPin } from "lucide-react";
+import { computeOrderPricing } from "@/lib/pricing";
+import StoreTelemetry from "@/components/shared/store-telemetry";
 
 export const metadata: Metadata = { title: "إتمام الطلب" };
 
@@ -22,7 +25,11 @@ const PlaceOrderPage = async () => {
   let userAddress: ShippingAddress | null = null;
 
   if (guestShippingInfo) {
-    const g = JSON.parse(guestShippingInfo);
+    let g: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(guestShippingInfo);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) g = Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+    } catch { /* Ignore a damaged preference cookie. */ }
     defaultValues = {
       fullName: g.fullName || "",
       phoneNumber: g.phoneNumber || "",
@@ -30,16 +37,18 @@ const PlaceOrderPage = async () => {
       address: g.streetAddress || g.address || "",
       quantity: 0,
     };
-    isEditable = false;
+    isEditable = true;
     userAddress = { fullName: g.fullName, streetAddress: g.address, city: g.governorate, postalCode: "", country: "" };
   }
 
-  if (!cart || cart.items.length === 0) redirect("/cart");
+  if (!cart || cart.items.length === 0) redirect(`/${await getLocale()}/cart`);
 
   const t = await getTranslations("Checkout");
 
   return (
     <div className="py-5 sm:py-8 space-y-5 sm:space-y-8">
+      <StoreTelemetry name="begin_checkout"/>
+      <Link href="/cart" className="inline-flex min-h-11 items-center font-semibold text-primary">{(await getLocale()) === "ar" ? "العودة إلى السلة وتعديل المنتجات" : "Back to cart and edit items"}</Link>
       {/* Title */}
       <div className="flex items-center gap-3">
         <div className="p-2.5 rounded-xl bg-primary/10">
@@ -70,7 +79,7 @@ const PlaceOrderPage = async () => {
                       </p>
                     </div>
                     <p className="font-extrabold text-base sm:text-lg text-primary shrink-0">
-                      {formatCurrency(Number(item.price) * item.qty)}
+                      {formatCurrency(computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice)}
                     </p>
                   </div>
                 ))}

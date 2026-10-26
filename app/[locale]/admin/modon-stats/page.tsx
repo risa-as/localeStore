@@ -81,7 +81,7 @@ export default async function ModonStatsPage() {
   const netDiff = priceStats.gainAmount - priceStats.lossAmount;
 
   return (
-    <div className="space-y-5 pb-10">
+    <div data-admin-wide data-admin-rounded className="min-w-0 w-full space-y-5 pb-10">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link

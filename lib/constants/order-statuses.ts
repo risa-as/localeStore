@@ -13,15 +13,17 @@
  * are gone from our shelves, even though the money has not arrived yet. This is the
  * definition of "sold" for stock deduction and for FEFO batch consumption.
  *
- * `returned` / `returnReceived` are intentionally absent: a return flips the order's
- * status out of this list, which automatically releases the units back to their
- * batch (consumption is derived from current status, never stored). That is the
- * restock path — no write is needed.
+ * Failed delivery, rescheduling and return-in-transit still occupy stock.
+ * Only returnReceived releases goods; persisted allocations retain their cost
+ * and record the reversal against the original batch.
  */
 export const STOCK_CONSUMED_STATUSES = [
   "completed",
   "completedAccountant",
   "pending",
+  "failed",
+  "rescheduled",
+  "returned",
 ];
 
 /**

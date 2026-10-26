@@ -24,6 +24,8 @@ const MainNav = ({
     { title: t("categories"),      href: "/admin/categories",        icon: Tag },
     { title: t("orders"),          href: "/admin/orders",            icon: ShoppingCart },
     { title: t("chats"),           href: "/admin/chats",             icon: MessageCircle },
+    { title: "رسائل الصفحات",       href: "/admin/social-inbox",      icon: MessageCircle, hide: role !== "admin" },
+    { title: "المتابعة",            href: "/admin/follow-up",         icon: LayoutDashboard },
     { title: t("marketing"),       href: "/admin/marketing",         icon: Megaphone, hide: role !== "admin" },
     { title: t("modonStats"),      href: "/admin/modon-stats",       icon: BarChart2,  hide: role !== "admin" },
     { title: t("users"),           href: "/admin/users",             icon: Users,     hide: role !== "admin" },

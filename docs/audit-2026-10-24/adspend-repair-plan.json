@@ -1,0 +1,989 @@
+{
+  "createdAt": "2026-10-24T10:01:09.252Z",
+  "scope": {
+    "from": "2026-10-01",
+    "to": "2026-10-24"
+  },
+  "sourceSnapshot": "2026-10-24T09:54:00.177Z",
+  "proposed": [
+    {
+      "productId": "40df6a66-047a-466e-870d-5b66ae7cd623",
+      "campaignId": "120246915589010037",
+      "date": "2026-10-01",
+      "amount": 16.89,
+      "currency": "USD",
+      "amountIQD": 23139.3,
+      "fxRate": 1370,
+      "campaignName": "‏كابسة قفايص 35‏ - نسخة"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-05",
+      "amount": 9.96,
+      "currency": "USD",
+      "amountIQD": 13645.2,
+      "fxRate": 1370,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-06",
+      "amount": 16.56,
+      "currency": "USD",
+      "amountIQD": 26115.12,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-07",
+      "amount": 27.35,
+      "currency": "USD",
+      "amountIQD": 43130.95,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-08",
+      "amount": 36.27,
+      "currency": "USD",
+      "amountIQD": 57197.79,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-09",
+      "amount": 35.29,
+      "currency": "USD",
+      "amountIQD": 55652.33,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-10",
+      "amount": 37.7,
+      "currency": "USD",
+      "amountIQD": 59452.9,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-11",
+      "amount": 26.34,
+      "currency": "USD",
+      "amountIQD": 41538.18,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-12",
+      "amount": 29.61,
+      "currency": "USD",
+      "amountIQD": 46694.97,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-13",
+      "amount": 30.64,
+      "currency": "USD",
+      "amountIQD": 48319.28,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-14",
+      "amount": 29.94,
+      "currency": "USD",
+      "amountIQD": 47215.38,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-15",
+      "amount": 27.12,
+      "currency": "USD",
+      "amountIQD": 42768.24,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247087554310037",
+      "date": "2026-10-16",
+      "amount": 20.81,
+      "currency": "USD",
+      "amountIQD": 32817.37,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247259950870037",
+      "date": "2026-10-16",
+      "amount": 8.37,
+      "currency": "USD",
+      "amountIQD": 13199.49,
+      "fxRate": 1577,
+      "campaignName": "‏مفتاح تمديد 30‏ - نسخة"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-17",
+      "amount": 16.9,
+      "currency": "USD",
+      "amountIQD": 26651.3,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-18",
+      "amount": 28.55,
+      "currency": "USD",
+      "amountIQD": 45023.35,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-19",
+      "amount": 38.68,
+      "currency": "USD",
+      "amountIQD": 60998.36,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-20",
+      "amount": 27.59,
+      "currency": "USD",
+      "amountIQD": 43509.43,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120247269742480037",
+      "date": "2026-10-21",
+      "amount": 1.23,
+      "currency": "USD",
+      "amountIQD": 1939.71,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد 30"
+    },
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-23",
+      "amount": 10.68,
+      "currency": "USD",
+      "amountIQD": 16842.36,
+      "fxRate": 1577,
+      "campaignName": "سيت تركيب المكابس 20"
+    },
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-24",
+      "amount": 2.48,
+      "currency": "USD",
+      "amountIQD": 3910.96,
+      "fxRate": 1577,
+      "campaignName": "سيت تركيب المكابس 20"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-14",
+      "amount": 17.74,
+      "currency": "USD",
+      "amountIQD": 27975.98,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-15",
+      "amount": 26.58,
+      "currency": "USD",
+      "amountIQD": 41916.66,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-16",
+      "amount": 30.76,
+      "currency": "USD",
+      "amountIQD": 48508.52,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-17",
+      "amount": 29.14,
+      "currency": "USD",
+      "amountIQD": 45953.78,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-18",
+      "amount": 28.54,
+      "currency": "USD",
+      "amountIQD": 45007.58,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-19",
+      "amount": 30.61,
+      "currency": "USD",
+      "amountIQD": 48271.97,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-20",
+      "amount": 29.58,
+      "currency": "USD",
+      "amountIQD": 46647.66,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-21",
+      "amount": 32.45,
+      "currency": "USD",
+      "amountIQD": 51173.65,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-22",
+      "amount": 29.61,
+      "currency": "USD",
+      "amountIQD": 46694.97,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-23",
+      "amount": 29.35,
+      "currency": "USD",
+      "amountIQD": 46284.95,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-24",
+      "amount": 2.17,
+      "currency": "USD",
+      "amountIQD": 3422.09,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248940470390027",
+      "date": "2026-10-13",
+      "amount": 3.72,
+      "currency": "USD",
+      "amountIQD": 5866.44,
+      "fxRate": 1577,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248940470390027",
+      "date": "2026-10-14",
+      "amount": 13.45,
+      "currency": "USD",
+      "amountIQD": 21210.65,
+      "fxRate": 1577,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-23",
+      "amount": 2.87,
+      "currency": "USD",
+      "amountIQD": 4525.99,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الفرامل - 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-24",
+      "amount": 13.64,
+      "currency": "USD",
+      "amountIQD": 21510.28,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الفرامل - 30"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-01",
+      "amount": 17.25,
+      "currency": "USD",
+      "amountIQD": 23632.5,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-02",
+      "amount": 21.27,
+      "currency": "USD",
+      "amountIQD": 29139.9,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-03",
+      "amount": 18.92,
+      "currency": "USD",
+      "amountIQD": 25920.4,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-04",
+      "amount": 20.91,
+      "currency": "USD",
+      "amountIQD": 28646.7,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-05",
+      "amount": 18.22,
+      "currency": "USD",
+      "amountIQD": 24961.4,
+      "fxRate": 1370,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-06",
+      "amount": 11.18,
+      "currency": "USD",
+      "amountIQD": 17630.86,
+      "fxRate": 1577,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248243531640570",
+      "date": "2026-10-07",
+      "amount": 24.83,
+      "currency": "USD",
+      "amountIQD": 39156.91,
+      "fxRate": 1577,
+      "campaignName": "حقنة تفريغ السوائل 20"
+    },
+    {
+      "productId": "2c648299-4604-4b2d-82c1-2ca362ac1bde",
+      "campaignId": "120248409371960570",
+      "date": "2026-10-08",
+      "amount": 12.28,
+      "currency": "USD",
+      "amountIQD": 19365.56,
+      "fxRate": 1577,
+      "campaignName": "حقنة سوائل 30‏ - نسخة"
+    },
+    {
+      "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+      "campaignId": "120253489251600508",
+      "date": "2026-10-24",
+      "amount": 9.5,
+      "currency": "USD",
+      "amountIQD": 14981.5,
+      "fxRate": 1577,
+      "campaignName": "سكويرة - 20"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-05",
+      "amount": 6.36,
+      "currency": "USD",
+      "amountIQD": 8713.2,
+      "fxRate": 1370,
+      "campaignName": "مخرطة فولاذية 30"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120251499871400308",
+      "date": "2026-10-06",
+      "amount": 37.74,
+      "currency": "USD",
+      "amountIQD": 59515.98,
+      "fxRate": 1577,
+      "campaignName": "مخرطة فولاذية 30"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-23",
+      "amount": 0.63,
+      "currency": "USD",
+      "amountIQD": 993.51,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد - 20"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-24",
+      "amount": 9.96,
+      "currency": "USD",
+      "amountIQD": 15706.92,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد - 20"
+    },
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120252296090660100",
+      "date": "2026-10-01",
+      "amount": 26.39,
+      "currency": "USD",
+      "amountIQD": 36154.3,
+      "fxRate": 1370,
+      "campaignName": "سيت مكابس 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-05",
+      "amount": 4.9,
+      "currency": "USD",
+      "amountIQD": 6713,
+      "fxRate": 1370,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-06",
+      "amount": 35.4,
+      "currency": "USD",
+      "amountIQD": 55825.8,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-07",
+      "amount": 26.97,
+      "currency": "USD",
+      "amountIQD": 42531.69,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-14",
+      "amount": 12.35,
+      "currency": "USD",
+      "amountIQD": 19475.95,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-15",
+      "amount": 30.21,
+      "currency": "USD",
+      "amountIQD": 47641.17,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-16",
+      "amount": 21.38,
+      "currency": "USD",
+      "amountIQD": 33716.26,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-17",
+      "amount": 27.74,
+      "currency": "USD",
+      "amountIQD": 43745.98,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-18",
+      "amount": 33.39,
+      "currency": "USD",
+      "amountIQD": 52656.03,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-19",
+      "amount": 30.53,
+      "currency": "USD",
+      "amountIQD": 48145.81,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-20",
+      "amount": 30.1,
+      "currency": "USD",
+      "amountIQD": 47467.7,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-21",
+      "amount": 31.93,
+      "currency": "USD",
+      "amountIQD": 50353.61,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-22",
+      "amount": 30.21,
+      "currency": "USD",
+      "amountIQD": 47641.17,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-23",
+      "amount": 28.91,
+      "currency": "USD",
+      "amountIQD": 45591.07,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-24",
+      "amount": 10.66,
+      "currency": "USD",
+      "amountIQD": 16810.82,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250686320120731",
+      "date": "2026-10-13",
+      "amount": 2.19,
+      "currency": "USD",
+      "amountIQD": 3453.63,
+      "fxRate": 1577,
+      "campaignName": "مخرطة فولاذية 30"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250686320120731",
+      "date": "2026-10-14",
+      "amount": 23.88,
+      "currency": "USD",
+      "amountIQD": 37658.76,
+      "fxRate": 1577,
+      "campaignName": "مخرطة فولاذية 30"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-17",
+      "amount": 2.29,
+      "currency": "USD",
+      "amountIQD": 3611.33,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-18",
+      "amount": 30.96,
+      "currency": "USD",
+      "amountIQD": 48823.92,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-19",
+      "amount": 30.81,
+      "currency": "USD",
+      "amountIQD": 48587.37,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-20",
+      "amount": 12.83,
+      "currency": "USD",
+      "amountIQD": 20232.91,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-21",
+      "amount": 5.25,
+      "currency": "USD",
+      "amountIQD": 8279.25,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    },
+    {
+      "productId": "108e0ee7-f2f2-4c50-a5e1-c89c1417247a",
+      "campaignId": "120250751089600731",
+      "date": "2026-10-22",
+      "amount": 42.36,
+      "currency": "USD",
+      "amountIQD": 66801.72,
+      "fxRate": 1577,
+      "campaignName": "‏مخرطة فولاذية 30‏ - نسخة"
+    }
+  ],
+  "changes": [
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-23",
+      "amount": 10.68,
+      "currency": "USD",
+      "amountIQD": 16842.36,
+      "fxRate": 1577,
+      "campaignName": "سيت تركيب المكابس 20"
+    },
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120247329739060037",
+      "date": "2026-10-24",
+      "amount": 2.48,
+      "currency": "USD",
+      "amountIQD": 3910.96,
+      "fxRate": 1577,
+      "campaignName": "سيت تركيب المكابس 20"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-22",
+      "amount": 29.61,
+      "currency": "USD",
+      "amountIQD": 46694.97,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-23",
+      "amount": 29.35,
+      "currency": "USD",
+      "amountIQD": 46284.95,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "304d761e-370c-4176-a19f-929a895cb0cb",
+      "campaignId": "120250396232720691",
+      "date": "2026-10-24",
+      "amount": 2.17,
+      "currency": "USD",
+      "amountIQD": 3422.09,
+      "fxRate": 1577,
+      "campaignName": "قاعدة كوسيرة 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-23",
+      "amount": 2.87,
+      "currency": "USD",
+      "amountIQD": 4525.99,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الفرامل - 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120249105397800027",
+      "date": "2026-10-24",
+      "amount": 13.64,
+      "currency": "USD",
+      "amountIQD": 21510.28,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الفرامل - 30"
+    },
+    {
+      "productId": "9981ffff-fffb-47b4-9a43-012a83a75454",
+      "campaignId": "120253489251600508",
+      "date": "2026-10-24",
+      "amount": 9.5,
+      "currency": "USD",
+      "amountIQD": 14981.5,
+      "fxRate": 1577,
+      "campaignName": "سكويرة - 20"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-23",
+      "amount": 0.63,
+      "currency": "USD",
+      "amountIQD": 993.51,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد - 20"
+    },
+    {
+      "productId": "56de0d71-dde2-4cf3-b567-b0a043643b64",
+      "campaignId": "120251898043260308",
+      "date": "2026-10-24",
+      "amount": 9.96,
+      "currency": "USD",
+      "amountIQD": 15706.92,
+      "fxRate": 1577,
+      "campaignName": "مفتاح تمديد - 20"
+    },
+    {
+      "productId": "0176df7f-5c9e-480c-869f-47008df6ace9",
+      "campaignId": "120252296090660100",
+      "date": "2026-10-01",
+      "amount": 26.39,
+      "currency": "USD",
+      "amountIQD": 36154.3,
+      "fxRate": 1370,
+      "campaignName": "سيت مكابس 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-05",
+      "amount": 4.9,
+      "currency": "USD",
+      "amountIQD": 6713,
+      "fxRate": 1370,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-06",
+      "amount": 35.4,
+      "currency": "USD",
+      "amountIQD": 55825.8,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ca0c60b1-6288-4095-9e3a-38a7e05fb3b4",
+      "campaignId": "120252395749850100",
+      "date": "2026-10-07",
+      "amount": 26.97,
+      "currency": "USD",
+      "amountIQD": 42531.69,
+      "fxRate": 1577,
+      "campaignName": "سيت ارجاع الديسكات 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-14",
+      "amount": 12.35,
+      "currency": "USD",
+      "amountIQD": 19475.95,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-15",
+      "amount": 30.21,
+      "currency": "USD",
+      "amountIQD": 47641.17,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-16",
+      "amount": 21.38,
+      "currency": "USD",
+      "amountIQD": 33716.26,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-17",
+      "amount": 27.74,
+      "currency": "USD",
+      "amountIQD": 43745.98,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-18",
+      "amount": 33.39,
+      "currency": "USD",
+      "amountIQD": 52656.03,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-19",
+      "amount": 30.53,
+      "currency": "USD",
+      "amountIQD": 48145.81,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-20",
+      "amount": 30.1,
+      "currency": "USD",
+      "amountIQD": 47467.7,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-21",
+      "amount": 31.93,
+      "currency": "USD",
+      "amountIQD": 50353.61,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-22",
+      "amount": 30.21,
+      "currency": "USD",
+      "amountIQD": 47641.17,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-23",
+      "amount": 28.91,
+      "currency": "USD",
+      "amountIQD": 45591.07,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    },
+    {
+      "productId": "ea3e9c5b-0d46-4778-a97a-5fec532ea96c",
+      "campaignId": "120252522279270100",
+      "date": "2026-10-24",
+      "amount": 10.66,
+      "currency": "USD",
+      "amountIQD": 16810.82,
+      "fxRate": 1577,
+      "campaignName": "حامل مغناطيسي 30"
+    }
+  ],
+  "applied": true,
+  "appliedAt": "2026-10-24T10:02:38.578Z",
+  "afterSummary": {
+    "rows": 72,
+    "usd": 1539.86,
+    "iqd": 2395017.73
+  }
+}

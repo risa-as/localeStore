@@ -18,9 +18,11 @@ import { Trash } from "lucide-react";
 const DeleteDialog = ({
   id,
   action,
+  triggerLabel = "حذف",
 }: {
   id: string;
   action: (id: string) => Promise<{ success: boolean; message: string }>;
+  triggerLabel?: string;
 }) => {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -41,7 +43,7 @@ const DeleteDialog = ({
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <Button size="icon" variant="ghost" className="text-red-500 hover:text-red-700 hover:bg-red-50">
+        <Button size="icon" variant="ghost" aria-label={triggerLabel} className="text-red-500 hover:text-red-700 hover:bg-red-50">
           <Trash className="w-4 h-4" />
         </Button>
       </AlertDialogTrigger>

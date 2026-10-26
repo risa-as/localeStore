@@ -11,28 +11,30 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { createCategory } from "@/lib/actions/category.actions";
+import { createCategory, updateCategory } from "@/lib/actions/category.actions";
 import slugify from "slugify";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Loader2, Wand2 } from "lucide-react";
 
-const CategoryForm = () => {
+const CategoryForm = ({ category }: { category?: { id: string; name: string; slug: string } }) => {
   const router = useRouter();
   const { toast } = useToast();
   const t = useTranslations("Categories");
+  const locale = useLocale();
 
   const form = useForm<z.infer<typeof insertCategorySchema>>({
     resolver: zodResolver(insertCategorySchema),
-    defaultValues: { name: "", slug: "" },
+    defaultValues: { name: category?.name ?? "", slug: category?.slug ?? "" },
   });
 
   async function onSubmit(values: z.infer<typeof insertCategorySchema>) {
-    const res = await createCategory(values);
+    const res = category ? await updateCategory({ ...values, id: category.id }) : await createCategory(values);
     if (!res.success) {
       toast({ variant: "destructive", description: res.message });
     } else {
       toast({ description: res.message });
-      router.push("/admin/categories");
+      router.push(`/${locale}/admin/categories`);
+      router.refresh();
     }
   }
 
@@ -58,31 +60,34 @@ const CategoryForm = () => {
           render={({ field }) => (
             <FormItem>
               <FormLabel>{t("slug")}</FormLabel>
-              <FormControl>
-                <div className="flex gap-2">
+              <div className="flex gap-2">
+                <FormControl>
                   <Input placeholder={t("placeholderSlug")} {...field} />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="gap-1.5 shrink-0"
-                    onClick={() =>
-                      form.setValue("slug", slugify(form.getValues("name"), { lower: true }))
-                    }
-                  >
-                    <Wand2 className="w-4 h-4" />
-                    {t("generate")}
-                  </Button>
-                </div>
-              </FormControl>
+                </FormControl>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-1.5 shrink-0"
+                  onClick={() =>
+                    form.setValue("slug", slugify(form.getValues("name"), { lower: true }))
+                  }
+                >
+                  <Wand2 className="w-4 h-4" />
+                  {t("generate")}
+                </Button>
+              </div>
               <FormMessage />
             </FormItem>
           )}
         />
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="outline" disabled={form.formState.isSubmitting} onClick={() => router.push(`/${locale}/admin/categories`)}>
+            {t("cancel")}
+          </Button>
           <Button type="submit" disabled={form.formState.isSubmitting} className="min-w-[120px]">
             {form.formState.isSubmitting
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{t("submitting")}</>
-              : t("create")}
+              : t(category ? "save" : "create")}
           </Button>
         </div>
       </form>

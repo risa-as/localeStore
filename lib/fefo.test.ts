@@ -25,6 +25,16 @@ describe("sortBatchesFefo", () => {
 });
 
 describe("computeFefo", () => {
+  it("does not consume a future receipt for an earlier sale", () => {
+    const result = computeFefo([batch("march", 2, 20, "2026-03-01")], [
+      { key: "feb", date: d("2026-02-01"), qty: 1 },
+      { key: "apr", date: d("2026-04-01"), qty: 1 },
+    ], 10);
+    expect(result.saleCost.get("feb")).toBe(10);
+    expect(result.saleFallbackQty.get("feb")).toBe(1);
+    expect(result.saleCost.get("apr")).toBe(20);
+    expect(result.batchRemaining.get("march")).toBe(1);
+  });
   it("consumes the oldest batch first and prices the sale at its cost", () => {
     const result = computeFefo(
       [batch("A", 10, 1000, "2026-01-01"), batch("B", 10, 2000, "2026-02-01")],
@@ -125,8 +135,8 @@ describe("order status groupings", () => {
     }
   });
 
-  it("never counts returned orders as consuming stock, so returns restock", () => {
-    expect(STOCK_CONSUMED_STATUSES).not.toContain("returned");
+  it("restocks only after the return is physically received", () => {
+    expect(STOCK_CONSUMED_STATUSES).toContain("returned");
     expect(STOCK_CONSUMED_STATUSES).not.toContain("returnReceived");
   });
 });

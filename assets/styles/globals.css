@@ -2,6 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Product-page dialogs are portaled outside the page container. */
+body:has([data-admin-products]) :is([role="dialog"], [role="alertdialog"], [role="listbox"]),
+body:has([data-admin-products]) :is([role="dialog"], [role="alertdialog"]) :is(button, input, textarea, [role="combobox"]) {
+  border-radius: 10px;
+}
+
+/* Shared 10px corners, including controls rendered in portal layers. */
+[data-admin-rounded] :is(button, input, select, textarea, [role="combobox"], [class*="rounded-"]),
+body:has([data-admin-rounded]) :is([role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [role="tooltip"]),
+body:has([data-admin-rounded]) :is([role="dialog"], [role="alertdialog"], [role="listbox"], [role="menu"], [role="tooltip"]) :is(button, input, select, textarea, [role="combobox"], [class*="rounded-"]) {
+  border-radius: 10px;
+}
+
 @layer utilities {
   .wrapper {
     @apply max-w-7xl lg:mx-auto p-5 md:px-10 w-full;

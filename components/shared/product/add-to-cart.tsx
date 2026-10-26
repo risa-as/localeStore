@@ -1,19 +1,21 @@
 "use client";
 import { Cart, CartItem } from "@/types";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+import { Link, useRouter } from "@/i18n/navigation";
 import { Plus, Minus, Loader, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { addItemToCart, removeItemFromCart } from "@/lib/actions/cart.actions";
 import { useTransition } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { recordStoreEvent } from "@/lib/actions/store-events.actions";
 
 const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const t = useTranslations("Product");
+  const locale = useLocale();
 
   const handleAddToCart = async () => {
     startTransition(async () => {
@@ -22,6 +24,7 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
         toast({ variant: "destructive", description: res.message });
         return;
       }
+      void recordStoreEvent("add_to_cart", item.productId).catch(() => undefined);
       toast({
         description: res.message,
         action: (
@@ -51,12 +54,14 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
 
   if (existItem) {
     return (
+      <div className="space-y-3">
       <div className="flex items-center gap-0 rounded-2xl border-2 border-primary/20 overflow-hidden w-fit">
         <Button
           variant="ghost"
           size="icon"
           disabled={isPending}
           onClick={handleRemoveFromCart}
+          aria-label={locale === "ar" ? "تقليل الكمية" : "Decrease quantity"}
           className="h-12 w-12 rounded-none hover:bg-primary/10 transition-colors"
         >
           {isPending ? (
@@ -73,6 +78,7 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
           size="icon"
           disabled={isPending}
           onClick={handleAddToCart}
+          aria-label={locale === "ar" ? "زيادة الكمية" : "Increase quantity"}
           className="h-12 w-12 rounded-none hover:bg-primary/10 transition-colors"
         >
           {isPending ? (
@@ -81,6 +87,8 @@ const AddToCart = ({ cart, item }: { cart?: Cart; item: CartItem }) => {
             <Plus className="h-4 w-4" />
           )}
         </Button>
+      </div>
+      <Button asChild className="w-full min-h-12 rounded-xl"><Link href="/cart">{t("goToCart")}</Link></Button>
       </div>
     );
   }

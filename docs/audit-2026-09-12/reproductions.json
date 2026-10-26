@@ -1,0 +1,61 @@
+[
+  {
+    "case": "One-day expense disappears with profit-page noon boundaries",
+    "expected": 100,
+    "actual": 0
+  },
+  {
+    "case": "First-day imported spend disappears",
+    "expected": 100,
+    "actual": 0
+  },
+  {
+    "case": "One imported day removes whole ten-day manual campaign",
+    "expectedIfOnlyCoveredDayReplaced": 100,
+    "actual": 10
+  },
+  {
+    "case": "February sale consumes March batch",
+    "expectedWithFutureBatchExcluded": 109,
+    "actual": 30
+  },
+  {
+    "case": "Returning earlier order changes another order historical cost",
+    "before": 20,
+    "after": 10
+  },
+  {
+    "case": "Offer differs from linear cart total",
+    "cart": 59,
+    "saved": 52
+  },
+  {
+    "case": "Return template payload, mocked API only",
+    "template": {
+      "name": "order_returned",
+      "language": {
+        "code": "ar"
+      },
+      "components": [
+        {
+          "type": "body",
+          "parameters": [
+            {
+              "type": "text",
+              "text": "اختبار"
+            },
+            {
+              "type": "text",
+              "text": "منتج اختبار"
+            },
+            {
+              "type": "text",
+              "text": "32"
+            }
+          ]
+        }
+      ]
+    },
+    "recipientNormalization": "passed"
+  }
+]

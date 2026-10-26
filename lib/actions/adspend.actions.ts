@@ -1,10 +1,14 @@
 "use server";
 
 import { prisma } from "@/db/prisma";
-import { auth } from "@/auth";
+import { requireAdministrator } from "@/lib/authorization";
+import { manualAdPortion } from "../manual-ad-coverage";
+import { fxPeriodIncludes, fxPeriodWhere } from "../fx-periods";
+import { saveCampaignProductLink } from "@/lib/meta/adspend-storage";
 import { revalidatePath } from "next/cache";
 import {
   syncSpendForDate,
+  syncSpendForRange,
   yesterdayBaghdad,
   buildCampaignProductMap,
   toBaghdadDateStr,
@@ -49,17 +53,11 @@ export async function getAdAccountsList(): Promise<{
 
 /** مدقق أدمن مشترك. */
 async function requireAdmin() {
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
+  await requireAdministrator();
 }
 
 function dayStart(d: Date): Date {
   return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-function addDays(d: Date, n: number): Date {
-  const x = new Date(d.getTime());
-  x.setUTCDate(x.getUTCDate() + n);
-  return x;
 }
 
 /* ─── سعر الصرف: فترات زمنية مع كشف تعارض احترافي ─────────────────────────── */
@@ -99,9 +97,9 @@ export async function getFxRates(): Promise<FxRateRow[]> {
 /** السعر الساري حالياً (أو آخر سعر مسجّل) لبطاقة العرض. */
 export async function getCurrentFx(): Promise<{ rate: number | null; fromDate: string | null }> {
   await requireAdmin();
-  const today = dayStart(new Date());
+  const today = new Date(`${toBaghdadDateStr(new Date())}T00:00:00.000Z`);
   const open = await prisma.fxRate.findFirst({
-    where: { fromDate: { lte: today }, OR: [{ toDate: null }, { toDate: { gt: today } }] },
+    where: fxPeriodWhere(today),
     orderBy: { fromDate: "desc" },
   });
   if (open) return { rate: Number(open.rate), fromDate: open.fromDate.toISOString().slice(0, 10) };
@@ -268,6 +266,8 @@ export type PeriodCampaign = {
   productName: string | null;
   /** ربط تلقائي (من إطلاقات النظام) أم يدوي مخزّن؟ */
   auto: boolean;
+  storedUsd: number;
+  storedUnderOtherProduct: number;
 };
 
 /**
@@ -344,6 +344,8 @@ export async function getPeriodCampaigns(input: {
       })
     : [];
   const productName = new Map(products.map((p) => [p.id, p.name]));
+  const stored = await prisma.adSpendDaily.groupBy({ by: ["campaignId", "productId"],
+    where: { date: { gte: from, lte: to } }, _sum: { amount: true } });
 
   const out: PeriodCampaign[] = [];
   for (const [campaignId, total] of spend) {
@@ -358,6 +360,8 @@ export async function getPeriodCampaigns(input: {
       productId: linked?.productId ?? null,
       productName: linked ? productName.get(linked.productId) ?? null : null,
       auto: !!linked && !manualIds.has(campaignId),
+      storedUsd: stored.filter(row => row.campaignId === campaignId && row.productId === linked?.productId).reduce((sum, row) => sum + Number(row._sum.amount || 0), 0),
+      storedUnderOtherProduct: stored.filter(row => row.campaignId === campaignId && row.productId !== linked?.productId).reduce((sum, row) => sum + Number(row._sum.amount || 0), 0),
     });
   }
   out.sort((a, b) => b.usd - a.usd);
@@ -382,7 +386,7 @@ export type BulkLinkResult = {
   message: string;
 };
 
-/** ربط عدة حملات بمنتجاتها في معاملة واحدة — زر «ربط الحملات المحددة». */
+/** Each campaign link and its saved history move together in one transaction. */
 export async function linkCampaignsBulk(entries: BulkLinkEntry[]): Promise<BulkLinkResult> {
   await requireAdmin();
   if (!entries.length)
@@ -401,50 +405,27 @@ export async function linkCampaignsBulk(entries: BulkLinkEntry[]): Promise<BulkL
 
   let linked = 0;
   let failed = 0;
-  try {
-    await prisma.$transaction(async (tx) => {
-      for (const e of valid) {
-        try {
-          await tx.campaignProductMap.upsert({
-            where: { campaignId: e.campaignId },
-            create: { campaignId: e.campaignId, productId: e.productId, campaignName: e.campaignName ?? null },
-            update: { productId: e.productId, campaignName: e.campaignName ?? null },
-          });
-          linked += 1;
-        } catch {
-          failed += 1;
-        }
-      }
-    });
-  } catch {
-    // المعاملة فشلت كلياً — نُعيد المحاولة صفّاً صفّاً كي لا نخسر الكل بخطأ واحد.
-    linked = 0;
-    failed = 0;
-    for (const e of valid) {
-      try {
-        await prisma.campaignProductMap.upsert({
-          where: { campaignId: e.campaignId },
-          create: { campaignId: e.campaignId, productId: e.productId, campaignName: e.campaignName ?? null },
-          update: { productId: e.productId, campaignName: e.campaignName ?? null },
-        });
-        linked += 1;
-      } catch {
-        failed += 1;
-      }
-    }
+  let moved = 0;
+  let lastError = "";
+  for (const entry of valid) {
+    try {
+      moved += await saveCampaignProductLink(entry);
+      linked += 1;
+    } catch (error) { failed += 1; lastError = (error as Error).message; }
   }
 
   failed += entries.length - valid.length; // المنتجات غير الصالحة
   revalidatePath("/admin/expenses");
   revalidatePath("/admin/marketing");
+  revalidatePath("/admin/profit");
 
   return {
     success: linked > 0,
     linked,
     failed,
     message:
-      `رُبطت ${linked} حملة بالمنتجات.` +
-      (failed > 0 ? ` فشل ${failed} — تأكد من اختيار منتج لكل صف ثم أعد المحاولة.` : ""),
+      `رُبطت ${linked} حملة بالمنتجات ونُقل ${moved} صف صرف سابق إلى المنتج الصحيح.` +
+      (failed > 0 ? ` فشل ${failed}: ${lastError || "تأكد من اختيار منتج لكل صف ثم أعد المحاولة"}.` : ""),
   };
 }
 
@@ -456,11 +437,12 @@ export type BackfillResult = {
   days: number;
   rows: number;
   skippedNoFx: number;
+  missingFx?: { date: string; currency: string; amount: number; rows: number }[];
 };
 
 /**
- * استيراد صرف كل أيام الفترة (بما فيها اليوم الحالي) يوماً بيوم، يخزّن صفوف
- * الحملات المرتبطة فقط (نفس منطق المزامنة اليومية). آمن للتكرار (upsert).
+ * استيراد صرف كل أيام الفترة (بما فيها اليوم الحالي) بتفصيل يومي ونداء واحد لكل حساب.
+ * يخزّن المرتبط وغير المصنّف، ويصحح المنتج السابق دون مضاعفة الصرف.
  * حد أقصى 92 يوماً حماية من النداءات المفرطة.
  */
 export async function importPeriodSpend(input: {
@@ -487,7 +469,7 @@ export async function importPeriodSpend(input: {
   const to = dayStart(new Date(`${input.to}T00:00:00.000Z`));
   if (isNaN(from.getTime()) || isNaN(to.getTime()) || from > to)
     return { success: false, message: "فترة غير صالحة", days: 0, rows: 0, skippedNoFx: 0 };
-  // حتى 92 يوماً (ربع سنوي) — أيام الفترة تُجلب تباعاً بنداء واحد لكل حساب يومياً.
+  // حتى 92 يوماً؛ تطلب التفاصيل اليومية للفترة دفعة واحدة لكل حساب.
   if (to.getTime() - from.getTime() > 91 * 86400000)
     return {
       success: false,
@@ -497,35 +479,23 @@ export async function importPeriodSpend(input: {
       skippedNoFx: 0,
     };
 
-  let rows = 0;
-  let days = 0;
-  let skippedNoFx = 0;
-  let accountsErr = 0;
-  let lastError: string | undefined;
-
-  for (let d = from; d <= to; d = addDays(d, 1)) {
-    const r = await syncSpendForDate(conn.userAccessToken, d, {
-      log: false,
-      accountIds: input.accountIds,
-    });
-    rows += r.rows;
-    days += 1;
-    skippedNoFx += r.skippedNoFx;
-    accountsErr += r.accountsErr;
-    if (!r.ok) lastError = r.message;
-  }
+  const result = await syncSpendForRange(conn.userAccessToken, input.from, input.to, { accountIds: input.accountIds });
+  const { rows, days, skippedNoFx, accountsErr, missingFx } = result;
+  const lastError = result.message;
 
   revalidatePath("/admin/expenses");
+  revalidatePath("/admin/profit");
 
   return {
-    success: rows > 0 || accountsErr === 0,
+    success: accountsErr === 0 && skippedNoFx === 0,
     message:
       `استُرجع صرف ${days} يوم: ${rows} صف مخزّن` +
-      (skippedNoFx ? ` — ${skippedNoFx} صف بلا سعر صرف (تخطّاه)` : "") +
-      (accountsErr ? ` — فشل ${accountsErr} حساب/يوم${lastError ? `: ${lastError}` : ""}` : ""),
+      (skippedNoFx ? ` — لم تُضمّن ${skippedNoFx} صفوف لعدم وجود سعر صرف: ${missingFx.map(item => `${item.date}: ${item.amount.toFixed(2)} ${item.currency}`).join("؛ ")}. أضف سعر الصرف لهذه الأيام وأعد الاسترجاع.` : "") +
+      (accountsErr ? ` — فشل ${accountsErr} حساب${lastError ? `: ${lastError}` : ""}` : ""),
     days,
     rows,
     skippedNoFx,
+    missingFx,
   };
 }
 
@@ -573,16 +543,19 @@ export async function syncAdSpendOnDate(dateStr?: string): Promise<{ success: bo
   return {
     success: r.ok,
     message: r.ok
-      ? `مزامنة ${r.date}: ${r.rows} صف من ${r.accountsOk} حساب` +
+      ? `مزامنة ${r.date}: فُحص ${r.accountsOk} حساباً، وحُفظ ${r.rows} صف صرف يومي` +
         (r.unlinked ? ` — ${r.unlinked} حملة بلا منتج (استخدم «جلب الحملات» لربطها)` : "") +
         (r.skippedNoFx ? ` — ${r.skippedNoFx} صف بلا سعر صرف` : "")
-      : `فشلت مزامنة ${r.accountsErr} حساب: ${r.message ?? ""}`,
+      : `المزامنة غير مكتملة${r.accountsErr ? ` — فشل ${r.accountsErr} حساب` : ""}: ${r.message ?? ""}`,
   };
 }
 
 /* ─── الجدول الموحّد: الإدخال اليدوي + الصرف المستورد من Meta ─────────────── */
 
 export type UnifiedCampaignRow = {
+  campaignId?: string | null;
+  originalAmount?: number;
+  notes?: string | null;
   id: string; // id فريد للصف
   productId: string;
   productName: string;
@@ -627,12 +600,18 @@ export async function getUnifiedCampaignRows(from: Date, to: Date): Promise<{
   let totalUSD = 0;
 
   // 1) اليدوي (كما أُدخل — يُعرض بالمبلغ والعملة الأصليين).
+  const fxRows = await prisma.fxRate.findMany({ orderBy: { fromDate: "desc" } });
   for (const c of campaignsRaw) {
-    const amount = Number(c.amount);
+    const portion = manualAdPortion({ amount: Number(c.amount), from: c.fromDate, to: c.toDate, periodFrom: f, periodTo: t, coveredDates: c.campaignId ? importedRows.filter(r => r.productId === c.productId && r.campaignId === c.campaignId).map(r => r.date.toISOString().slice(0, 10)) : [] });
+    const amount = portion.amount;
     // الإدخال اليدوي يُخزَّن بالألف د.ع (يطابق عرض ×1000 في الواجهة القديمة).
-    const iqd = c.currency === "IQD" ? amount * 1000 : amount;
+    const fx = fxRows.find(rate => fxPeriodIncludes(rate, c.fromDate));
+    const iqd = c.currency === "IQD" ? amount * 1000 : fx ? amount * Number(fx.rate) : 0;
     rows.push({
       id: `manual-${c.id}`,
+      campaignId: c.campaignId,
+      originalAmount: Number(c.amount),
+      notes: c.notes,
       productId: c.productId,
       productName: c.product.name,
       from: c.fromDate.toISOString().slice(0, 10),
@@ -643,7 +622,7 @@ export async function getUnifiedCampaignRows(from: Date, to: Date): Promise<{
       source: "manual",
       refId: c.id,
       campaigns: 1,
-      days: 1,
+      days: portion.remainingDays,
     });
     totalIQD += iqd;
     if (c.currency === "USD") totalUSD += amount;
@@ -698,7 +677,7 @@ export async function getUnifiedCampaignRows(from: Date, to: Date): Promise<{
       days: g.days.size,
     });
     totalIQD += g.iqd;
-    totalUSD += g.usd;
+    if (g.currency === "USD") totalUSD += g.usd;
   }
 
   // اليدوي أولاً ثم المستورد، كلاهما بالتاريخ الأحدث أولاً.

@@ -1,4 +1,5 @@
 "use server";
+import { requireAdministrator } from "@/lib/authorization";
 
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
@@ -13,6 +14,7 @@ export async function getSiteSettings() {
 }
 
 export async function updateLogoUrl(logoUrl: string) {
+  await requireAdministrator();
   try {
     await prisma.siteSettings.upsert({
       where: { id: "default" },

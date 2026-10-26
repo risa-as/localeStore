@@ -5,6 +5,7 @@ import UpdateUserForm from "./update-user-form";
 import Link from "next/link";
 import { ArrowRight, UserCog } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { updateUserSchema } from "@/lib/validators";
 
 export const metadata: Metadata = { title: "تعديل المستخدم" };
 
@@ -33,7 +34,7 @@ const AdminUserUpdatePage = async (props: { params: Promise<{ id: string }> }) =
           <p className="text-sm font-medium">بيانات المستخدم</p>
         </div>
         <div className="p-6">
-          <UpdateUserForm user={user} />
+          <UpdateUserForm user={updateUserSchema.parse(user)} />
         </div>
       </div>
     </div>

@@ -24,7 +24,10 @@ import ReviewList from "./review-list";
 import Rating from "@/components/shared/product/rating";
 import { getReviews } from "@/lib/actions/review.actions";
 import { Truck, Star, Tag, CheckCircle2, Package, ChevronLeft, Home } from "lucide-react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import BrowseBack from "@/components/shared/product/browse-back";
+import { getAvailableStock } from "@/lib/inventory";
+import StoreTelemetry from "@/components/shared/store-telemetry";
 
 const ProductDetailsPage = async (props: {
   params: Promise<{ slug: string }>;
@@ -33,14 +36,16 @@ const ProductDetailsPage = async (props: {
   const product = await getProductBySlug(slug);
   if (!product) return notFound();
 
-  const session = await auth();
+  const [session, cart, t, reviews, availableStock] = await Promise.all([
+    auth(), getMyCart(), getTranslations("Product"),
+    getReviews({ productId: product.id }), getAvailableStock(product.id, product.stock),
+  ]);
   const userId = session?.user?.id;
-  const cart = await getMyCart();
-  const t = await getTranslations("Product");
-  const reviews = await getReviews({ productId: product.id });
 
   return (
     <>
+      <StoreTelemetry name="view_product" productId={product.id}/>
+      <BrowseBack />
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm text-muted-foreground py-4 flex-wrap">
         <Link href="/" className="flex items-center gap-1 hover:text-foreground transition-colors">
@@ -71,7 +76,10 @@ const ProductDetailsPage = async (props: {
         </span>
       </nav>
 
-      <section className="py-5 sm:py-8">
+      {availableStock > 0 && <div className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
+        <a href="#purchase" className="flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 font-bold text-primary-foreground">{t("addToCart")}</a>
+      </div>}
+      <section className="py-5 sm:py-8 pb-24 md:pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 sm:gap-8">
 
           {/* Images — left */}
@@ -99,12 +107,12 @@ const ProductDetailsPage = async (props: {
             <h1 className="text-2xl sm:text-3xl font-extrabold leading-tight">{product.name}</h1>
 
             {/* Rating */}
-            <div className="flex items-center gap-3">
+            {product.numReviews > 0 && <div className="flex items-center gap-3">
               <Rating value={Number(product.rating)} />
               <span className="text-sm text-muted-foreground font-medium">
                 ({product.numReviews} {t("reviews")})
               </span>
-            </div>
+            </div>}
 
             {/* Price — big and bold */}
             <div className="py-3 px-4 rounded-2xl bg-primary/5 border border-primary/15 inline-block">
@@ -115,12 +123,12 @@ const ProductDetailsPage = async (props: {
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
-              <h3 className="text-base font-bold">{t("description")}</h3>
-              <p className="text-base text-muted-foreground leading-relaxed">
+            <details className="space-y-2">
+              <summary className="text-base font-bold cursor-pointer">{t("description")}</summary>
+              <p className="text-base text-muted-foreground leading-relaxed whitespace-pre-line">
                 {product.description}
               </p>
-            </div>
+            </details>
 
             {/* Trust badges */}
             <div className="flex flex-wrap gap-2">
@@ -130,7 +138,7 @@ const ProductDetailsPage = async (props: {
                   {t("free")} {t("shipping")}
                 </div>
               )}
-              {product.stock > 0 ? (
+              {availableStock > 0 ? (
                 <div className="flex items-center gap-1.5 text-sm font-semibold text-blue-700 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 rounded-xl">
                   <CheckCircle2 className="w-4 h-4" />
                   {t("inStock")}
@@ -145,7 +153,7 @@ const ProductDetailsPage = async (props: {
           </div>
 
           {/* Purchase card — right */}
-          <div className="lg:col-span-1">
+          <div id="purchase" className="lg:col-span-1 scroll-mt-24">
             <Card className="rounded-3xl border-2 shadow-lg shadow-primary/5 lg:sticky lg:top-20">
               <CardContent className="p-5 space-y-4">
                 <div className="space-y-3">
@@ -163,7 +171,7 @@ const ProductDetailsPage = async (props: {
                   </div>
                   <div className="flex justify-between items-center text-base">
                     <span className="text-muted-foreground">{t("status")}</span>
-                    {product.stock > 0 ? (
+                    {availableStock > 0 ? (
                       <span className="text-green-600 font-bold text-sm">{t("inStock")}</span>
                     ) : (
                       <span className="text-destructive font-bold text-sm">{t("outOfStock")}</span>
@@ -172,7 +180,7 @@ const ProductDetailsPage = async (props: {
                 </div>
 
                 <div className="border-t-2 pt-4">
-                  {product.stock > 0 ? (
+                  {availableStock > 0 ? (
                     <AddToCart
                       cart={cart}
                       item={{
@@ -182,6 +190,7 @@ const ProductDetailsPage = async (props: {
                         price: product.price,
                         costPrice: product.costPrice,
                         shippingPrice: product.shippingPrice,
+                        offers: product.offers,
                         qty: 1,
                         image: product.images![0],
                       }}

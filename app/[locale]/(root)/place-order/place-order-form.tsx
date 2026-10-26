@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +37,7 @@ const PlaceOrderForm = ({
   const t = useTranslations("Checkout");
   const tGov = useTranslations("Governorates");
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const {
     register,
@@ -57,8 +58,9 @@ const PlaceOrderForm = ({
 
   const onSubmit = async (values: z.infer<typeof insertOrderSchema>) => {
     setLoading(true);
+    setSubmitError("");
+    try {
     const res = await createOrder(values);
-    setLoading(false);
     if (res.success && res.redirectTo) {
       if (res.redirectTo.startsWith("http")) {
         window.location.href = res.redirectTo;
@@ -66,8 +68,11 @@ const PlaceOrderForm = ({
         router.push(res.redirectTo);
       }
     } else {
-      alert(res.message);
+      setSubmitError(res.message || "تعذر إتمام الطلب، حاول مجدداً.");
     }
+    } catch {
+      setSubmitError("تعذر الاتصال. تحقق من اتصالك وحاول مجدداً.");
+    } finally { setLoading(false); }
   };
 
   return (
@@ -75,9 +80,11 @@ const PlaceOrderForm = ({
       {isEditable ? (
         <>
           <div className="space-y-1.5">
-            <Label className="text-base font-semibold">{t("fullName")}</Label>
+            <Label htmlFor="checkout-name" className="text-base font-semibold">{t("fullName")}</Label>
             <Input
               {...register("fullName")}
+              id="checkout-name"
+              autoComplete="name"
               placeholder={t("fullName")}
               className={inputClass}
               style={inputStyle}
@@ -86,11 +93,14 @@ const PlaceOrderForm = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-base font-semibold">{t("phoneNumber")}</Label>
+            <Label htmlFor="checkout-phone" className="text-base font-semibold">{t("phoneNumber")}</Label>
             <Input
               {...register("phoneNumber")}
+              id="checkout-phone"
               placeholder={t("phoneNumber")}
               type="tel"
+              autoComplete="tel"
+              inputMode="tel"
               className={inputClass}
               style={inputStyle}
               dir="ltr"
@@ -99,10 +109,10 @@ const PlaceOrderForm = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-base font-semibold">{t("governorate")}</Label>
+            <Label htmlFor="checkout-governorate" className="text-base font-semibold">{t("governorate")}</Label>
             <Select onValueChange={(v) => setValue("governorate", v)}
               defaultValue={defaultValues.governorate || ""}>
-              <SelectTrigger className={`${inputClass} w-full`} style={inputStyle}>
+              <SelectTrigger id="checkout-governorate" className={`${inputClass} w-full`} style={inputStyle}>
                 <SelectValue placeholder={t("governorate")} />
               </SelectTrigger>
               <SelectContent>
@@ -117,9 +127,11 @@ const PlaceOrderForm = ({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-base font-semibold">{t("address")}</Label>
+            <Label htmlFor="checkout-address" className="text-base font-semibold">{t("address")}</Label>
             <Input
               {...register("address")}
+              id="checkout-address"
+              autoComplete="street-address"
               placeholder={t("address")}
               className={inputClass}
               style={inputStyle}
@@ -147,6 +159,7 @@ const PlaceOrderForm = ({
         </div>
       )}
 
+      {submitError && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{submitError}</p>}
       <Button
         disabled={loading}
         className="w-full h-14 text-base font-extrabold rounded-2xl gap-2 shadow-lg shadow-primary/20"

@@ -148,7 +148,7 @@ const AdminOrdersPage = async (props: {
   ];
 
   return (
-    <div className="space-y-4">
+    <div data-admin-wide data-admin-rounded className="min-w-0 w-full space-y-4">
       {/* ── Row 1: Title + Modon Sync ── */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5 min-w-0">

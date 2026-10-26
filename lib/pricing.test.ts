@@ -2,6 +2,7 @@ import {
   computeItemsPriceTotal,
   computeOrderPricing,
   parseTwoPieceOfferPrice,
+  toIqdAmount,
 } from "./pricing";
 
 // نصوص العروض الحقيقية كما هي في قاعدة البيانات — أي تغيير في صياغة المشرف
@@ -154,5 +155,35 @@ describe("computeItemsPriceTotal", () => {
 
   it("returns zero for an empty order", () => {
     expect(computeItemsPriceTotal([], offers)).toBe(0);
+  });
+});
+
+describe("toIqdAmount", () => {
+  // الأسعار تُخزَّن بالألوف: "سعر القطعة ب27 الف" تُحفظ 27
+  it.each([
+    [27, 27000],
+    [47, 47000],
+    [92, 92000],
+    [177, 177000],
+  ])("converts %s (thousands) to %s IQD", (stored, expected) => {
+    expect(toIqdAmount(stored)).toBe(expected);
+  });
+
+  it("keeps the same storage unit even for large orders", () => {
+    expect(toIqdAmount(27000)).toBe(27000000);
+    expect(toIqdAmount(1000)).toBe(1000000);
+  });
+
+  it("accepts strings and Decimal-like objects", () => {
+    expect(toIqdAmount("27")).toBe(27000);
+    expect(toIqdAmount({ toString: () => "27" })).toBe(27000);
+  });
+
+  it("returns 0 for empty or invalid values", () => {
+    expect(toIqdAmount(null)).toBe(0);
+    expect(toIqdAmount(undefined)).toBe(0);
+    expect(toIqdAmount(0)).toBe(0);
+    expect(toIqdAmount(-5)).toBe(0);
+    expect(toIqdAmount("abc")).toBe(0);
   });
 });

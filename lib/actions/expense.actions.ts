@@ -1,25 +1,30 @@
 "use server";
+import { fxPeriodIncludes } from "../fx-periods";
+import { requireAdministrator } from "@/lib/authorization";
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { accountingDay, inclusiveDays, overlappingDays } from "../accounting-dates";
+import { manualAdPortion } from "../manual-ad-coverage";
 
 const expenseSchema = z.object({
   category: z.string().min(1),
   description: z.string().min(1),
-  fromDate: z.string(),
-  toDate: z.string(),
+  fromDate: z.string().date(),
+  toDate: z.string().date(),
   amount: z.coerce.number().positive(),
   notes: z.string().optional().nullable(),
-});
+}).refine(data => data.fromDate <= data.toDate, { message: "تاريخ النهاية يجب ألا يسبق البداية" });
 
 const adCampaignSchema = z.object({
   productId: z.string().uuid(),
-  fromDate: z.string(),
-  toDate: z.string(),
+  fromDate: z.string().date(),
+  toDate: z.string().date(),
   amount: z.coerce.number().positive(),
-  currency: z.string().default("IQD"),
+  currency: z.enum(["IQD", "USD"]).default("IQD"),
+  campaignId: z.string().trim().optional().nullable(),
   notes: z.string().optional().nullable(),
-});
+}).refine(data => data.fromDate <= data.toDate, { message: "تاريخ النهاية يجب ألا يسبق البداية" });
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
 
@@ -29,10 +34,12 @@ function dayStart(d: Date): Date {
 }
 
 export async function getExpenses() {
+  await requireAdministrator();
   return prisma.expense.findMany({ orderBy: { fromDate: "desc" } });
 }
 
 export async function createExpense(data: z.infer<typeof expenseSchema>) {
+  await requireAdministrator();
   try {
     const parsed = expenseSchema.parse(data);
     await prisma.expense.create({
@@ -50,6 +57,7 @@ export async function createExpense(data: z.infer<typeof expenseSchema>) {
 }
 
 export async function updateExpense(id: string, data: z.infer<typeof expenseSchema>) {
+  await requireAdministrator();
   try {
     const parsed = expenseSchema.parse(data);
     await prisma.expense.update({
@@ -68,6 +76,7 @@ export async function updateExpense(id: string, data: z.infer<typeof expenseSche
 }
 
 export async function deleteExpense(id: string) {
+  await requireAdministrator();
   try {
     await prisma.expense.delete({ where: { id } });
     revalidatePath("/admin/expenses");
@@ -80,6 +89,7 @@ export async function deleteExpense(id: string) {
 // ─── Ad Campaigns ─────────────────────────────────────────────────────────────
 
 export async function getAdCampaigns() {
+  await requireAdministrator();
   return prisma.adCampaign.findMany({
     orderBy: { fromDate: "desc" },
     include: { product: { select: { name: true } } },
@@ -87,6 +97,7 @@ export async function getAdCampaigns() {
 }
 
 export async function createAdCampaign(data: z.infer<typeof adCampaignSchema>) {
+  await requireAdministrator();
   try {
     const parsed = adCampaignSchema.parse(data);
     await prisma.adCampaign.create({
@@ -104,6 +115,7 @@ export async function createAdCampaign(data: z.infer<typeof adCampaignSchema>) {
 }
 
 export async function updateAdCampaign(id: string, data: z.infer<typeof adCampaignSchema>) {
+  await requireAdministrator();
   try {
     const parsed = adCampaignSchema.parse(data);
     await prisma.adCampaign.update({
@@ -122,6 +134,7 @@ export async function updateAdCampaign(id: string, data: z.infer<typeof adCampai
 }
 
 export async function deleteAdCampaign(id: string) {
+  await requireAdministrator();
   try {
     await prisma.adCampaign.delete({ where: { id } });
     revalidatePath("/admin/expenses");
@@ -137,17 +150,18 @@ function overlapDays(
   aFrom: Date, aTo: Date,
   bFrom: Date, bTo: Date,
 ): number {
-  const start = Math.max(aFrom.getTime(), bFrom.getTime());
-  const end   = Math.min(aTo.getTime(),   bTo.getTime());
-  if (start > end) return 0;
-  return Math.round((end - start) / 86400000) + 1;
+  return overlappingDays(aFrom, aTo, bFrom, bTo);
 }
 
 function campaignDays(from: Date, to: Date): number {
-  return Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+  return inclusiveDays(from, to);
 }
 
 export async function getExpenseStatsForPeriod(from: Date, to: Date) {
+  await requireAdministrator();
+  from = accountingDay(from);
+  to = accountingDay(to);
+  if (from > to) throw new Error("تاريخ النهاية يجب ألا يسبق البداية");
   // Fetch campaigns and expenses that overlap with [from, to]
   const [campaignsRaw, expenses] = await Promise.all([
     prisma.adCampaign.findMany({
@@ -196,19 +210,20 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     spanFrom && spanTo
       ? await prisma.adSpendDaily.findMany({
           where: { date: { gte: spanFrom, lte: spanTo } },
-          select: { productId: true, date: true },
+          select: { productId: true, campaignId: true, date: true },
         })
       : [];
   for (const r of allImported) {
-    let s = importedDaysByProduct.get(r.productId);
+    const key = `${r.productId}:${r.campaignId}`;
+    let s = importedDaysByProduct.get(key);
     if (!s) {
       s = new Set<string>();
-      importedDaysByProduct.set(r.productId, s);
+      importedDaysByProduct.set(key, s);
     }
     s.add(r.date.toISOString().slice(0, 10));
   }
   const campaigns = campaignsRaw.map((c) => {
-    const days = importedDaysByProduct.get(c.productId);
+    const days = c.campaignId ? importedDaysByProduct.get(`${c.productId}:${c.campaignId}`) : undefined;
     if (!days || days.size === 0) return { ...c, _replaced: false as const, _partial: false as const };
     // هل أي يوم ضمن [fromDate, toDate] له صف مستورد؟ (نفحص التقاطع مع مدى الإدخال
     // وليس مع نافذة التقرير — الوسم خاصية للإدخال نفسه)
@@ -249,8 +264,7 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
     for (const c of usdRows) {
       const day = dayStart(c.fromDate);
       const fx = fxRows.find(
-        (f) =>
-          f.fromDate <= day && (f.toDate === null || f.toDate > day),
+        (f) => fxPeriodIncludes(f, day),
       );
       if (fx) usdToKiqd.set(c.id, Number(fx.rate) / 1000); // د.ع → ألف د.ع
     }
@@ -276,15 +290,10 @@ export async function getExpenseStatsForPeriod(from: Date, to: Date) {
       }
       total = total * usdFactor; // دولار → ألف د.ع
     }
-    const days    = campaignDays(c.fromDate, c.toDate);
-    const overlap = overlapDays(c.fromDate, c.toDate, from, to);
-    const portion = days > 0 ? (total * overlap) / days : 0;
-    if (c._replaced) {
-      // مُستبدَل تلقائياً من Meta — خارج الحساب (يبقى السجل ظاهراً مشطوباً).
-      // portion هنا بوحدة الألف د.ع (نفس وحدة الإدخال اليدوي).
-      replacedManualTotal += portion;
-      continue;
-    }
+    const coveredDays = c.campaignId ? importedDaysByProduct.get(`${c.productId}:${c.campaignId}`) : undefined;
+    const allocation = manualAdPortion({ amount: total, from: c.fromDate, to: c.toDate, periodFrom: from, periodTo: to, coveredDates: [...(coveredDays ?? [])] });
+    const portion = allocation.amount;
+    replacedManualTotal += allocation.replaced;
 
     totalAdCost += portion;
     const existing = adByProduct.get(c.productId);

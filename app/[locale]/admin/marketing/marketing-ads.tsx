@@ -284,6 +284,7 @@ export default function AdsPanel({ data }: { data: AdsData }) {
           {selectedPost?.videoUrl ? (
             <video
               src={selectedPost.videoUrl}
+              preload="none"
               className="w-24 h-24 rounded-lg border object-cover bg-black shrink-0"
               controls
             />

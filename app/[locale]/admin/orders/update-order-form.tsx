@@ -26,7 +26,8 @@ import {
 import { updateOrder } from "@/lib/actions/order.actions";
 import { updateOrderSchema } from "@/lib/validators";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
+import { computeOrderPricing } from "@/lib/pricing";
 
 type Order = z.infer<typeof updateOrderSchema>;
 
@@ -49,13 +50,30 @@ export default function UpdateOrderForm({
             (order.orderitems ?? []).map((item: any) => [item.productId, item.qty ?? 1])
         )
     );
+    // المنتجات التي أزالها المشرف — لا تُحذف فعلياً إلا عند الحفظ
+    const [removedIds, setRemovedIds] = useState<string[]>([]);
     const [isPriceManual, setIsPriceManual] = useState(false);
 
-    const calcAutoPrice = (qtys: Record<string, number>) => {
-        if (!order.orderitems?.length) return Number(order.totalPrice);
-        return (order.orderitems as any[]).reduce((sum: number, item: any) => {
-            return sum + Number(item.price) * (qtys[item.productId] ?? item.qty ?? 1);
-        }, 0);
+    const visibleItems = ((order.orderitems ?? []) as any[]).filter(
+        (item: any) => !removedIds.includes(item.productId)
+    );
+
+    // مصدر واحد للسعر والكمية معاً، حتى لا يبقى أحدهما يحسب منتجاً محذوفاً
+    const deriveTotals = (qtys: Record<string, number>, removed: string[]) => {
+        const items = ((order.orderitems ?? []) as any[]).filter(
+            (item: any) => !removed.includes(item.productId)
+        );
+        if (!items.length) return { total: Number(order.totalPrice), qty: 0 };
+        return items.reduce(
+            (acc: { total: number; qty: number }, item: any) => {
+                const qty = qtys[item.productId] ?? item.qty ?? 1;
+                return {
+                    total: acc.total + computeOrderPricing({ quantity: qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offersSnapshot }).itemsPrice,
+                    qty: acc.qty + qty,
+                };
+            },
+            { total: Number(form.getValues("shippingPrice") || 0), qty: 0 }
+        );
     };
 
     const form = useForm<Order>({
@@ -76,23 +94,39 @@ export default function UpdateOrderForm({
         },
     });
 
+    const applyTotals = (qtys: Record<string, number>, removed: string[]) => {
+        const { total, qty } = deriveTotals(qtys, removed);
+        if (!isPriceManual) {
+            form.setValue("totalPrice", String(total));
+        }
+        form.setValue("quantity", qty);
+    };
+
     const handleQtyChange = (productId: string, val: number) => {
         const newQtys = { ...itemQtys, [productId]: val };
         setItemQtys(newQtys);
-        if (!isPriceManual) {
-            form.setValue("totalPrice", String(calcAutoPrice(newQtys)));
-        }
-        const totalQty = Object.values(newQtys).reduce((s, q) => s + q, 0);
-        form.setValue("quantity", totalQty);
+        applyTotals(newQtys, removedIds);
+    };
+
+    const handleRemoveItem = (productId: string) => {
+        // لا يمكن تفريغ الطلب من كل منتجاته
+        if (visibleItems.length <= 1) return;
+        const newRemoved = [...removedIds, productId];
+        setRemovedIds(newRemoved);
+        applyTotals(itemQtys, newRemoved);
     };
 
     const onSubmit = (values: Order) => {
         startTransition(async () => {
-            const orderItems = (order.orderitems ?? []).map((item: any) => ({
+            const orderItems = visibleItems.map((item: any) => ({
                 productId: item.productId,
                 qty: itemQtys[item.productId] ?? item.qty ?? 1,
             }));
-            const res = await updateOrder({ ...values, orderItems });
+            const res = await updateOrder({
+                ...values,
+                orderItems,
+                removedProductIds: removedIds,
+            });
 
             if (!res.success) {
                 toast({ variant: "destructive", title: "Error", description: res.message });
@@ -163,11 +197,11 @@ export default function UpdateOrderForm({
                 />
 
                 {/* Per-item quantity */}
-                {order.orderitems?.length > 0 && (
+                {visibleItems.length > 0 && (
                     <div className="space-y-2">
                         <p className="text-sm font-medium">{t("quantity")}</p>
                         <div className="rounded-lg border divide-y">
-                            {(order.orderitems as any[]).map((item: any, idx: number) => (
+                            {visibleItems.map((item: any, idx: number) => (
                                 <div key={item.productId ?? idx} className="flex items-center justify-between px-3 py-2 gap-4">
                                     <span className="text-sm flex-1 truncate">{item.name}</span>
                                     <Input
@@ -179,9 +213,26 @@ export default function UpdateOrderForm({
                                             handleQtyChange(item.productId, Math.max(1, parseInt(e.target.value) || 1))
                                         }
                                     />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 shrink-0 text-destructive hover:text-destructive"
+                                        title={t("delete")}
+                                        aria-label={t("delete")}
+                                        disabled={visibleItems.length <= 1}
+                                        onClick={() => handleRemoveItem(item.productId)}
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             ))}
                         </div>
+                        {removedIds.length > 0 && (
+                            <p className="text-xs text-muted-foreground">
+                                سيتم حذف المنتجات المُزالة نهائياً عند الضغط على «{t("Orders.update")}»
+                            </p>
+                        )}
                     </div>
                 )}
 

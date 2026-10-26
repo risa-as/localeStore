@@ -47,6 +47,25 @@ export function parseTwoPieceOfferPrice(offers?: string | null): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+/**
+ * تحويل سعر مخزَّن إلى مبلغ بالدينار العراقي الكامل.
+ *
+ * الأسعار تُخزَّن بالألوف (27 يعني 27,000 د.ع) — وهو ما تفترضه `formatCurrency`
+ * حين تضرب × 1000 وتضيف «د.ع». الوحدة ثابتة لكل القيم، بما فيها الطلبات
+ * التي تتجاوز مليون دينار؛ لا نستنتج وحدة مختلفة من حجم الرقم.
+ *
+ * يلزم كل جهة تتعامل مع مبالغ حقيقيّة خارج الواجهة: شركة التوصيل، وقيمة حدث
+ * الشراء المُرسَلة إلى ميتا (إرسال 27 بدل 27,000 يفسد تحسين الحملات و ROAS).
+ */
+export function toIqdAmount(
+  // نوع بنيوي بدل Prisma.Decimal حتى تبقى هذه الوحدة بلا استيراد من الخادم
+  price: number | string | { toString(): string } | null | undefined,
+): number {
+  const raw = Number(price ?? 0);
+  if (!Number.isFinite(raw) || raw <= 0) return 0;
+  return Math.round(raw * 1000);
+}
+
 export type OrderPricing = {
   /** سعر المنتج فقط بلا توصيل */
   itemsPrice: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -53,6 +53,7 @@ import {
   type UnifiedCampaignRow,
   type FxOverlap,
   type FxRateRow,
+  type BackfillResult,
 } from "@/lib/actions/adspend.actions";
 import {
   createAdCampaign,
@@ -101,8 +102,10 @@ function daysAgoStr(n: number): string {
 
 function FxRateCard({
   onChanged,
+  refreshKey,
 }: {
   onChanged?: () => void;
+  refreshKey: number;
 }) {
   const { toast } = useToast();
   const [rates, setRates] = useState<FxRateRow[]>([]);
@@ -122,13 +125,13 @@ function FxRateCard({
   const [checking, startCheck] = useTransition();
   const [saving, startSave] = useTransition();
 
-  const reload = () => {
+  const reload = useCallback(() => {
     getFxRates().then(setRates).catch(() => null);
     getCurrentFx().then(setCurrent).catch(() => null);
-  };
+  }, []);
   useEffect(() => {
     reload();
-  }, []);
+  }, [reload, refreshKey]);
 
   const submit = (revalue: boolean) => {
     startSave(async () => {
@@ -390,7 +393,7 @@ function FxRateCard({
                 <TableHead className="text-right">السعر (د.ع/$1)</TableHead>
                 <TableHead className="text-right">من</TableHead>
                 <TableHead className="text-right">إلى</TableHead>
-                <TableHead className="text-center">أيام مستوردة</TableHead>
+                <TableHead className="text-center">صفوف مستوردة</TableHead>
                 <TableHead className="text-right">إجمالي طبّق عليه</TableHead>
                 <TableHead>ملاحظة</TableHead>
                 <TableHead className="text-center w-12">حذف</TableHead>
@@ -505,7 +508,7 @@ function SyncBar({ onChanged }: { onChanged?: () => void }) {
             )}
             <span className="text-muted-foreground">
               آخر مزامنة: <span className="font-bold text-foreground">{last.date}</span> —{" "}
-              {last.rows} صف من {last.accountsOk} حساب
+              فُحص {last.accountsOk} حساباً، وحُفظ {last.rows} صف صرف يومي
               {last.accountsErr ? (
                 <span className="text-red-600"> ({last.accountsErr} فشل)</span>
               ) : null}
@@ -514,7 +517,7 @@ function SyncBar({ onChanged }: { onChanged?: () => void }) {
             {last.unlinked > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 px-2 py-0.5">
                 <AlertTriangle className="w-3 h-3" />
-                {last.unlinked} حملة بصرف بلا منتج — صرفها غير محسوب
+                {last.unlinked} حملة بلا ربط — راجع بند «غير مصنّف» ونتيجة المزامنة
               </span>
             )}
           </>
@@ -571,9 +574,11 @@ function PeriodCampaignsFetcher({
 
   // rows === null: لم يُجلب بعد. تبقى ظاهرة بعد الربط وتتحدث حالتها فقط.
   const [rows, setRows] = useState<PeriodCampaign[] | null>(null);
+  const [fetchedAt, setFetchedAt] = useState("");
   const [fetching, startFetch] = useTransition();
   const [linking, startLink] = useTransition();
   const [importing, startImport] = useTransition();
+  const [importResult, setImportResult] = useState<(BackfillResult & { from: string; to: string }) | null>(null);
   const [picks, setPicks] = useState<Record<string, string>>({}); // campaignId → productId
 
   // اختيار الحسابات الإعلانية: null = كل الحسابات، غير ذلك = المحدد فقط.
@@ -636,6 +641,7 @@ function PeriodCampaignsFetcher({
     startFetch(async () => {
       const r = await getPeriodCampaigns({ from, to, accountIds: accountFilter() });
       setRows(r.campaigns);
+      setFetchedAt(new Date().toLocaleString("ar-IQ"));
       // حافظ على الاختيارات السابقة للحملات ما تزال غير مرتبطة.
       setPicks((prev) => {
         const next: Record<string, string> = {};
@@ -701,6 +707,7 @@ function PeriodCampaignsFetcher({
     }
     startImport(async () => {
       const r = await importPeriodSpend({ from, to, accountIds: accountFilter() });
+      setImportResult({ ...r, from, to });
       toast({
         description: r.message,
         variant: r.success ? undefined : "destructive",
@@ -709,6 +716,7 @@ function PeriodCampaignsFetcher({
       if (r.rows > 0 || r.days > 0) {
         onMutated();
         router.refresh();
+        fetchCampaigns();
       }
     });
   };
@@ -1125,6 +1133,8 @@ function PeriodCampaignsFetcher({
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold" dir="ltr">
                         {c.usd.toFixed(2)}
+                        <span className="block text-[10px] text-muted-foreground font-normal" dir="rtl">المحفوظ للمنتج: <bdi>{c.storedUsd.toFixed(2)} $</bdi></span>
+                        {c.storedUnderOtherProduct > 0 && <span className="block text-[10px] text-amber-700 dark:text-amber-400 font-normal" dir="rtl">بربط سابق: <bdi>{c.storedUnderOtherProduct.toFixed(2)} $</bdi></span>}
                       </TableCell>
                     <TableCell className="text-center">
                       {c.linked ? (
@@ -1168,12 +1178,19 @@ function PeriodCampaignsFetcher({
           </div>
 
           <p className="text-xs text-muted-foreground">
-            «استرجاع صرف الفترة» يخزّن صرف الأيام للحملات المرتبطة (تظهر بعدئذ في
-            الجدول الموحّد وصفحة الأرباح). «ربط الحملات المحددة» يحفظ كل الاختيارات
-            دفعة واحدة — والقائمة تبقى ظاهرة وتتحدّث حالتها.
+            «استرجاع صرف الفترة» يخزّن صرف الأيام بسعر الصرف الساري لكل يوم، بما فيه تاريخ نهاية فترة السعر. الصرف بلا ربط يُحفظ تحت «غير مصنّف» ويظهر في
+            الجدول الموحّد وصفحة الأرباح. «ربط الحملات المحددة» يحفظ كل الاختيارات
+            مع نقل الصرف السابق للمنتج الصحيح. الربط لا يجلب الأيام غير المستوردة؛ استخدم «استرجاع صرف الفترة» لجلبها.
+            {fetchedAt && <span className="block mt-1">آخر جلب حي من Meta: {fetchedAt}. صرف اليوم الحالي قابل للتغير.</span>}
           </p>
         </>
       )}
+      {importResult && <div role="status" className={cn("rounded-lg border p-3 space-y-2 text-sm", importResult.success ? "border-green-300 bg-green-50 dark:bg-green-950/20" : "border-amber-300 bg-amber-50 dark:bg-amber-950/20")}>
+        <p className="font-medium">نتيجة الاسترجاع: <bdi>{importResult.from} → {importResult.to}</bdi></p>
+        <p>{importResult.message}</p>
+        {!!importResult.missingFx?.length && <ul className="list-disc list-inside text-xs space-y-1">{importResult.missingFx.map(item => <li key={`${item.date}:${item.currency}`}><bdi>{item.date}</bdi>: <bdi>{item.amount.toFixed(2)} {item.currency}</bdi> لم تُضمّن ({item.rows} صفوف) لعدم وجود سعر صرف.</li>)}</ul>}
+        <p className="text-xs text-muted-foreground">صرف اليوم الحالي قد يتغير بعد الاسترجاع، والقائمة الحية والجدول المخزّن يمثلان وقتي جلب مختلفين.</p>
+      </div>}
     </div>
   );
 }
@@ -1192,7 +1209,7 @@ function UnifiedCampaignsTable({
   const { toast } = useToast();
   const [from, setFrom] = useState<string>(iraqMonthStartStr());
   const [to, setTo] = useState<string>(iraqTodayStr());
-  const [data, setData] = useState<{ rows: UnifiedCampaignRow[]; totalIQD: number; totalUSD: number } | null>(
+  const [data, setData] = useState<{ rows: UnifiedCampaignRow[]; totalIQD: number; totalUSD: number; from: string; to: string } | null>(
     null,
   );
   const [loading, setLoading] = useState(true);
@@ -1209,7 +1226,7 @@ function UnifiedCampaignsTable({
         new Date(`${from}T00:00:00.000Z`),
         new Date(`${to}T00:00:00.000Z`),
       );
-      setData(r);
+      setData({ ...r, from, to });
     } finally {
       setLoading(false);
     }
@@ -1262,7 +1279,7 @@ function UnifiedCampaignsTable({
               {Math.round(data.totalIQD).toLocaleString()} د.ع
             </Badge>
               <Link
-                href="/admin/profit"
+                href={`/admin/profit?from=${data.from}&to=${data.to}`}
                 className="text-xs text-primary hover:underline whitespace-nowrap"
               >
                 الأثر في الأرباح ←
@@ -1498,9 +1515,10 @@ function EditManualCampaignForm({
     productId: row.productId,
     fromDate: row.from,
     toDate: row.to,
-    amount: String(row.amount),
+    amount: String(row.originalAmount ?? row.amount),
+    campaignId: row.campaignId ?? "",
     currency: row.currency,
-    notes: null as string | null,
+    notes: row.notes ?? null,
   });
 
   const submit = () => {
@@ -1518,6 +1536,11 @@ function EditManualCampaignForm({
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">معرف حملة Meta (اختياري)</label>
+        <Input value={form.campaignId} onChange={event => setForm({ ...form, campaignId: event.target.value })} />
+        <p className="text-xs text-muted-foreground">اتركه فارغاً للمصروف الإضافي. عند ربطه، تُستبدل فقط الأيام المستوردة لنفس الحملة.</p>
+      </div>
       <div>
         <label className="text-xs text-muted-foreground">المنتج</label>
         <select
@@ -1603,6 +1626,7 @@ function ManualCampaignForm({
     fromDate: iraqMonthStartStr(),
     toDate: iraqTodayStr(),
     amount: "",
+    campaignId: "",
     currency: "IQD",
     notes: null as string | null,
   });
@@ -1621,6 +1645,11 @@ function ManualCampaignForm({
 
   return (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <label className="text-xs text-muted-foreground">معرف حملة Meta (اختياري)</label>
+        <Input value={form.campaignId} onChange={event => setForm({ ...form, campaignId: event.target.value })} />
+        <p className="text-xs text-muted-foreground">اتركه فارغاً للمصروف الإضافي. عند ربطه، تُستبدل فقط الأيام المستوردة لنفس الحملة.</p>
+      </div>
       <div>
         <label className="text-xs text-muted-foreground">المنتج</label>
         <select
@@ -1700,7 +1729,7 @@ export default function AdSpendSection({
 
   return (
     <div className="space-y-4">
-      <FxRateCard />
+      <FxRateCard refreshKey={refreshKey} onChanged={bump} />
       <SyncBar onChanged={bump} />
       <PeriodCampaignsFetcher products={products} onMutated={bump} />
       <UnifiedCampaignsTable

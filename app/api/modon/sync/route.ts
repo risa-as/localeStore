@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
-import { syncModonOrders } from "@/lib/actions/order.actions";
+import { syncModonOrders } from "@/lib/orders/internal-operations";
 import { auth } from "@/auth";
+import { requireAdministrator } from "@/lib/authorization";
+import { processReturnOutbox } from "@/lib/orders/message-outbox";
+import { after } from "next/server";
 
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -15,6 +18,8 @@ export async function GET(req: Request) {
     if (!isCron && !isAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    if (!isCron) await requireAdministrator();
+    after(() => processReturnOutbox().then(() => {}));
 
     const res = await syncModonOrders();
 

@@ -28,11 +28,10 @@ import {
 } from "@/lib/meta/ads";
 import { getAdsBaseUrl, isPublicHttpUrl } from "@/lib/meta/config";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "@/lib/constants/internal-products";
+import { requireAdministrator } from "@/lib/authorization";
 
 async function requireAdmin() {
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Unauthorized");
-  return session;
+  return requireAdministrator();
 }
 
 /** يحمّل صف الاتصال بالتوكنات — للاستخدام داخل السيرفر فقط. */

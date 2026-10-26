@@ -7,6 +7,9 @@ datasource db {
 }
 
 model Product {
+  allocations InventoryAllocation[]
+  isArchived    Boolean      @default(false)
+  relatedProductIds String[] @default([])
   id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name          String
   slug          String       @unique(map: "product_slug_idx")
@@ -34,6 +37,7 @@ model Product {
 }
 
 model ProductBatch {
+  allocations InventoryAllocation[]
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId   String   @db.Uuid
   batchNumber String?
@@ -114,6 +118,17 @@ model Cart {
 }
 
 model Order {
+  socialInboxOrders SocialInboxOrder[]
+  reservationExpiresAt DateTime?
+  allocations InventoryAllocation[]
+  statusEvents OrderStatusEvent[]
+  messageOutbox MessageOutbox[]
+  isArchived          Boolean     @default(false)
+  inventoryDispatchedAt DateTime?
+  inventoryReturnedAt DateTime?
+  returnReasonCode     String?
+  returnReasonText     String?
+  manualDiscount      Decimal     @default(0) @db.Decimal(12, 2)
   id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fullName            String
   phoneNumber         String
@@ -129,7 +144,7 @@ model Order {
   paidAt              DateTime?   @db.Timestamp(6)
   paymentResult       Json?       @db.Json
   userId              String?     @db.Uuid
-  user                User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
   orderitems          OrderItem[]
   notes               String?
   ip                  String?
@@ -143,6 +158,10 @@ model Order {
 }
 
 model OrderItem {
+  costSource    String?
+  lineTotal     Decimal? @db.Decimal(12, 2)
+  offersSnapshot String?
+  costTotal     Decimal? @db.Decimal(12, 2)
   orderId       String  @db.Uuid
   productId     String  @db.Uuid
   qty           Int
@@ -154,7 +173,7 @@ model OrderItem {
   selectedColor String?
   shippingPrice Decimal @default(0) @db.Decimal(12, 2)
   order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product       Product @relation(fields: [productId], references: [id], onDelete: Restrict)
 
   @@id([orderId, productId], map: "orderitems_orderId_productId_pk")
 }
@@ -181,12 +200,13 @@ model Category {
 
 model ShippingSettings {
   id          String   @id @default("default")
-  baghdadCost Decimal  @default(4000) @db.Decimal(12, 2)
-  othersCost  Decimal  @default(5000) @db.Decimal(12, 2)
+  baghdadCost Decimal  @default(4) @db.Decimal(12, 2)
+  othersCost  Decimal  @default(5) @db.Decimal(12, 2)
   updatedAt   DateTime @updatedAt
 }
 
 model AdCampaign {
+  campaignId String?
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   productId String   @db.Uuid
   fromDate  DateTime @db.Date
@@ -246,6 +266,9 @@ model WaConversation {
 }
 
 model WaMessage {
+  orderId        String?        @db.Uuid
+  replyToMessageId String?
+  buttonPayload  String?
   id             String         @id @default(cuid())
   conversationId String
   conversation   WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -259,6 +282,62 @@ model WaMessage {
   timestamp      DateTime       @default(now())
 
   @@index([conversationId, timestamp])
+}
+
+model InventoryAllocation {
+  source String @default("dispatch")
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  batch ProductBatch? @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  orderId String @db.Uuid
+  productId String @db.Uuid
+  batchId String? @db.Uuid
+  quantity Int
+  unitCost Decimal @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  returnedAt DateTime?
+  @@index([orderId, productId])
+  @@index([batchId])
+}
+
+model OrderStatusEvent {
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  orderId String @db.Uuid
+  fromStatus String
+  toStatus String
+  source String
+  createdAt DateTime @default(now())
+  @@index([orderId, createdAt])
+}
+
+model MessageOutbox {
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  id String @id @default(cuid())
+  orderId String @db.Uuid
+  eventKey String @unique
+  template String
+  payload Json
+  status String @default("queued")
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lockedAt DateTime?
+  lastError String?
+  waMessageId String? @unique
+  createdAt DateTime @default(now())
+  @@index([status, nextAttemptAt])
+}
+
+model StoreEvent {
+  eventKey String? @unique
+  id String @id @default(cuid())
+  name String
+  orderId String? @db.Uuid
+  productId String? @db.Uuid
+  sessionId String
+  createdAt DateTime @default(now())
+  @@index([name, createdAt])
 }
 
 /// اتصال Meta (فيسبوك/إنستغرام/إعلانات) — صف واحد لكل نشر (متجر واحد لكل نشر).
@@ -283,6 +362,45 @@ model MetaConnection {
   selectedAdAccountName String?
   createdAt        DateTime  @default(now()) @db.Timestamp(6)
   updatedAt        DateTime  @updatedAt
+}
+
+/// Shared read/reply receipts for the social inbox, scoped to each authorized Page.
+model SocialInboxState {
+  pageId                String
+  platform              String
+  conversationId        String
+  lastReadMessageId     String?
+  lastReplyMessageId    String?
+  lastReplyText         String?
+  lastReplyAt           DateTime? @db.Timestamp(3)
+  previousMessageIds    String[] @default([])
+  updatedAt             DateTime @updatedAt @db.Timestamp(3)
+
+  @@id([pageId, platform, conversationId])
+}
+
+// Customer delivery/read watermarks; distinct from an administrator reading the inbox.
+model SocialInboxPeerReceipt {
+  pageId           String
+  platform         String
+  recipientId      String
+  deliveredThrough DateTime? @db.Timestamp(3)
+  readThrough      DateTime? @db.Timestamp(3)
+  updatedAt        DateTime @updatedAt @db.Timestamp(3)
+
+  @@id([pageId, platform, recipientId])
+}
+
+model SocialInboxMessageReceipt {
+  pageId      String
+  platform    String
+  recipientId String
+  messageId   String
+  deliveredAt DateTime? @db.Timestamp(3)
+  readAt      DateTime? @db.Timestamp(3)
+  updatedAt   DateTime @updatedAt @db.Timestamp(3)
+
+  @@id([pageId, platform, recipientId, messageId])
 }
 
 /// منشور نُشر على فيسبوك و/أو إنستغرام من النظام.
@@ -402,4 +520,19 @@ model AdSpendSyncLog {
   createdAt   DateTime @default(now()) @db.Timestamp(6)
 
   @@index([date])
+}
+
+/// Durable approval receipt: a retry returns the same order, even after its status changes.
+model SocialInboxOrder {
+  requestKey     String @id
+  pageId         String
+  platform       String
+  conversationId String
+  createdBy      String
+  snapshot       String
+  orderId        String @db.Uuid
+  order          Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  createdAt      DateTime @default(now()) @db.Timestamp(3)
+
+  @@index([pageId, platform, conversationId, createdAt])
 }

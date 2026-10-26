@@ -1,4 +1,5 @@
 "use server";
+import { requireAdministrator } from "@/lib/authorization";
 import { prisma } from "@/db/prisma";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -28,6 +29,7 @@ async function nextBatchNumber(productId: string): Promise<string> {
 }
 
 export async function createBatch(data: z.infer<typeof insertBatchSchema>) {
+  await requireAdministrator();
   try {
     const parsed = insertBatchSchema.parse(data);
     const batchNumber =
@@ -57,30 +59,18 @@ export async function createBatch(data: z.infer<typeof insertBatchSchema>) {
 }
 
 export async function updateBatch(data: z.infer<typeof updateBatchSchema>) {
+  await requireAdministrator();
   try {
     const parsed = updateBatchSchema.parse(data);
-    // عدّل المخزون بفارق الكمية فقط (الجديدة − القديمة).
-    const existing = await prisma.productBatch.findUnique({
-      where: { id: parsed.id },
-      select: { quantity: true },
+    await prisma.$transaction(async tx => {
+      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${parsed.productId}::uuid FOR UPDATE`;
+      const existing = await tx.productBatch.findUniqueOrThrow({ where: { id: parsed.id } });
+      if (existing.productId !== parsed.productId) throw new Error("لا يمكن نقل دفعة إلى منتج آخر");
+      const used = await tx.inventoryAllocation.count({ where: { batchId: parsed.id } });
+      if (used && (existing.quantity !== parsed.quantity || Number(existing.costPrice) !== Number(parsed.costPrice))) throw new Error("هذه الدفعة مرتبطة بحركات مخزون؛ أضف دفعة أو تسوية مستقلة بدلاً من تغيير تاريخها");
+      await tx.productBatch.update({ where: { id: parsed.id }, data: { quantity: parsed.quantity, costPrice: parsed.costPrice, notes: parsed.notes || null } });
+      await tx.product.update({ where: { id: existing.productId }, data: { stock: { increment: parsed.quantity - existing.quantity } } });
     });
-    const stockDelta = parsed.quantity - (existing?.quantity ?? 0);
-    await prisma.$transaction([
-      prisma.productBatch.update({
-        where: { id: parsed.id },
-        data: {
-          productId: parsed.productId,
-          // رقم الدفعة يُولَّد آلياً ولا يُعدَّل من النموذج — نُبقي القيمة الحالية.
-          quantity: parsed.quantity,
-          costPrice: parsed.costPrice,
-          notes: parsed.notes || null,
-        },
-      }),
-      prisma.product.update({
-        where: { id: parsed.productId },
-        data: { stock: { increment: stockDelta } },
-      }),
-    ]);
     revalidateBatchPages();
     return { success: true, message: "تم تحديث الدفعة بنجاح" };
   } catch (error) {
@@ -90,22 +80,15 @@ export async function updateBatch(data: z.infer<typeof updateBatchSchema>) {
 }
 
 export async function deleteBatch(id: string) {
+  await requireAdministrator();
   try {
-    const existing = await prisma.productBatch.findUnique({
-      where: { id },
-      select: { quantity: true, productId: true },
+    await prisma.$transaction(async tx => {
+      const existing = await tx.productBatch.findUniqueOrThrow({ where: { id } });
+      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${existing.productId}::uuid FOR UPDATE`;
+      if (await tx.inventoryAllocation.count({ where: { batchId: id } })) throw new Error("لا يمكن حذف دفعة استُخدمت في طلبات");
+      await tx.productBatch.delete({ where: { id } });
+      await tx.product.update({ where: { id: existing.productId }, data: { stock: { decrement: existing.quantity } } });
     });
-    if (!existing) {
-      return { success: false, message: "الدفعة غير موجودة" };
-    }
-    await prisma.$transaction([
-      prisma.productBatch.delete({ where: { id } }),
-      // اخصم كمية الدفعة من مخزون المنتج
-      prisma.product.update({
-        where: { id: existing.productId },
-        data: { stock: { decrement: existing.quantity } },
-      }),
-    ]);
     revalidateBatchPages();
     return { success: true, message: "تم حذف الدفعة بنجاح" };
   } catch (error) {
@@ -172,6 +155,7 @@ export async function getAllBatchesWithStatus(): Promise<{
   rows: BatchRow[];
   summary: BatchesSummary;
 }> {
+  await requireAdministrator();
   const contexts = await buildFefoContexts();
   const rows = buildRows(contexts);
 
@@ -186,6 +170,7 @@ export async function getAllBatchesWithStatus(): Promise<{
 }
 
 export async function getBatchesByProduct(productId: string): Promise<BatchRow[]> {
+  await requireAdministrator();
   const contexts = await buildFefoContexts([productId]);
   return buildRows(contexts);
 }
@@ -194,6 +179,7 @@ export async function getBatchesByProduct(productId: string): Promise<BatchRow[]
 export async function getProductsForBatchSelect(): Promise<
   { id: string; name: string }[]
 > {
+  await requireAdministrator();
   const products = await prisma.product.findMany({
     select: { id: true, name: true },
     orderBy: { name: "asc" },

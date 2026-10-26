@@ -1,0 +1,11 @@
+const fs=require('node:fs');
+const path='lib/actions/order.actions.ts';
+let s=fs.readFileSync(path,'utf8').replace(/\r\n/g,'\n');
+const importAt=s.indexOf('// Import Orders from Excel');
+let regular=s.slice(0,importAt);
+regular=regular.replaceAll('costPrice: product.costPrice,','costPrice: product.costPrice,\n              offersSnapshot: product.offers,\n              lineTotal: computeOrderPricing({ quantity: orderData.quantity, unitPrice: Number(product.price), shippingPrice: 0, offers: product.offers }).itemsPrice,');
+regular=regular.replaceAll('costPrice: item.costPrice,','costPrice: item.costPrice,\n                offersSnapshot: item.offers,\n                lineTotal: computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice,');
+regular=regular.replace('data: { qty: item.qty },', `data: { qty: item.qty, lineTotal: computeOrderPricing({ quantity: item.qty, unitPrice: Number(locked.orderitems.find(i => i.productId === item.productId)!.price), shippingPrice: 0, offers: locked.orderitems.find(i => i.productId === item.productId)!.offersSnapshot }).itemsPrice },`);
+regular=regular.replace('          totalPrice: order.totalPrice,','          totalPrice: order.totalPrice,\n          manualDiscount: updatedItems.reduce((sum, item) => sum + Number(item.lineTotal ?? Number(item.price) * item.qty), 0) + Number(order.shippingPrice) - Number(order.totalPrice),');
+s=regular+s.slice(importAt);
+fs.writeFileSync(path,s);

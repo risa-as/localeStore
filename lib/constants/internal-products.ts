@@ -15,5 +15,6 @@ export const UNLINKED_AD_SPEND_SLUG = "unlinked-ad-spend";
 
 /** فلتر Prisma لاستبعاد المنتجات الداخلية من قوائم المنتجات. */
 export const EXCLUDE_INTERNAL_PRODUCTS = {
+  isArchived: false,
   slug: { not: UNLINKED_AD_SPEND_SLUG },
 } as const;

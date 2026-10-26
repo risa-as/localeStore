@@ -1,5 +1,15 @@
 "use server";
+import { submitQuickOrder } from "@/lib/orders/quick-order";
+import { reserveOrderStock } from "@/lib/orders/reservations";
+import { syncModonOrders as syncModonOrdersInternal } from "@/lib/orders/internal-operations";
+import { requireStaff, requireAdministrator, requireUser } from "@/lib/authorization";
+import { setOrderStatus, transitionOrder } from "@/lib/orders/status-service";
+import { after } from "next/server";
+import { processReturnOutbox } from "@/lib/orders/message-outbox";
+import { getExpenseStatsForPeriod } from "./expense.actions";
+import { getAvailableStock } from "@/lib/inventory";
 import { cookies, headers } from "next/headers";
+import { assertOrderAccess, grantOrderAccess, hasOrderAccess } from "@/lib/orders/access";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { auth } from "@/auth";
 import { convertToPlainObject, formatError } from "../utils";
@@ -14,8 +24,57 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { getDeliveryProvider, type DeliveryOrderInput } from "@/lib/delivery";
 import { buildFefoContexts, saleKey } from "@/lib/fefo-cogs";
-import { computeItemsPriceTotal, computeOrderPricing } from "@/lib/pricing";
+import { computeItemsPriceTotal, computeOrderPricing, toIqdAmount } from "@/lib/pricing";
+import { sendCAPIEvent } from "@/lib/actions/facebook.actions";
 import { sendOrderConfirmation, sendOrderReturned } from "@/lib/whatsapp";
+import {
+  appendNote,
+  decideItemMerge,
+  decideShippingUpdate,
+  differentAddressNote,
+  duplicateNote,
+} from "@/lib/orders/merge-policy";
+
+/**
+ * يرسل رسالة واتساب بالحالة النهائية للطلب.
+ *
+ * تُقرأ الأصناف من قاعدة البيانات بعد الحفظ، فتعكس الرسالة ما سيصل الزبون فعلاً
+ * لا ما أرسله في النموذج. كانت الرسالة تُرسَل في مسار واحد فقط (طلب جديد من
+ * صفحة الهبوط): لا شيء من المتجر، ولا شيء عند الدمج — فيبقى الزبون بلا تأكيد
+ * فيعيد الطلب.
+ *
+ * لا ترمي أبداً: فشل الإشعار لا يُسقط الطلب.
+ */
+async function notifyOrderState(
+  orderId: string,
+  fullName: string,
+  phoneNumber: string,
+) {
+  try {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { orderitems: true },
+    });
+    if (!order) return;
+
+    const productNames =
+      order.orderitems.map((i) => i.name).join(" + ") || "طلب إلكتروني";
+    const quantity = order.orderitems.reduce((acc, i) => acc + i.qty, 0);
+    const shippingPrice = Number(order.shippingPrice);
+    const itemsPrice = Number(order.totalPrice) - shippingPrice;
+
+    await sendOrderConfirmation({
+      fullName,
+      phoneNumber,
+      product: productNames,
+      quantity,
+      itemsPrice,
+      shippingPrice,
+    });
+  } catch (error) {
+    console.error(`⚠️ تعذّر إرسال رسالة واتساب للطلب ${orderId}:`, error);
+  }
+}
 
 // يبني مدخل التوصيل الموحّد من بيانات الطلب.
 // يطبّق ×1000 على السعر المختصر (طريقة تخزيننا)، ويجمّع أسماء المنتجات.
@@ -30,8 +89,7 @@ function buildDeliveryInput(o: {
   notes?: string | null;
   orderitems?: { name: string; selectedColor?: string | null }[] | null;
 }): DeliveryOrderInput {
-  const rawPrice = Number(o.totalPrice ?? 0);
-  const price = rawPrice > 0 && rawPrice < 1000 ? rawPrice * 1000 : rawPrice;
+  const price = toIqdAmount(o.totalPrice);
   const productNames =
     o.orderitems && o.orderitems.length > 0
       ? o.orderitems
@@ -109,7 +167,7 @@ async function checkForFraud(
 async function getActualShippingCost(governorate: string): Promise<number> {
   const settings = await prisma.shippingSettings.upsert({
     where: { id: "default" },
-    create: { id: "default", baghdadCost: 4000, othersCost: 5000 },
+    create: { id: "default", baghdadCost: 4, othersCost: 5 },
     update: {},
   });
   return governorate === "Baghdad"
@@ -136,243 +194,24 @@ export async function createQuickOrder(
 ) {
   try {
     const orderData = insertOrderSchema.parse(data);
-
-    // Set Guest Cookie for persistence
-    const cookieStore = await cookies();
-    cookieStore.set(
-      "guest-shipping-info",
-      JSON.stringify({
-        fullName: orderData.fullName,
-        streetAddress: orderData.address,
-        city: orderData.governorate, // Mapping governorate to city/address field as best fit
-        phoneNumber: orderData.phoneNumber,
-        postalCode: "00000", // Default or extract if available
-        country: "Iraq", // Default or extract
-      }),
-      {
-        expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-        path: "/",
-      },
-    );
-
-    // Fetch product to ensure price and stock
-    const product = await prisma.product.findUnique({
-      where: { id: productId },
-    });
-
-    if (!product) {
-      return { success: false, message: "Product not found" };
-    }
-
-    // ملاحظة: المقارنة هنا مع مجموع الدفعات المستلمة وليس المتبقي فعلاً — قرار
-    // مقصود حتى لا تتوقف المبيعات على منتج تأخّر إدخال دفعته (انظر المتبقي
-    // السالب في /admin/products). العرض في صفحة الهبوط يستخدم المتبقي الحقيقي.
-    if (product.stock < orderData.quantity) {
-      return { success: false, message: "Not enough stock" };
-    }
-
-    // Check for existing order within 18 hours
     const session = await auth();
-    const userId = session?.user?.id;
-
-    const cutoffDate = new Date(Date.now() - 18 * 60 * 60 * 1000);
-    const recentOrder = await prisma.order.findFirst({
-      where: {
-        phoneNumber: orderData.phoneNumber,
-        createdAt: { gte: cutoffDate },
-        status: "home",
-      },
-      include: { orderitems: true },
-    });
-
-    if (recentOrder) {
-      // Checking if item exists
-      const existingItem = recentOrder.orderitems.find(
-        (item) => item.productId === product.id,
-      );
-
-      await prisma.$transaction(async (tx) => {
-        if (existingItem) {
-          // Update quantity
-          await tx.orderItem.update({
-            where: {
-              orderId_productId: {
-                orderId: recentOrder.id,
-                productId: existingItem.productId,
-              },
-            },
-            data: {
-              qty: existingItem.qty + orderData.quantity,
-            },
-          });
-        } else {
-          // Add new item
-          await tx.orderItem.create({
-            data: {
-              orderId: recentOrder.id,
-              productId: product.id,
-              slug: product.slug,
-              name: product.name,
-              qty: orderData.quantity,
-              image: product.images[0] || "/placeholder.jpg",
-              price: product.price,
-              costPrice: product.costPrice,
-              selectedColor: orderData.selectedColor,
-              shippingPrice: product.shippingPrice,
-            },
-          });
-        }
-
-        // Recalculate total
-        const updatedItems = await tx.orderItem.findMany({
-          where: { orderId: recentOrder.id },
-        });
-
-        // Items Price — بتسعير العروض لكل منتج على حدة
-        const offersByProduct = await getOffersByProductId(
-          tx,
-          updatedItems.map((item) => item.productId),
-        );
-        const itemsPrice = computeItemsPriceTotal(
-          updatedItems.map((item) => ({
-            productId: item.productId,
-            unitPrice: Number(item.price),
-            quantity: item.qty,
-          })),
-          offersByProduct,
-        );
-
-        // Flat Shipping (Max of items)
-        const shippingPrice =
-          updatedItems.length > 0
-            ? Math.max(
-                ...updatedItems.map((item) => Number(item.shippingPrice)),
-              )
-            : 0;
-
-        const newTotalPrice = itemsPrice + shippingPrice;
-        const newQuantity = updatedItems.reduce(
-          (acc, item) => acc + item.qty,
-          0,
-        );
-
-        await tx.order.update({
-          where: { id: recentOrder.id },
-          data: {
-            totalPrice: newTotalPrice,
-            shippingPrice: shippingPrice,
-            quantity: newQuantity,
-            fullName: orderData.fullName,
-            governorate: orderData.governorate,
-            address: orderData.address,
-            actualShippingCost: await getActualShippingCost(
-              orderData.governorate,
-            ),
-            userId: session?.user?.id,
-          },
-        });
-      });
-
-      return {
-        success: true,
-        message: "تم تحديث طلبك بنجاح",
-        redirectTo: `/thank-you?orderId=${recentOrder.id}`,
-      };
-    }
-
-    // Create Order
-    // السعر من عروض المنتج (سعر القطعتين فما فوق) + كلفة توصيل واحدة
-    const pricing = computeOrderPricing({
-      quantity: orderData.quantity,
-      unitPrice: Number(product.price),
-      shippingPrice: Number(product.shippingPrice),
-      offers: product.offers,
-    });
-    const shippingPrice = pricing.shippingPrice;
-    const price = pricing.totalPrice;
-
-    // Capture IP
     const ip = (await headers()).get("x-forwarded-for");
-
-    // Check for fraud
-    // Exempt Admin and Employees
-    const isAdminOrEmployee =
-      session?.user?.role === "admin" || session?.user?.role === "employee";
-    const isFraud = isAdminOrEmployee
-      ? false
-      : await checkForFraud(
-          ip as string,
-          orderData.phoneNumber,
-          orderData.governorate,
-        );
-
-    // Create a transaction to create order and order items in database
-    const insertedOrderId = await prisma.$transaction(async (tx) => {
-      // Create order
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { selectedColor, quantity, ...orderDataWithoutColor } = orderData;
-      const insertedOrder = await tx.order.create({
-        data: {
-          ...orderDataWithoutColor,
-          quantity: orderData.quantity,
-          totalPrice: price,
-          shippingPrice: shippingPrice,
-          status: isFraud ? "banned" : "home",
-          actualShippingCost: await getActualShippingCost(
-            orderData.governorate,
-          ),
-          userId,
-          ip: ip as string,
-        },
-      });
-
-      // Create order item
-      await tx.orderItem.create({
-        data: {
-          orderId: insertedOrder.id,
-          productId: product.id,
-          slug: product.slug,
-          name: product.name,
-          qty: orderData.quantity,
-          image: product.images[0] || "/placeholder.jpg",
-          price: product.price,
-          costPrice: product.costPrice,
-          selectedColor: orderData.selectedColor,
-          shippingPrice: product.shippingPrice,
-        },
-      });
-
-      return insertedOrder.id;
+    const staff = session?.user?.role === "admin" || session?.user?.role === "employee";
+    const isFraud = staff ? false : await checkForFraud(ip || "", orderData.phoneNumber, orderData.governorate);
+    const result = await submitQuickOrder(orderData, productId, {
+      userId: session?.user?.id, ip, banned: isFraud, canMerge: hasOrderAccess,
     });
-
-    if (!insertedOrderId) throw new Error("Order not created");
-
-    // cookieStore.delete("guest-shipping-info"); // Clear guest info after successful order
-    // WhatsApp: رسالة تأكيد الطلب — السعر من عروض المنتج لا من price × qty
-    try {
-      if (pricing.source === "fallback" && orderData.quantity > 1) {
-        console.warn(
-          `⚠️ لا يوجد «سعر القطعتين» في عروض ${product.name} — استُخدم ضرب بسيط في الرسالة`,
-        );
-      }
-      await sendOrderConfirmation({
-        fullName: orderData.fullName,
-        phoneNumber: orderData.phoneNumber,
-        product: product.name,
-        quantity: orderData.quantity,
-        itemsPrice: pricing.itemsPrice,
-        shippingPrice: pricing.shippingPrice,
-      });
-    } catch (err) {
-      console.error("❌ WhatsApp order confirmation error:", err);
-    }
-    return {
-      success: true,
-      message: "Order created",
-      redirectTo: isFraud
-        ? "https://www.facebook.com"
-        : `/thank-you?orderId=${insertedOrderId}`,
-    };
+    const cookieStore = await cookies();
+    cookieStore.set("guest-shipping-info", JSON.stringify({
+      fullName: orderData.fullName, streetAddress: orderData.address, city: orderData.governorate,
+      phoneNumber: orderData.phoneNumber, postalCode: "00000", country: "Iraq",
+    }), { expires: new Date(Date.now() + 30 * 86400000), path: "/" });
+    await grantOrderAccess(result.orderId);
+    const duplicate = result.kind === "duplicate";
+    return { success: true, message: duplicate ? "طلبك السابق ما زال قيد التجهيز — لم نُضِف قطعة ثانية"
+      : result.kind === "merged" ? "تم تحديث طلبك بنجاح" : "Order created",
+      redirectTo: isFraud && result.kind === "created" ? "https://www.facebook.com"
+        : `/thank-you?orderId=${result.orderId}${duplicate ? "&dup=1" : ""}` };
   } catch (error) {
     console.error("Error in createQuickOrder:", error);
     if (isRedirectError(error)) throw error;
@@ -398,6 +237,12 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
 
     // Get product offers first — التسعير يعتمد على عرض كل منتج
     const productIds = cart.items.map((item) => item.productId);
+    for (const item of cart.items) {
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (!product || product.isArchived || item.qty < 1 || !Number.isInteger(item.qty)) {
+        return { success: false, message: `الكمية غير متاحة: ${item.name}` };
+      }
+    }
     const offersByProduct = await getOffersByProductId(prisma, productIds);
 
     // Calculate total price from cart items
@@ -429,26 +274,36 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
       include: { orderitems: true },
     });
 
-    if (recentOrder) {
+    if (recentOrder && await hasOrderAccess(recentOrder)) {
       // MERGE LOGIC FOR CART
+      // نفس القاعدة: المنتج الموجود لا تُجمَع كميته، والمنتج الجديد يُضاف.
+      const shippingDecision = decideShippingUpdate(recentOrder, orderData);
+      let notes = recentOrder.notes;
+      let duplicateCount = 0;
+      let appendedItemCount = 0;
+
+      for (const item of cart.items as CartItem[]) {
+        const existing = recentOrder.orderitems.find(
+          (oi) => oi.productId === item.productId,
+        );
+        if (decideItemMerge(existing?.qty, item.qty).kind === "duplicate") {
+          duplicateCount += 1;
+          notes = appendNote(notes, duplicateNote(item.name, item.qty));
+        } else {
+          appendedItemCount += 1;
+        }
+      }
+      if (shippingDecision.kind === "keep") {
+        notes = appendNote(notes, differentAddressNote(shippingDecision.incoming));
+      }
+
       await prisma.$transaction(async (tx) => {
         for (const item of cart.items as CartItem[]) {
           const existingItem = recentOrder.orderitems.find(
             (oi) => oi.productId === item.productId,
           );
 
-          if (existingItem) {
-            // Update quantity
-            await tx.orderItem.update({
-              where: {
-                orderId_productId: {
-                  orderId: recentOrder.id,
-                  productId: existingItem.productId,
-                },
-              },
-              data: { qty: existingItem.qty + item.qty },
-            });
-          } else {
+          if (!existingItem) {
             // Create new item
             await tx.orderItem.create({
               data: {
@@ -460,6 +315,8 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
                 image: item.image,
                 price: item.price,
                 costPrice: item.costPrice,
+                offersSnapshot: item.offers,
+                lineTotal: computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice,
                 shippingPrice: item.shippingPrice,
               },
             });
@@ -505,12 +362,18 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             totalPrice: newTotalPrice,
             shippingPrice: newShippingPrice,
             quantity: newQuantity,
-            fullName: orderData.fullName,
-            governorate: orderData.governorate,
-            address: orderData.address,
-            actualShippingCost: await getActualShippingCost(
-              orderData.governorate,
-            ),
+            notes,
+            // وجهة مختلفة ⇒ لا يُغيَّر عنوان الطلب القائم ولا كلفة توصيله.
+            ...(shippingDecision.kind === "update"
+              ? {
+                  fullName: orderData.fullName,
+                  governorate: orderData.governorate,
+                  address: orderData.address,
+                  actualShippingCost: await getActualShippingCost(
+                    orderData.governorate,
+                  ),
+                }
+              : {}),
             userId: userId ?? recentOrder.userId,
           },
         });
@@ -525,15 +388,31 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             itemsPrice: 0,
           },
         });
-      });
+
+      await reserveOrderStock(tx, recentOrder.id);
+});
 
       const cookieStore = await cookies();
       cookieStore.delete("guest-shipping-info");
 
+      // إذا كانت السلة كلها منتجات موجودة في الطلب السابق، لم يتغير محتوى الطلب
+      // ولا داعي لإرسال تأكيد واتساب ثانٍ. السلة المختلطة تُرسل تأكيداً واحداً لأن
+      // المنتجات الجديدة أُضيفت فعلاً.
+      const isDuplicate = appendedItemCount === 0 && duplicateCount > 0;
+      if (appendedItemCount > 0) {
+        await notifyOrderState(
+          recentOrder.id,
+          orderData.fullName,
+          orderData.phoneNumber,
+        );
+      }
+
       return {
         success: true,
-        message: "Order Updated Successfully",
-        redirectTo: `/thank-you?orderId=${recentOrder.id}`,
+        message: isDuplicate
+          ? "طلبك السابق ما زال قيد التجهيز — لم نُضِف نسخة ثانية من المنتج"
+          : "Order Updated Successfully",
+        redirectTo: `/thank-you?orderId=${recentOrder.id}${isDuplicate ? "&dup=1" : ""}`,
       };
     }
 
@@ -582,6 +461,8 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
             image: item.image,
             price: item.price,
             costPrice: item.costPrice,
+                offersSnapshot: item.offers,
+                lineTotal: computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice,
             shippingPrice: item.shippingPrice,
           },
         });
@@ -597,6 +478,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
         },
       });
 
+      await reserveOrderStock(tx, insertedOrder.id);
       return insertedOrder.id;
     });
 
@@ -605,6 +487,18 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
     const cookieStore = await cookies();
     cookieStore.delete("guest-shipping-info");
 
+    // تأكيد واتساب لطلبات المتجر — لم تكن تُرسَل إطلاقاً من هذا المسار، فيبقى
+    // زبون المتجر بلا أي إشعار فيعيد الطلب ظنّاً أنه لم ينجح.
+    // الطلبات المشبوهة (status: banned) مستثناة.
+    if (!isFraud) {
+      await notifyOrderState(
+        insertedOrderId,
+        orderData.fullName,
+        orderData.phoneNumber,
+      );
+    }
+
+    await grantOrderAccess(insertedOrderId);
     return {
       success: true,
       message: "Order created",
@@ -625,6 +519,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
 
 // Get Order By Id
 export async function getOrderById(orderId: string) {
+  await assertOrderAccess(await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true } }));
   const data = await prisma.order.findFirst({
     where: { id: orderId },
     include: {
@@ -633,10 +528,78 @@ export async function getOrderById(orderId: string) {
           product: { select: { categories: true } },
         },
       },
-      user: true,
+      // لا نُعيد سجل المستخدم كاملاً: `user: true` كان يُخرج `password` (تجزئة
+      // كلمة المرور) والعنوان ووسيلة الدفع من إجراء خادم عام يُنادى من المتصفح.
+      user: { select: { id: true, name: true, email: true } },
     },
   });
   return convertToPlainObject(data);
+}
+
+/**
+ * بيانات صفحة الشكر — بلا أي معلومات شخصية.
+ *
+ * تُرسل حدث الشراء إلى Conversions API من الخادم (حيث تبقى بيانات المطابقة:
+ * البريد والهاتف والاسم)، وتُعيد للمتصفح ما يلزم حدث البكسل والتحويل فقط.
+ * بديل استدعاء `getOrderById` من العميل، الذي كان يُنزل بيانات الزبون كاملة
+ * إلى أي متصفح يملك معرّف الطلب.
+ *
+ * معرّف الحدث `purchase-${orderId}` ثابت: تحديث الصفحة لا يُنتج شراءً ثانياً،
+ * والنسختان (متصفح/خادم) تُدمجان عند ميتا.
+ */
+export async function getThankYouPurchaseData(orderId: string) {
+  await assertOrderAccess(await prisma.order.findUnique({ where: { id: orderId }, select: { id: true, userId: true } }));
+  const order = await prisma.order.findFirst({
+    where: { id: orderId },
+    include: {
+      orderitems: { include: { product: { select: { categories: true } } } },
+      user: { select: { email: true } },
+    },
+  });
+  if (!order) return null;
+
+  const eventId = `purchase-${order.id}`;
+  const value = toIqdAmount(order.totalPrice);
+  const contentIds = order.orderitems.map((item) => item.productId);
+  const [firstName, ...restName] = (order.fullName ?? "").trim().split(/\s+/);
+
+  await sendCAPIEvent("Purchase", eventId, {
+    eventSourceUrl: null,
+    value,
+    currency: "IQD",
+    content_ids: contentIds,
+    content_type: "product",
+    content_name: `Order ${order.id}`,
+    email: order.user?.email,
+    phone: order.phoneNumber,
+    firstName: firstName || undefined,
+    lastName: restName.join(" ") || undefined,
+    city: order.governorate,
+    country: "IQ",
+    externalId: order.id,
+  }).catch(() => {});
+
+  return {
+    eventId,
+    value,
+    currency: "IQD",
+    contentIds,
+    numItems: order.orderitems.length,
+    redirectCategory: order.orderitems[0]?.product?.categories?.[0] ?? "",
+    // ملخّص الطلب ليراه الزبون على الصفحة — لا بيانات شخصية فيه (لا اسم ولا هاتف
+    // ولا عنوان). صفحة الشكر كانت لا تعرض شيئاً، فيعيد الزبون الطلب ظنّاً أنه لم
+    // ينجح؛ وهذا سبب مشكلة مضاعفة الكمية من أصلها.
+    summary: {
+      orderNo: order.id.slice(0, 8).toUpperCase(),
+      status: order.status,
+      totalPrice: toIqdAmount(order.totalPrice),
+      shippingPrice: toIqdAmount(order.shippingPrice),
+      items: order.orderitems.map((item) => ({
+        name: item.name,
+        qty: item.qty,
+      })),
+    },
+  };
 }
 
 // Get All Orders
@@ -653,6 +616,7 @@ export async function getAllOrders({
   status?: string;
   sort?: string;
 }) {
+  await requireStaff();
   const queryFilter = buildOrdersFilter(query, status);
 
   // Handle Product Sorting
@@ -745,6 +709,7 @@ function buildOrdersFilter(query: string, status?: string) {
       : {};
 
   if (status && status !== "all") filter.status = status;
+  filter.isArchived = false;
   return filter;
 }
 
@@ -762,6 +727,7 @@ export async function getOrdersSummaryStats({
   query: string;
   status?: string;
 }) {
+  await requireStaff();
   const result = await prisma.order.aggregate({
     where: buildOrdersFilter(query, status),
     _count: { _all: true },
@@ -798,6 +764,7 @@ export async function getAllOrdersForExport({
   status?: string;
   sort?: string;
 }) {
+  await requireStaff();
   const queryFilter = buildOrdersFilter(query, status);
 
   const data = await prisma.order.findMany({
@@ -830,10 +797,7 @@ export async function getMyOrders({
   page: number;
   query?: string;
 }) {
-  const session = await auth();
-  if (!session) {
-    throw new Error("User is not authorized");
-  }
+  const session = await requireUser();
 
   const data = await prisma.order.findMany({
     where: { userId: session.user.id },
@@ -854,15 +818,20 @@ export async function getMyOrders({
 
 // Delete an Order
 export async function deleteOrder(id: string) {
+  await requireStaff();
   try {
     const res = await prisma.order.findFirst({
       where: { id },
     });
     if (res?.status === "delete") {
-      await prisma.order.delete({
+      await prisma.order.update({
         where: { id },
+        data: { isArchived: true },
       });
     } else {
+      if (!res || !["home", "banned", "unavailable", "waiting"].includes(res.status)) {
+        return { success: false, message: "لا يمكن حذف طلب خرج للتوصيل؛ حدّث حالته للحفاظ على المخزون والتاريخ المالي" };
+      }
       await prisma.order.update({
         where: { id },
         data: {
@@ -887,6 +856,8 @@ export async function deleteOrder(id: string) {
 
 // Update Order
 export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
+  await requireStaff();
+  after(() => processReturnOutbox().then(() => {}));
   try {
     const order = updateOrderSchema.parse(data);
 
@@ -909,10 +880,44 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
       },
     });
 
+    const removedIds = order.removedProductIds ?? [];
+
+    // طلب بلا منتجات يكسر التوصيل وحساب الأرباح — ارفضه قبل أي تعديل
+    if (removedIds.length > 0) {
+      const remaining = await prisma.orderItem.count({
+        where: { orderId: order.id, productId: { notIn: removedIds } },
+      });
+      if (remaining === 0) {
+        return {
+          success: false,
+          message: "لا يمكن حذف كل المنتجات من الطلب",
+        };
+      }
+    }
+
+    // بيانات العناصر بعد التعديل — تُستخدم لاحقاً في إرسال التوصيل والواتساب
+    let freshItems: { name: string; selectedColor: string | null; qty: number }[] =
+      existingOrder?.orderitems?.map((i) => ({ ...i, qty: 0 })) ?? [];
+    let freshQuantity = existingOrder?.quantity ?? 0;
+
     await prisma.$transaction(async (tx) => {
+      // احذف العناصر التي أزالها المشرف أولاً، حتى لا يُحدَّث عنصر محذوف
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${order.id}::uuid FOR UPDATE`;
+      const locked = await tx.order.findUniqueOrThrow({ where: { id: order.id }, include: { orderitems: true } });
+      if (locked.inventoryDispatchedAt && (removedIds.length > 0 || order.orderItems?.some(item => locked.orderitems.find(i => i.productId === item.productId)?.qty !== item.qty))) {
+        throw new Error("لا يمكن تغيير أصناف أو كميات طلب خرج من المخزن؛ سجّل الراجع وأنشئ طلباً جديداً");
+      }
+      if (removedIds.length > 0) {
+        await tx.orderItem.deleteMany({
+          where: { orderId: order.id, productId: { in: removedIds } },
+        });
+      }
+
       // Update each OrderItem qty if provided
       if (order.orderItems && order.orderItems.length > 0) {
         for (const item of order.orderItems) {
+          if (removedIds.includes(item.productId)) continue;
+          if (locked.orderitems.find(existing => existing.productId === item.productId)?.qty === item.qty) continue;
           await tx.orderItem.update({
             where: {
               orderId_productId: {
@@ -920,7 +925,7 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
                 productId: item.productId,
               },
             },
-            data: { qty: item.qty },
+            data: { qty: item.qty, lineTotal: computeOrderPricing({ quantity: item.qty, unitPrice: Number(locked.orderitems.find(i => i.productId === item.productId)!.price), shippingPrice: 0, offers: locked.orderitems.find(i => i.productId === item.productId)!.offersSnapshot }).itemsPrice },
           });
         }
       }
@@ -929,7 +934,19 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
       const updatedItems = await tx.orderItem.findMany({
         where: { orderId: order.id },
       });
+
+      // حارس ضد التزامن: لو أفرغ الحذف الطلب رغم الفحص السابق، تراجع عن كل شيء
+      if (removedIds.length > 0 && updatedItems.length === 0) {
+        throw new Error("لا يمكن حذف كل المنتجات من الطلب");
+      }
+
       const newQuantity = updatedItems.reduce((sum, i) => sum + i.qty, 0);
+      freshItems = updatedItems.map((i) => ({
+        name: i.name,
+        selectedColor: i.selectedColor,
+        qty: i.qty,
+      }));
+      freshQuantity = newQuantity;
 
       const enteringPending =
         order.status === "pending" && existingOrder?.status !== "pending";
@@ -943,8 +960,8 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           address: order.address,
           quantity: newQuantity,
           totalPrice: order.totalPrice,
+          manualDiscount: updatedItems.reduce((sum, item) => sum + Number(item.lineTotal ?? Number(item.price) * item.qty), 0) + Number(order.shippingPrice) - Number(order.totalPrice),
           shippingPrice: order.shippingPrice,
-          status: order.status,
           notes: order.notes,
           actualShippingCost: order.actualShippingCost,
           ...(order.deliveryTrackingId !== undefined && {
@@ -956,6 +973,7 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
           }),
         },
       });
+      await transitionOrder(tx, order.id, order.status, "admin-edit");
     });
 
     // ── إرسال تلقائي لشركة التوصيل عند الانتقال إلى "pending" ──
@@ -966,10 +984,10 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
         phoneNumber: order.phoneNumber ?? existingOrder?.phoneNumber,
         governorate: order.governorate ?? existingOrder?.governorate,
         address: order.address ?? existingOrder?.address,
-        quantity: existingOrder?.quantity,
+        quantity: freshQuantity,
         totalPrice: order.totalPrice ?? existingOrder?.totalPrice,
         notes: order.notes ?? existingOrder?.notes,
-        orderitems: existingOrder?.orderitems,
+        orderitems: freshItems,
       });
 
       const result = await getDeliveryProvider().sendOrder(input);
@@ -985,25 +1003,6 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
     }
 
     revalidatePath("/admin/orders");
-    // WhatsApp: رسالة الطلب الراجع (كانت عبر n8n سابقاً)
-    if (order.status === "returned" && existingOrder?.status !== "returned") {
-      try {
-        const productNames =
-          existingOrder?.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
-        const price = order.totalPrice ?? existingOrder?.totalPrice ?? 0;
-
-        await sendOrderReturned({
-          fullName: order.fullName ?? existingOrder?.fullName ?? "",
-          phoneNumber:
-            order.phoneNumber ?? existingOrder?.phoneNumber ?? "",
-          product: productNames,
-          price: price.toString(),
-        });
-      } catch (err) {
-        console.error("❌ WhatsApp returned order error:", err);
-      }
-    }
-
     return {
       success: true,
       message: "Order Updated Successfully",
@@ -1016,12 +1015,14 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
 
 // Bulk Update Order Status
 export async function bulkUpdateOrderStatus(ids: string[], status: string) {
+  await requireStaff();
+  after(() => processReturnOutbox().then(() => {}));
   try {
     // ── أولاً: حدّث الحالة في قاعدة البيانات لجميع الطلبات ──
-    await prisma.order.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
+    ids = [...new Set(ids)];
+    await prisma.$transaction(async tx => {
+      for (const id of ids.sort()) await transitionOrder(tx, id, status, "admin-bulk");
+    }, { timeout: 60000 });
 
     // ── ثانياً: إن كانت الحالة الجديدة "pending" → أرسل لمدن ──
     let modonSent = 0;
@@ -1029,14 +1030,12 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     if (status === "pending") {
       // مسح بيانات التوصيل القديمة لإعادة الإرسال دائماً
-      await prisma.order.updateMany({
-        where: { id: { in: ids } },
-        data: { deliveryTrackingId: null, deliverySentAt: null },
-      });
+
 
       const ordersToSend = await prisma.order.findMany({
         where: {
           id: { in: ids },
+          deliveryTrackingId: null,
         },
         select: {
           id: true,
@@ -1085,34 +1084,6 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
     revalidatePath("/admin/orders");
 
-    // WhatsApp: رسائل الطلبات الراجعة (كانت عبر n8n سابقاً)
-    if (status === "returned") {
-      const returnedOrders = await prisma.order.findMany({
-        where: { id: { in: ids } },
-        select: {
-          fullName: true,
-          phoneNumber: true,
-          totalPrice: true,
-          orderitems: { select: { name: true } },
-        },
-      });
-
-      for (const o of returnedOrders) {
-        try {
-          const productNames =
-            o.orderitems?.map((i: any) => i.name).join(" + ") ?? "";
-
-          await sendOrderReturned({
-            fullName: o.fullName ?? "",
-            phoneNumber: o.phoneNumber ?? "",
-            product: productNames,
-            price: o.totalPrice?.toString() ?? "0",
-          });
-        } catch (err) {
-          console.error("❌ WhatsApp returned order error:", err);
-        }
-      }
-    }
     const baseMsg = `تم تحديث ${ids.length} طلب بنجاح.`;
     const modonMsg =
       status === "pending" && modonSent + modonFailed > 0
@@ -1133,6 +1104,7 @@ export async function bulkUpdateOrderStatus(ids: string[], status: string) {
 
 // إعادة إرسال طلب واحد لمدن يدوياً (للطلبات التي فشل إرسالها)
 export async function resendOrderToModon(orderId: string) {
+  await requireStaff();
   try {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -1194,6 +1166,7 @@ export async function countOrdersByDateAndStatus({
   to: Date;
   fromStatus: string;
 }) {
+  await requireStaff();
   const toLocalMidnight = (d: Date, endOfDay: boolean) => {
     const iso = d.toISOString().split("T")[0];
     const [y, m, day] = iso.split("-").map(Number);
@@ -1224,6 +1197,7 @@ export async function bulkUpdateOrderStatusByDateRange({
   fromStatus: string;
   toStatus: string;
 }) {
+  await requireStaff();
   try {
     // Parse date string as local Iraq time (UTC+3)
     const toLocalMidnight = (d: Date, endOfDay: boolean) => {
@@ -1240,16 +1214,12 @@ export async function bulkUpdateOrderStatusByDateRange({
     const startDate = toLocalMidnight(new Date(from), false);
     const endDate = toLocalMidnight(new Date(to), true);
 
-    const result = await prisma.order.updateMany({
-      where: {
-        status: fromStatus,
-        createdAt: { gte: startDate, lte: endDate },
-      },
-      data: { status: toStatus },
-    });
+    const selected = await prisma.order.findMany({ where: { status: fromStatus, createdAt: { gte: startDate, lte: endDate } }, select: { id: true } });
+    const result = await bulkUpdateOrderStatus(selected.map(o => o.id), toStatus);
+    if (!result.success) throw new Error(result.message);
 
     revalidatePath("/admin/orders");
-    return { success: true, count: result.count };
+    return { success: true, count: selected.length };
   } catch (error) {
     const { success, formError } = formatError(error);
     return { success, message: formError, count: 0 };
@@ -1257,51 +1227,11 @@ export async function bulkUpdateOrderStatusByDateRange({
 }
 
 // Update Order To Paid
-export async function updateOrderToPaid({
-  orderId,
-  paymentResult,
-}: {
-  orderId: string;
-  paymentResult?: {
-    id: string;
-    status: string;
-    email_address: string;
-    pricePaid: string;
-  };
-}) {
-  const order = await prisma.order.findFirst({
-    where: {
-      id: orderId,
-    },
-    include: {
-      orderitems: true,
-    },
-  });
 
-  if (!order) throw new Error("Order not found");
-
-  if (order.isPaid) throw new Error("Order is already paid");
-
-  // Transaction
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      isPaid: true,
-      paidAt: new Date(),
-      paymentResult,
-    },
-  });
-
-  revalidatePath(`/order/${orderId}`);
-
-  return {
-    success: true,
-    message: "Order Paid Successfully",
-  };
-}
 
 // Update order to delivered
 export async function deliverOrder(orderId: string) {
+  await requireStaff();
   try {
     const order = await prisma.order.findFirst({
       where: {
@@ -1311,12 +1241,7 @@ export async function deliverOrder(orderId: string) {
 
     if (!order) throw new Error("Order not found");
 
-    await prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: "completed",
-      },
-    });
+    await setOrderStatus(orderId, "completed", "admin-deliver");
 
     revalidatePath(`/order/${orderId}`);
     return {
@@ -1336,6 +1261,7 @@ type SalesDataType = {
 
 // Get sales data and order statistics
 export async function getOrderSummery() {
+  await requireAdministrator();
   const now = new Date();
   const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -1344,7 +1270,7 @@ export async function getOrderSummery() {
   // Get monthly sales
   const salesDataRaw = await prisma.$queryRaw<
     Array<{ month: string; totalSales: Prisma.Decimal }>
-  >`SELECT to_char("createdAt", 'MM/YY') as "month", sum("totalPrice") as "totalSales" FROM "Order" GROUP BY to_char("createdAt", 'MM/YY') ORDER BY min("createdAt")`;
+  >`SELECT to_char("createdAt", 'MM/YY') as "month", sum("totalPrice") as "totalSales" FROM "Order" WHERE status IN ('completed', 'completedAccountant') GROUP BY to_char("createdAt", 'MM/YY') ORDER BY min("createdAt")`;
 
   const salesData: SalesDataType = salesDataRaw.map((item) => ({
     month: item.month,
@@ -1356,7 +1282,7 @@ export async function getOrderSummery() {
   thirtyDaysAgo.setDate(now.getDate() - 29);
   const dailySalesDataRaw = await prisma.$queryRaw<
     Array<{ day: string; totalSales: Prisma.Decimal }>
-  >`SELECT to_char("createdAt", 'DD/MM') as "day", sum("totalPrice") as "totalSales" FROM "Order" WHERE "createdAt" >= ${thirtyDaysAgo} GROUP BY to_char("createdAt", 'DD/MM'), date_trunc('day', "createdAt") ORDER BY min("createdAt")`;
+  >`SELECT to_char("createdAt", 'DD/MM') as "day", sum("totalPrice") as "totalSales" FROM "Order" WHERE status IN ('completed', 'completedAccountant') AND "createdAt" >= ${thirtyDaysAgo} GROUP BY to_char("createdAt", 'DD/MM'), date_trunc('day', "createdAt") ORDER BY min("createdAt")`;
 
   const dailySalesData = dailySalesDataRaw.map((item) => ({
     month: item.day,
@@ -1368,25 +1294,11 @@ export async function getOrderSummery() {
     take: 6,
   });
 
-  // Calculate total profit
-  const totalProfitRaw = await prisma.orderItem.findMany({
-    where: {
-      order: {
-        createdAt: { gte: currentMonthStart },
-        status: { not: "Cancelled" },
-      },
-    },
-    select: {
-      price: true,
-      qty: true,
-      costPrice: true,
-    },
-  });
-
-  const totalProfit = totalProfitRaw.reduce((acc, item) => {
-    const cost = Number(item.costPrice) * item.qty;
-    return acc + (Number(item.price) * item.qty - cost);
-  }, 0);
+  const [profitStats, expenses] = await Promise.all([
+    getOrderProfitStats({ from: currentMonthStart, to: now }),
+    getExpenseStatsForPeriod(currentMonthStart, now),
+  ]);
+  const totalProfit = profitStats.productStats.reduce((sum, product) => sum + product.totalProfit, 0) - expenses.totalOverheadCost;
 
   // --- Real Stats Calculation ---
 
@@ -1407,6 +1319,7 @@ export async function getOrderSummery() {
     const result = await prisma.order.aggregate({
       _sum: { totalPrice: true },
       where: {
+        status: { in: REVENUE_STATUSES },
         createdAt: {
           gte: start,
           ...(end ? { lte: end } : {}),
@@ -1492,6 +1405,7 @@ export async function getOrderProfitStats({
   from: Date;
   to: Date;
 }) {
+  await requireAdministrator();
   // Iraq is UTC+3: midnight local = 21:00 prev day UTC, end of day = 20:59:59 UTC
   const toIraqDay = (d: Date, endOfDay: boolean) => {
     const iso = new Date(d).toISOString().split("T")[0];
@@ -1514,6 +1428,7 @@ export async function getOrderProfitStats({
         id: true,
         createdAt: true,
         totalPrice: true,
+        manualDiscount: true,
         shippingPrice: true,
         actualShippingCost: true,
         governorate: true,
@@ -1524,6 +1439,8 @@ export async function getOrderProfitStats({
             qty: true,
             price: true,
             costPrice: true,
+            costTotal: true,
+            lineTotal: true,
             shippingPrice: true,
           },
         },
@@ -1632,13 +1549,13 @@ export async function getOrderProfitStats({
 
     // Distribute proportionally among items (handles multi-product + bundle discounts)
     const rawItemsTotal = orderItems.reduce(
-      (sum, i) => sum + Number(i.price) * i.qty,
+      (sum, i) => sum + Number(i.lineTotal ?? Number(i.price) * i.qty),
       0,
     );
 
     // Flag orders that do not add up. Tolerance is 1 IQD (values are stored in
     // thousands), which is well below any real rounding.
-    const expectedTotal = rawItemsTotal + Number(order.shippingPrice);
+    const expectedTotal = rawItemsTotal + Number(order.shippingPrice) - Number(order.manualDiscount);
     const totalDiff = Number(order.totalPrice) - expectedTotal;
     if (Math.abs(totalDiff) > 0.001) {
       inconsistentOrders.push({
@@ -1652,16 +1569,16 @@ export async function getOrderProfitStats({
     }
 
     for (const item of orderItems) {
-      const rawRevenue = Number(item.price) * item.qty;
+      const rawRevenue = Number(item.lineTotal ?? Number(item.price) * item.qty);
       const revenue =
         rawItemsTotal > 0
           ? (rawRevenue / rawItemsTotal) * orderNetRevenue
           : rawRevenue;
 
       // Default to the frozen snapshot cost; override with FEFO when available.
-      let cost = Number(item.costPrice) * item.qty;
+      let cost = Number(item.costTotal ?? Number(item.costPrice) * item.qty);
       const ctx = fefoContexts.get(item.productId);
-      if (ctx && new Date(order.createdAt) >= ctx.fefoStart) {
+      if (item.costTotal === null && ctx && new Date(order.createdAt) >= ctx.fefoStart) {
         const key = saleKey(order.id, item.productId);
         const fefoCost = ctx.saleCost.get(key);
         if (fefoCost !== undefined) {
@@ -1774,62 +1691,9 @@ export async function getOrderProfitStats({
 
 // ── مزامنة حالات طلبات مدن ──
 export async function syncModonOrders() {
-  try {
-    // جلب جميع الطلبات المحلية التي لديها معرّف تتبّع وليست مكتملة/راجعة نهائياً
-    const localOrders = await prisma.order.findMany({
-      where: {
-        deliveryTrackingId: { not: null },
-        status: { notIn: ["completed", "returnReceived"] },
-      },
-      select: { id: true, deliveryTrackingId: true, status: true },
-    });
-
-    if (localOrders.length === 0) {
-      return {
-        success: false,
-        message: "لا توجد طلبات للمزامنة",
-        updatedOrders: 0,
-      };
-    }
-
-    const remoteOrders = await getDeliveryProvider().fetchRemoteOrders(
-      localOrders.map((o) => String(o.deliveryTrackingId)),
-    );
-
-    // فهرسة الطلبات البعيدة حسب معرّف التتبّع لتسريع المطابقة
-    const byTrackingId = new Map(remoteOrders.map((o) => [o.trackingId, o]));
-
-    let updatedCount = 0;
-
-    for (const localOrder of localOrders) {
-      const remote = byTrackingId.get(String(localOrder.deliveryTrackingId));
-      if (!remote || !remote.localStatus) continue;
-
-      if (remote.localStatus !== localOrder.status) {
-        const updateData: Prisma.OrderUpdateInput = {
-          status: remote.localStatus,
-        };
-        if (remote.localStatus === "completed" && remote.collectedPrice != null) {
-          updateData.deliveryCollectedPrice = remote.collectedPrice / 1000;
-        }
-        await prisma.order.update({
-          where: { id: localOrder.id },
-          data: updateData,
-        });
-        updatedCount++;
-      }
-    }
-
-    revalidatePath("/admin/orders");
-    return {
-      success: true,
-      message: `تم التزامن وتحديث حالة ${updatedCount} طلب بنجاح.`,
-      updatedOrders: updatedCount,
-    };
-  } catch (error) {
-    const { success, formError } = formatError(error);
-    return { success, message: formError, updatedOrders: 0 };
-  }
+  await requireStaff();
+  after(() => processReturnOutbox().then(() => {}));
+  return syncModonOrdersInternal();
 }
 
 // Import Orders from Excel
@@ -1974,6 +1838,7 @@ export async function importOrders(data: any[]) {
 
 // ── إحصائيات مدن ──
 export async function getModonStats() {
+  await requireStaff();
   const MODON_STATUSES = [
     "pending",
     "completed",

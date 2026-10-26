@@ -45,5 +45,20 @@ export async function getAvailableStock(
   stock: number,
 ): Promise<number> {
   const sold = await getSoldQuantities([productId]);
-  return Math.max(0, (stock ?? 0) - (sold.get(productId) ?? 0));
+  const held = await prisma.orderItem.aggregate({ where: { productId, order: { status: "home", reservationExpiresAt: { gt: new Date() } } }, _sum: { qty: true } });
+  return Math.max(0, (stock ?? 0) - (sold.get(productId) ?? 0) - (held._sum.qty ?? 0));
+}
+
+/** Batch lookup for admin pickers: the same formula without two queries per row. */
+export async function getAvailableStocks(products: { id: string; stock: number }[]): Promise<Map<string, number>> {
+  if (!products.length) return new Map();
+  const ids = products.map(product => product.id);
+  const [sold, held] = await Promise.all([
+    getSoldQuantities(ids),
+    prisma.orderItem.groupBy({ by: ["productId"], where: { productId: { in: ids },
+      order: { status: "home", reservationExpiresAt: { gt: new Date() } } }, _sum: { qty: true } }),
+  ]);
+  const reservations = new Map(held.map(item => [item.productId, item._sum.qty || 0]));
+  return new Map(products.map(product => [product.id,
+    Math.max(0, product.stock - (sold.get(product.id) || 0) - (reservations.get(product.id) || 0))]));
 }

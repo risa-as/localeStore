@@ -1,4 +1,5 @@
 "use server";
+import { requireAdministrator, requireStaff } from "@/lib/authorization";
 import { prisma } from "@/db/prisma";
 import { convertToPlainObject, formatError } from "../utils";
 import { LATEST_PRODUCTS_LIMIT, PAGE_SIZE } from "../constants";
@@ -28,7 +29,7 @@ export const getLatestProducts = unstable_cache(
 export const getProductBySlug = unstable_cache(
   async (slug: string) => {
     const data = await prisma.product.findFirst({
-      where: { slug },
+      where: { slug, isArchived: false },
     });
     return convertToPlainObject(data) as any;
   },
@@ -43,6 +44,11 @@ export async function getProductById(productId: string) {
   });
 
   return convertToPlainObject(data) as any;
+}
+
+export async function getRelatedProductOptions() {
+  await requireStaff();
+  return prisma.product.findMany({ where: EXCLUDE_INTERNAL_PRODUCTS, select: { id: true, name: true }, orderBy: { name: "asc" } });
 }
 
 // Get all products
@@ -134,6 +140,7 @@ export async function getAllProducts({
 
 // Delete a product
 export async function deleteProduct(id: string) {
+  await requireAdministrator();
   try {
     const productExists = await prisma.product.findFirst({
       where: { id },
@@ -141,14 +148,14 @@ export async function deleteProduct(id: string) {
 
     if (!productExists) throw new Error("Product not found");
 
-    await prisma.product.delete({ where: { id } });
+    await prisma.product.update({ where: { id }, data: { isArchived: true, isFeatured: false } });
 
     revalidatePath("/admin/products");
     revalidateTag("products", {});
 
     return {
       success: true,
-      message: "Product deleted successfully",
+      message: "تمت أرشفة المنتج مع حفظ سجل الطلبات والتكاليف",
     };
   } catch (error) {
     const { formError } = formatError(error);
@@ -158,6 +165,7 @@ export async function deleteProduct(id: string) {
 
 // Create a product
 export async function createProduct(data: z.infer<typeof insertProductSchema>) {
+  await requireStaff();
   try {
     const product = insertProductSchema.parse(data);
 
@@ -203,6 +211,7 @@ export async function createProduct(data: z.infer<typeof insertProductSchema>) {
 
 // Update a product
 export async function updateProduct(data: z.infer<typeof updateProductSchema>) {
+  await requireStaff();
   try {
     const product = updateProductSchema.parse(data);
     const productExists = await prisma.product.findFirst({
@@ -254,7 +263,7 @@ export async function getAllCategories() {
 export const getFeaturedProducts = unstable_cache(
   async () => {
     const data = await prisma.product.findMany({
-      where: { isFeatured: true },
+      where: { isFeatured: true, ...EXCLUDE_INTERNAL_PRODUCTS },
       orderBy: { createdAt: "desc" },
       take: 4,
     });

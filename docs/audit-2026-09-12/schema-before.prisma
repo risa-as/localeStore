@@ -1,0 +1,405 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String
+  slug          String       @unique(map: "product_slug_idx")
+  categories    String[]     @default([])
+  images        String[]
+  description   String
+  stock         Int
+  price         Decimal      @default(0) @db.Decimal(12, 2)
+  rating        Decimal      @default(0) @db.Decimal(3, 2)
+  numReviews    Int          @default(0)
+  isFeatured    Boolean      @default(false)
+  banner        String?
+  createdAt     DateTime     @default(now()) @db.Timestamp(6)
+  costPrice     Decimal      @default(0) @db.Decimal(12, 2)
+  colors        String[]
+  shippingPrice Decimal      @default(0) @db.Decimal(12, 2)
+  offers        String?
+  OrderItem     OrderItem[]
+  Review        Review[]
+  AdCampaign    AdCampaign[]
+  batches       ProductBatch[]
+  socialPosts   SocialPost[]
+  adSpends      AdSpendDaily[]
+  campaignMaps  CampaignProductMap[]
+}
+
+model ProductBatch {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String   @db.Uuid
+  batchNumber String?
+  quantity    Int
+  costPrice   Decimal  @default(0) @db.Decimal(12, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+}
+
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String    @default("NO_NAME")
+  email         String    @unique(map: "user_email_idx")
+  emailVerified DateTime? @db.Timestamp(6)
+  image         String?
+  password      String?
+  role          String    @default("user")
+  address       Json?     @db.Json
+  paymentMethod String?
+  createdAt     DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt     DateTime  @updatedAt
+  account       Account[]
+  Cart          Cart[]
+  Order         Order[]
+  Review        Review[]
+  session       Session[]
+}
+
+model Account {
+  userId            String   @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now()) @db.Timestamp(6)
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @id
+  userId       String   @db.Uuid
+  expires      DateTime @db.Timestamp(6)
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Cart {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String?  @db.Uuid
+  sessionCartId String
+  items         Json[]   @default([]) @db.Json
+  itemsPrice    Decimal  @db.Decimal(12, 2)
+  totalPrice    Decimal  @db.Decimal(12, 2)
+  shippingPrice Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now()) @db.Timestamp(6)
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Order {
+  id                  String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName            String
+  phoneNumber         String
+  governorate         String
+  address             String
+  quantity            Int
+  totalPrice          Decimal     @default(0) @db.Decimal(12, 2)
+  status              String      @default("home")
+  createdAt           DateTime    @default(now()) @db.Timestamp(6)
+  deliveredAt         DateTime?   @db.Timestamp(6)
+  isDelivered         Boolean     @default(false)
+  isPaid              Boolean     @default(false)
+  paidAt              DateTime?   @db.Timestamp(6)
+  paymentResult       Json?       @db.Json
+  userId              String?     @db.Uuid
+  user                User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderitems          OrderItem[]
+  notes               String?
+  ip                  String?
+  shippingPrice       Decimal     @default(0) @db.Decimal(12, 2)
+  actualShippingCost  Decimal     @default(0) @db.Decimal(12, 2)
+  // حقول التوصيل العامة — الأعمدة الفعلية تبقى بأسماء modon* (لا ترحيل بيانات)
+  deliveryTrackingId     String?   @map("modonQrId")
+  deliveryRawStatus      String?   @map("modonStatus")
+  deliverySentAt         DateTime? @map("modonSentAt")
+  deliveryCollectedPrice Decimal?  @map("modonCollectedPrice") @db.Decimal(12, 2)
+}
+
+model OrderItem {
+  orderId       String  @db.Uuid
+  productId     String  @db.Uuid
+  qty           Int
+  price         Decimal @db.Decimal(12, 2)
+  name          String
+  slug          String
+  image         String
+  costPrice     Decimal @default(0) @db.Decimal(12, 2)
+  selectedColor String?
+  shippingPrice Decimal @default(0) @db.Decimal(12, 2)
+  order         Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product       Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@id([orderId, productId], map: "orderitems_orderId_productId_pk")
+}
+
+model Review {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId             String   @db.Uuid
+  productId          String   @db.Uuid
+  rating             Int
+  title              String
+  description        String
+  isVerifiedPurchase Boolean  @default(true)
+  createdAt          DateTime @default(now()) @db.Timestamp(6)
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Category {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+}
+
+model ShippingSettings {
+  id          String   @id @default("default")
+  baghdadCost Decimal  @default(4000) @db.Decimal(12, 2)
+  othersCost  Decimal  @default(5000) @db.Decimal(12, 2)
+  updatedAt   DateTime @updatedAt
+}
+
+model AdCampaign {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String   @db.Uuid
+  fromDate  DateTime @db.Date
+  toDate    DateTime @db.Date
+  amount    Decimal  @db.Decimal(12, 2)
+  currency  String   @default("IQD")
+  notes     String?
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Expense {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  category    String
+  description String
+  fromDate    DateTime @db.Date
+  toDate      DateTime @db.Date
+  amount      Decimal  @db.Decimal(12, 2)
+  notes       String?
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+}
+
+model DealSettings {
+  id        String   @id @default("default")
+  isActive  Boolean  @default(false)
+  endDate   DateTime @db.Timestamp(6)
+  productId String?  @db.Uuid
+  title     String   @default("صفقة الشهر")
+  updatedAt DateTime @updatedAt
+}
+
+model SiteSettings {
+  id        String   @id @default("default")
+  logoUrl   String   @default("/images/logo.svg")
+  updatedAt DateTime @updatedAt
+}
+
+model WhatsAppFailedDelivery {
+  id        String   @id @default(cuid())
+  phone     String
+  status    String
+  messageId String?
+  errorCode String?
+  createdAt DateTime @default(now())
+}
+
+model WaConversation {
+  id                 String      @id @default(cuid())
+  phone              String      @unique // بصيغة محلية 07XXXXXXXXX
+  customerName       String?
+  lastMessageAt      DateTime    @default(now())
+  lastMessagePreview String?
+  unreadCount        Int         @default(0)
+  windowExpiresAt    DateTime? // آخر رسالة واردة + 24 ساعة (نافذة الرد المجاني)
+  createdAt          DateTime    @default(now())
+  messages           WaMessage[]
+}
+
+model WaMessage {
+  id             String         @id @default(cuid())
+  conversationId String
+  conversation   WaConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  waMessageId    String?        @unique // معرف Meta — لمنع التكرار وربط حالات التسليم
+  direction      String // "in" | "out"
+  type           String         @default("text") // text|template|image|audio|video|document|sticker|unsupported
+  body           String?
+  mediaId        String? // معرف الوسائط لدى Meta — تُجلب عبر مسار الوسيط
+  status         String         @default("sent") // sending|sent|delivered|read|failed
+  errorCode      String?
+  timestamp      DateTime       @default(now())
+
+  @@index([conversationId, timestamp])
+}
+
+/// اتصال Meta (فيسبوك/إنستغرام/إعلانات) — صف واحد لكل نشر (متجر واحد لكل نشر).
+/// التوكنات تُخزَّن هنا وتبقى في السيرفر فقط؛ الإجراءات تُرجع بيانات بلا توكنات.
+model MetaConnection {
+  id               String    @id @default("default")
+  fbUserId         String?
+  fbUserName       String?
+  userAccessToken  String? // توكن مستخدم طويل العمر (~60 يوماً)
+  userTokenExpires DateTime? @db.Timestamp(6)
+  scopes           String[]  @default([])
+  // القوائم المكتشَفة من Graph — تُخزَّن كما تعود لاختيار الأصول لاحقاً.
+  pages            Json? // [{ id, name, access_token, instagram_business_account? }]
+  adAccounts       Json? // [{ id, account_id, name }]
+  // الأصول المختارة حالياً للنشر والإعلان.
+  selectedPageId        String?
+  selectedPageName      String?
+  selectedPageToken     String?
+  selectedIgId          String?
+  selectedIgUsername    String?
+  selectedAdAccountId   String?
+  selectedAdAccountName String?
+  createdAt        DateTime  @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime  @updatedAt
+}
+
+/// منشور نُشر على فيسبوك و/أو إنستغرام من النظام.
+model SocialPost {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId   String?        @db.Uuid
+  caption     String?
+  imageUrls   String[]       @default([])
+  videoUrls   String[]       @default([]) // فيديو واحد كحد أقصى حالياً
+  platforms   String[]       @default([]) // ["facebook","instagram"]
+  // draft|published|partial|failed|pending_ig (فيديو إنستغرام قيد المعالجة)
+  status      String         @default("draft")
+  fbPostId    String? // معرّف منشور صفحة قابل للتعزيز {pageId}_{postId}
+  fbVideoId   String? // معرّف فيديو الصفحة (ليس منشوراً قابلاً للتعزيز)
+  igPostId    String?
+  igContainerId String? // حاوية إنستغرام بانتظار الإنهاء (فيديو قيد المعالجة)
+  error       String?
+  publishedAt DateTime?      @db.Timestamp(6)
+  createdAt   DateTime       @default(now()) @db.Timestamp(6)
+  product     Product?       @relation(fields: [productId], references: [id], onDelete: SetNull)
+  adLaunches  MetaAdLaunch[]
+
+  @@index([createdAt])
+}
+
+/// إعلان أُطلق من منشور. يُنشأ دائماً بحالة PAUSED؛ يفعّله المستخدم بنفسه.
+/// ملاحظة: dailyBudget ميزانية مخطّطة لا إنفاق فعلي — لا تُكتب في AdCampaign
+/// (ذاك جدول الإنفاق الفعلي الذي تعتمده صفحة الأرباح).
+model MetaAdLaunch {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // اختياري: قد يعيد الإعلان استخدام منشور إعلان على الصفحة لم ينشره النظام
+  // (لا SocialPost له) — عندها نسجّل المنشور المُعلَن عنه في pagePostStoryId.
+  postId      String?     @db.Uuid
+  post        SocialPost? @relation(fields: [postId], references: [id], onDelete: Cascade)
+  pagePostStoryId String? // object_story_id للمنشور الذي أُعلن عنه (عند غياب postId)
+  adAccountId String
+  campaignId  String?
+  adSetId     String?
+  creativeId  String?
+  adId        String?
+  objective   String
+  dailyBudget Decimal    @db.Decimal(12, 2) // بوحدة العملة الكاملة (مثلاً د.ع)
+  currency    String     @default("IQD")
+  adType      String     @default("boost") // boost (منشور صور) | video (إعلان فيديو)
+  destinationUrl String? // رابط زر الإعلان (صفحة هبوط المنتج)
+  cta         String? // نوع زر الحث (ORDER_NOW…)
+  // معرّف منشور الإعلان الناتج (يحمل الزر/الرابط) — لإعادة استخدامه كـ «منشور حالي».
+  effectiveStoryId String?
+  headline    String?
+  startTime   DateTime?  @db.Timestamp(6)
+  endTime     DateTime?  @db.Timestamp(6)
+  status      String     @default("PAUSED")
+  error       String?
+  createdAt   DateTime   @default(now()) @db.Timestamp(6)
+
+  @@index([postId])
+}
+
+// ─── Ad spend integration (Meta → per-product daily spend) ─────────────────
+
+/**
+ * الصرف الإعلاني اليومي الفعلي لكل حملة/منتج كما تبلغه Meta.
+ * يُستورد يومياً (يوم أمس) عبر /api/cron/adspend-sync — صف لكل (منتج، حملة، يوم).
+ * المبلغ الأصلي بعملة الحساب الإعلاني (USD عادة) + المحوّل بالدينار بسعر يومه.
+ */
+model AdSpendDaily {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId    String   @db.Uuid
+  campaignId   String
+  date         DateTime @db.Date
+  amount       Decimal  @db.Decimal(12, 2) // بعملة الحساب الإعلاني (الأصل)
+  currency     String   @default("USD")
+  amountIQD    Decimal  @db.Decimal(14, 2) // المحوّل بسعر يوم الاستهلاك
+  fxRate       Decimal? @db.Decimal(12, 4) // السعر المطبَّق (نسخة تاريخية)
+  campaignName String? // نسخة للعرض دون نداء API
+  source       String   @default("meta-daily")
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, campaignId, date])
+  @@index([date])
+  @@index([productId])
+}
+
+/** ربط يدوي (مرة واحدة) بين حملة Meta ومنتج — للحملات غير المنشأة من النظام. */
+model CampaignProductMap {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  campaignId   String   @unique
+  campaignName String?
+  productId    String   @db.Uuid
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([productId])
+}
+
+/** فترات سعر صرف الدولار — قد تتقاطع مع إعادة تقييم صريحة للمستورد. */
+model FxRate {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rate      Decimal   @db.Decimal(12, 4) // د.ع لكل 1$
+  fromDate  DateTime  @db.Date
+  toDate    DateTime? @db.Date // null = ساري حتى إشعار آخر
+  note      String?
+  createdAt DateTime  @default(now()) @db.Timestamp(6)
+}
+
+/** سجل عمليات مزامنة الصرف — آخر مزامنة، الأيام الفائتة، والأخطاء. */
+model AdSpendSyncLog {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date        DateTime @db.Date // يوم الاستهلاك الذي جُلب
+  ok          Boolean
+  accountsOk  Int      @default(0)
+  accountsErr Int      @default(0)
+  rows        Int      @default(0)
+  unlinked    Int      @default(0) // حملات بصرف بلا منتج مرتبط
+  message     String?
+  createdAt   DateTime @default(now()) @db.Timestamp(6)
+
+  @@index([date])
+}

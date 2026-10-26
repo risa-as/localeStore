@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/return-messages",
+      "schedule": "0 13 * * *"
+    },
+    {
       "path": "/api/modon/sync",
       "schedule": "0 12 * * *"
     },

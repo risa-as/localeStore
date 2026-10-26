@@ -1,23 +1,20 @@
 "use server";
 
 import { prisma } from "@/db/prisma";
-import { auth } from "@/auth";
+import { requireStaff as requireCurrentStaff } from "@/lib/authorization";
 import {
   sendWaText,
   sendWaImage,
   uploadWaMedia,
   getWaConfig,
+  WA_TEMPLATE_BODY_PREFIX,
+  type WaTemplateKind,
 } from "@/lib/whatsapp";
+import type { Prisma } from "@prisma/client";
+import { waConversationFilter, waConversationStatusWhere } from "@/lib/whatsapp-inbox-filters";
 
 async function requireStaff() {
-  const session = await auth();
-  if (
-    session?.user?.role !== "admin" &&
-    session?.user?.role !== "employee"
-  ) {
-    throw new Error("Unauthorized");
-  }
-  return session;
+  return requireCurrentStaff();
 }
 
 export async function isWhatsAppConfigured() {
@@ -25,20 +22,54 @@ export async function isWhatsAppConfigured() {
   return getWaConfig() !== null;
 }
 
-/** قائمة المحادثات مع بحث بالاسم أو الرقم */
-export async function getWaConversations(query?: string) {
-  await requireStaff();
+function isTemplateKind(value: unknown): value is WaTemplateKind {
+  return value === "confirmation" || value === "returned";
+}
 
+/** شرط البحث بالاسم/الرقم + (اختيارياً) محادثات أُرسل لها قالب معيّن */
+function conversationWhere(
+  query?: string,
+  template?: WaTemplateKind,
+): Prisma.WaConversationWhereInput {
+  const and: Prisma.WaConversationWhereInput[] = [];
+  if (query) {
+    and.push({
+      OR: [
+        { phone: { contains: query } },
+        { customerName: { contains: query, mode: "insensitive" } },
+      ],
+    });
+  }
+  if (template) {
+    and.push({
+      messages: {
+        some: {
+          direction: "out",
+          type: "template",
+          body: { startsWith: WA_TEMPLATE_BODY_PREFIX[template] },
+        },
+      },
+    });
+  }
+  return and.length > 0 ? { AND: and } : {};
+}
+
+/**
+ * قائمة المحادثات مع بحث بالاسم أو الرقم.
+ * فلاتر الحالة والقالب تُطبَّق في قاعدة البيانات قبل حد الـ 100.
+ */
+export async function getWaConversations(query?: string, template?: string, filter?: string) {
+  await requireStaff();
+  return findWaConversations({
+    ...conversationWhere(query, isTemplateKind(template) ? template : undefined),
+    ...waConversationStatusWhere(waConversationFilter(filter), new Date()),
+  });
+}
+
+async function findWaConversations(where: Prisma.WaConversationWhereInput) {
   const conversations = await prisma.waConversation.findMany({
-    where: query
-      ? {
-          OR: [
-            { phone: { contains: query } },
-            { customerName: { contains: query, mode: "insensitive" } },
-          ],
-        }
-      : undefined,
-    orderBy: { lastMessageAt: "desc" },
+    where,
+    orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
     take: 100,
   });
 
@@ -53,6 +84,46 @@ export async function getWaConversations(query?: string) {
   }));
 }
 
+/** Counts cover every matching conversation; the list contains the latest 100 matches. */
+export async function getWaInbox(query?: string, template?: string, filter?: string) {
+  await requireStaff();
+  const selectedQuery = typeof query === "string" ? query.trim() : "";
+  const selectedTemplate = isTemplateKind(template) ? template : undefined;
+  const selectedFilter = waConversationFilter(filter);
+  const now = new Date();
+  const base = conversationWhere(selectedQuery, selectedTemplate);
+  const [conversations, all, unread, open, confirmation, returned] = await Promise.all([
+    findWaConversations({ ...base, ...waConversationStatusWhere(selectedFilter, now) }),
+    prisma.waConversation.count({ where: base }),
+    prisma.waConversation.count({ where: { ...base, ...waConversationStatusWhere("unread", now) } }),
+    prisma.waConversation.count({ where: { ...base, ...waConversationStatusWhere("open", now) } }),
+    prisma.waConversation.count({ where: conversationWhere(selectedQuery, "confirmation") }),
+    prisma.waConversation.count({ where: conversationWhere(selectedQuery, "returned") }),
+  ]);
+  return {
+    conversations,
+    counts: { all, unread, open, closed: Math.max(0, all - open) },
+    templateCounts: { confirmation, returned },
+    selection: { query: selectedQuery, template: selectedTemplate ?? ("all" as const), filter: selectedFilter },
+  };
+}
+
+/** عدد المحادثات التي أُرسل لها كل قالب (ضمن نتيجة البحث الحالية) */
+export async function getWaTemplateCounts(query?: string) {
+  await requireStaff();
+
+  const [confirmation, returned] = await Promise.all([
+    prisma.waConversation.count({
+      where: conversationWhere(query, "confirmation"),
+    }),
+    prisma.waConversation.count({
+      where: conversationWhere(query, "returned"),
+    }),
+  ]);
+
+  return { confirmation, returned };
+}
+
 /** رسائل محادثة + طلبات الزبون (بالرقم) — ويصفّر عداد غير المقروء */
 export async function getWaThread(conversationId: string) {
   await requireStaff();
@@ -65,7 +136,7 @@ export async function getWaThread(conversationId: string) {
   const [messages] = await Promise.all([
     prisma.waMessage.findMany({
       where: { conversationId },
-      orderBy: { timestamp: "asc" },
+      orderBy: [{ timestamp: "desc" }, { id: "desc" }],
       take: 500,
     }),
     conversation.unreadCount > 0
@@ -84,6 +155,8 @@ export async function getWaThread(conversationId: string) {
     select: {
       id: true,
       status: true,
+      phoneNumber: true,
+      isArchived: true,
       totalPrice: true,
       createdAt: true,
       orderitems: { select: { name: true, qty: true } },
@@ -97,7 +170,7 @@ export async function getWaThread(conversationId: string) {
       customerName: conversation.customerName,
       windowExpiresAt: conversation.windowExpiresAt?.toISOString() ?? null,
     },
-    messages: messages.map((m) => ({
+    messages: messages.reverse().map((m) => ({
       id: m.id,
       direction: m.direction,
       type: m.type,
@@ -110,6 +183,8 @@ export async function getWaThread(conversationId: string) {
     orders: orders.map((o) => ({
       id: o.id,
       status: o.status,
+      phoneNumber: o.phoneNumber,
+      isArchived: o.isArchived,
       totalPrice: Number(o.totalPrice),
       createdAt: o.createdAt.toISOString(),
       items: o.orderitems.map((i) => `${i.name} × ${i.qty}`).join(" + "),

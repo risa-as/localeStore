@@ -11,6 +11,7 @@ const currency = z
 
 // Schema for inserting products
 export const insertProductSchema = z.object({
+  relatedProductIds: z.array(z.string().uuid()).max(3).optional().default([]),
   name: z.string().min(3, "Name must be at least 3 characters"),
   slug: z.string().min(3, "Slug must be at least 3 characters"),
   categories: z.array(z.string()).min(1, "يجب اختيار فئة واحدة على الأقل"),
@@ -87,10 +88,11 @@ export const signUpFormSchema = z
 
 // Cart Schemas
 export const cartItemSchema = z.object({
+  offers: z.string().nullable().optional(),
   productId: z.string().min(1, "Product is required"),
   name: z.string().min(1, "Name is required"),
   slug: z.string().min(1, "Slug is required"),
-  qty: z.number().int().nonnegative("Quantity must be a positive number"),
+  qty: z.number().int().positive("Quantity must be a positive number"),
   image: z.string().min(1, "Image is required"),
   shippingPrice: currency,
   price: currency,
@@ -149,6 +151,7 @@ export const updateOrderSchema = insertOrderSchema.extend({
   orderItems: z
     .array(z.object({ productId: z.string(), qty: z.number().int().positive() }))
     .optional(),
+  removedProductIds: z.array(z.string()).optional(),
 });
 
 // Schema for inserting an order item
@@ -179,7 +182,7 @@ export const updateProfileSchema = z.object({
 // Schema to update users
 export const updateUserSchema = updateProfileSchema.extend({
   id: z.string().min(1, "ID is required"),
-  role: z.string().min(1, "Role is required"),
+  role: z.enum(["admin", "employee", "user", "disabled"]),
 });
 
 // Schema to insert reviews

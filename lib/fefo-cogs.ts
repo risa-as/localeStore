@@ -108,6 +108,7 @@ export async function buildFefoContexts(
       orderId: true,
       productId: true,
       qty: true,
+      costTotal: true,
       order: { select: { createdAt: true } },
     },
   });
@@ -118,6 +119,7 @@ export async function buildFefoContexts(
     { key: string; date: Date; qty: number }[]
   >();
   for (const item of orderItems) {
+    if (item.costTotal !== null) continue;
     const ctx = byProduct.get(item.productId);
     if (!ctx) continue;
     const createdAt = new Date(item.order.createdAt);
@@ -134,9 +136,19 @@ export async function buildFefoContexts(
 
   // 3) Run FEFO per product.
   const contexts = new Map<string, ProductFefoContext>();
+  const allocations = await prisma.inventoryAllocation.findMany({ where: { productId: { in: batchedProductIds }, returnedAt: null } });
   for (const [productId, ctx] of byProduct) {
     const sales = salesByProduct.get(productId) ?? [];
-    const result = computeFefo(ctx.batches, sales, ctx.fallbackCost);
+    const productAllocations = allocations.filter(a => a.productId === productId);
+    const used = new Map<string, number>();
+    for (const allocation of productAllocations) if (allocation.batchId) used.set(allocation.batchId, (used.get(allocation.batchId) ?? 0) + allocation.quantity);
+    const result = computeFefo(ctx.batches.map(batch => ({ ...batch, quantity: Math.max(0, batch.quantity - (used.get(batch.id) ?? 0)) })), sales, ctx.fallbackCost);
+    for (const [batchId, qty] of used) result.batchConsumed.set(batchId, (result.batchConsumed.get(batchId) ?? 0) + qty);
+    for (const item of orderItems.filter(item => item.productId === productId && item.costTotal !== null)) result.saleCost.set(saleKey(item.orderId, productId), Number(item.costTotal));
+    for (const allocation of productAllocations.filter(a => !a.batchId)) {
+      const key = saleKey(allocation.orderId, productId);
+      result.saleFallbackQty.set(key, (result.saleFallbackQty.get(key) ?? 0) + allocation.quantity);
+    }
     contexts.set(productId, {
       productId,
       productName: ctx.productName,

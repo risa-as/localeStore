@@ -24,7 +24,7 @@ import slugify from "slugify";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
-import { createProduct, updateProduct } from "@/lib/actions/product.actions";
+import { createProduct, updateProduct, getRelatedProductOptions } from "@/lib/actions/product.actions";
 import { Card, CardContent } from "../ui/card";
 import Image from "next/image";
 import Link from "next/link";
@@ -100,6 +100,8 @@ const ProductForm = ({
   const router = useRouter();
   const { toast } = useToast();
   const t = useTranslations('AdminProduct');
+  const [relatedOptions, setRelatedOptions] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => { getRelatedProductOptions().then(setRelatedOptions).catch(() => setRelatedOptions([])); }, []);
 
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(
@@ -159,7 +161,8 @@ const ProductForm = ({
           <div className="flex flex-col md:flex-row gap-5"></div>
           <div className="flex flex-col md:flex-row gap-5">
             {/* Name */}
-            <FormField
+            <FormField control={form.control} name="relatedProductIds" render={({ field }) => <FormItem><FormLabel>منتجات مكملة لهذا المنتج (حتى 3)</FormLabel><p className="text-xs text-muted-foreground">اختر المنتجات التي تصلح فعلاً معه؛ ستظهر للزبون لإضافتها إلى طلبه نفسه.</p><div className="max-h-40 overflow-auto border rounded p-3 space-y-2">{relatedOptions.filter(option => option.id !== productId).map(option => <label className="flex gap-2 text-sm" key={option.id}><input type="checkbox" checked={(field.value ?? []).includes(option.id)} disabled={!(field.value ?? []).includes(option.id) && (field.value ?? []).length >= 3} onChange={event => field.onChange(event.target.checked ? [...(field.value ?? []), option.id] : (field.value ?? []).filter(id => id !== option.id))}/>{option.name}</label>)}</div><FormMessage/></FormItem>} />
+<FormField
               control={form.control}
               name="name"
               render={({

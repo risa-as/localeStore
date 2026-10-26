@@ -8,10 +8,12 @@ import { cartItemSchema, insertCartSchema } from "../validators";
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { getTranslations } from "next-intl/server";
+import { computeOrderPricing } from "../pricing";
+import { getAvailableStock } from "../inventory";
 // Calculate cart prices
 const calcPrice = (items: CartItem[]) => {
   const itemsPrice = round2(
-    items.reduce((acc, item) => acc + Number(item.price) * item.qty, 0)
+    items.reduce((acc, item) => acc + computeOrderPricing({ quantity: item.qty, unitPrice: Number(item.price), shippingPrice: 0, offers: item.offers }).itemsPrice, 0)
   ),
     shippingPrice = items.length > 0
       ? Math.max(...items.map((item) => Number(item.shippingPrice)))
@@ -40,6 +42,7 @@ export async function addItemToCart(data: CartItem) {
     const product = await prisma.product.findFirst({
       where: {
         id: item.productId,
+        isArchived: false,
       },
     });
     if (!product) throw new Error(t("productNotFound"));
@@ -48,6 +51,13 @@ export async function addItemToCart(data: CartItem) {
     item.price = product.price.toString();
     item.shippingPrice = product.shippingPrice.toString();
     item.costPrice = product.costPrice.toString();
+    item.offers = product.offers;
+    item.name = product.name;
+    item.slug = product.slug;
+    item.image = product.images[0] || item.image;
+    const existingQty = cart?.items.find((x: CartItem) => x.productId === item.productId)?.qty ?? 0;
+    const available = await getAvailableStock(product.id, product.stock);
+    if (existingQty + (existingQty ? 1 : item.qty) > available) throw new Error(t("notEnoughStock"));
 
     // Create New Cart Object
     if (!cart) {
@@ -62,7 +72,7 @@ export async function addItemToCart(data: CartItem) {
       });
 
       // Revalidate product page
-      revalidatePath(`/product/${product.slug}`);
+      revalidatePath('/[locale]', 'layout');
       return {
         success: true,
         message: `${product.name} ${t("addedToCart")}`,
@@ -98,7 +108,7 @@ export async function addItemToCart(data: CartItem) {
         },
       });
       // Revalidate product page
-      revalidatePath(`/product/${product.slug}`);
+      revalidatePath('/[locale]', 'layout');
 
       return {
         success: true,
@@ -121,17 +131,22 @@ export async function getMyCart() {
   const session = await auth();
   const userId = session?.user?.id ? (session?.user.id as string) : undefined;
   // Get User cart from db
+  if (!userId && !sessionCartId) return undefined;
   const cart = await prisma.cart.findFirst({
     where: userId ? { userId: userId } : { sessionCartId: sessionCartId },
   });
   if (!cart) return undefined;
+  const products = await prisma.product.findMany({ where: { id: { in: (cart.items as CartItem[]).map(item => item.productId) } } });
+  const items = (cart.items as CartItem[]).map(item => {
+    const product = products.find(product => product.id === item.productId);
+    if (!product) return item;
+    return { ...item, price: product.price.toString(), costPrice: product.costPrice.toString(), shippingPrice: product.shippingPrice.toString(), offers: product.offers };
+  });
   // convert decimals and return
   return convertToPlainObject({
     ...cart,
-    items: cart.items as CartItem[],
-    itemsPrice: cart.itemsPrice.toString(),
-    totalPrice: cart.totalPrice.toString(),
-    shippingPrice: cart.shippingPrice.toString(),
+    items,
+    ...calcPrice(items),
   });
 }
 
@@ -172,7 +187,7 @@ export async function removeItemFromCart(productId: string) {
       },
     });
     // Revalidate product page
-    revalidatePath(`/product/${product.slug}`);
+    revalidatePath('/[locale]', 'layout');
     return {
       success: true,
       message: `${product.name} ${exist.qty > 1 ? t("updatedInCart") : t("removedFromCart")
