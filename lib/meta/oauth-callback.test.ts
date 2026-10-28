@@ -14,7 +14,8 @@ beforeEach(() => {
   jest.mocked(verifyOAuthState).mockReturnValue(true);
   jest.mocked(prisma.metaConnection.findUnique).mockResolvedValue(null);
   jest.mocked(oauthExchange).mockResolvedValue({ access_token: "PRIVATE_USER", expires_in: 3600 });
-  jest.mocked(graphGet).mockResolvedValue({ id: "fb-user", name: "Owner" });
+  jest.mocked(graphGet).mockImplementation(async path => path === "debug_token"
+    ? { data: { is_valid: true, app_id: "app1" } } : { id: "fb-user", name: "Owner" });
 });
 it("keeps authorized pages when ad discovery fails without selecting the first Page", async () => {
   const pages = [{ id: "page1", name: "Page", access_token: "PRIVATE_PAGE" }];
@@ -35,4 +36,15 @@ it("rejects invalid OAuth state before any token exchange or asset persistence",
   expect(res.headers.get("location")).toContain("meta=invalid");
   expect(oauthExchange).not.toHaveBeenCalled();
   expect(prisma.metaConnection.upsert).not.toHaveBeenCalled();
+});
+it("preserves the stored connection when the exchanged token belongs to another app", async () => {
+  jest.mocked(graphGet).mockResolvedValueOnce({ data: { is_valid: true, app_id: "anotherApp" } });
+  const log = jest.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const res = await GET(new Request("https://store.example/api/meta/oauth/callback?code=test&state=test"));
+    expect(res.headers.get("location")).toContain("meta=failed");
+    expect(prisma.metaConnection.upsert).not.toHaveBeenCalled();
+    expect(graphGetAll).not.toHaveBeenCalled();
+    expect(JSON.stringify(log.mock.calls)).not.toContain("PRIVATE");
+  } finally { log.mockRestore(); }
 });

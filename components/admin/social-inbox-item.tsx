@@ -25,6 +25,11 @@ export default function SocialInboxItem({ item, compact = false, hideCommentLink
         : item.deliveryStatus === "read" ? <><CheckCheck className="size-3" />تمت القراءة</>
         : <><AlertCircle className="size-3 shrink-0" /><span>{item.deliveryStatus === "failed" ? "فشل الإرسال" : "الإرسال غير مؤكد"}{item.sendError ? `: ${item.sendError}` : ""}</span></>}
     </div>}
+    {item.outgoing && item.deliveryStatus === "failed" && /\(551(?:\/\d+)?\)/.test(item.sendError || "") &&
+      <a href="https://business.facebook.com/latest/inbox/all" target="_blank" rel="noopener noreferrer"
+        className="mt-2 inline-flex items-center gap-1.5 rounded-[10px] border bg-background px-2.5 py-1.5 text-xs font-medium hover:bg-muted">
+        فتح صندوق Meta <ExternalLink aria-hidden="true" className="size-3" />
+      </a>}
   </>;
 }
 

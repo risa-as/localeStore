@@ -5,6 +5,13 @@ import type { InboxContext, InboxPage } from "./inbox";
 type Scope = Pick<InboxContext, "pageId" | "platform">;
 const key = (ctx: Scope, conversationId: string) => ({ pageId: ctx.pageId, platform: ctx.platform, conversationId });
 
+/** Keep a confirmed private reply consumed even while Meta's history/flags lag. */
+export async function hasInboxReplyForOrigin(ctx: Scope, conversationId: string, noticeId: string) {
+  const receipt = await prisma.socialInboxState.findUnique({ where: { pageId_platform_conversationId: key(ctx, conversationId) },
+    select: { lastReplyMessageId: true, previousMessageIds: true } });
+  return !!receipt?.lastReplyMessageId && receipt.previousMessageIds.includes(noticeId);
+}
+
 export async function applyInboxReceipts(ctx: Scope, page: InboxPage): Promise<InboxPage> {
   if (!page.items.length) return page;
   const rows = await prisma.socialInboxState.findMany({ where: { pageId: ctx.pageId, platform: ctx.platform,

@@ -1,12 +1,24 @@
 import { prisma } from "@/db/prisma";
-import { applyInboxReceipts, saveInboxRead, saveInboxReply } from "./inbox-receipts";
+import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "./inbox-receipts";
 import type { InboxPage } from "./inbox";
 
-jest.mock("@/db/prisma", () => ({ prisma: { socialInboxState: { findMany: jest.fn(), upsert: jest.fn() } } }));
+jest.mock("@/db/prisma", () => ({ prisma: { socialInboxState: { findMany: jest.fn(), findUnique: jest.fn(), upsert: jest.fn() } } }));
 const ctx = { pageId: "page1", platform: "facebook" as const };
 const page: InboxPage = { items: [{ id: "thread1", handle: "handle", title: "Customer", text: "Question",
   time: "2026-10-23T10:00:00Z", outgoing: false, unread: 1, lastMessageId: "incoming1" }], after: null };
 beforeEach(() => jest.resetAllMocks());
+
+it("consumes only a notice included in a confirmed send's snapshot, under the same Page/platform/thread", async () => {
+  jest.mocked(prisma.socialInboxState.findUnique).mockResolvedValue({ lastReplyMessageId: "sent1", previousMessageIds: ["notice"] } as never);
+  expect(await hasInboxReplyForOrigin(ctx, "thread1", "notice")).toBe(true);
+  expect(await hasInboxReplyForOrigin(ctx, "thread1", "different-notice")).toBe(false);
+  expect(prisma.socialInboxState.findUnique).toHaveBeenCalledWith({
+    where: { pageId_platform_conversationId: { ...ctx, conversationId: "thread1" } },
+    select: { lastReplyMessageId: true, previousMessageIds: true },
+  });
+  jest.mocked(prisma.socialInboxState.findUnique).mockResolvedValue({ lastReplyMessageId: null, previousMessageIds: ["notice"] } as never);
+  expect(await hasInboxReplyForOrigin(ctx, "thread1", "notice")).toBe(false);
+});
 
 it("restores read and replied state from the database on a fresh page load", async () => {
   jest.mocked(prisma.socialInboxState.findMany).mockResolvedValue([{ conversationId: "thread1",

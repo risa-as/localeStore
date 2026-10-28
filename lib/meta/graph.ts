@@ -51,6 +51,7 @@ export async function graphGet<T = Record<string, unknown>>(
   path: string,
   token: string,
   params?: Record<string, string | undefined>,
+  options?: { signal?: AbortSignal },
 ): Promise<T> {
   const url = new URL(`${BASE}/${path.replace(/^\//, "")}`);
   for (const [k, v] of Object.entries(params ?? {})) {
@@ -59,6 +60,7 @@ export async function graphGet<T = Record<string, unknown>>(
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
+    signal: options?.signal,
   });
   return parse(res) as Promise<T>;
 }

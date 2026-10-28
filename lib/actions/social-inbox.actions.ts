@@ -7,7 +7,7 @@ import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
   sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId, type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
-import { applyInboxReceipts, saveInboxRead, saveInboxReply } from "@/lib/meta/inbox-receipts";
+import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "@/lib/meta/inbox-receipts";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "@/lib/constants/internal-products";
 import { getAvailableStocks } from "@/lib/inventory";
 import { SERVER_URL } from "@/lib/constants";
@@ -21,6 +21,7 @@ import { submitQuickOrder } from "@/lib/orders/quick-order";
 import { revalidatePath } from "next/cache";
 import { applyInboxDelivery } from "@/lib/meta/inbox-delivery-storage";
 import { selectedOrderValue } from "@/lib/meta/inbox-workflow";
+import { inspectInboxConnection, inboxTokenFingerprint } from "@/lib/meta/inbox-connection";
 
 type PageAsset = { id: string; name: string; access_token?: string;
   instagram_business_account?: { id: string; username?: string } };
@@ -161,6 +162,40 @@ async function context(pageId: string, platform: SocialPlatform): Promise<InboxC
   return { pageId, platform, token: page.access_token, igId, secret: config.appSecret, userId: session.user.id };
 }
 
+export async function checkSocialInboxConnection(input: { pageId: string; platform: SocialPlatform }) {
+  return attempt(async () => {
+    // Read a single connection snapshot: health and fingerprint must describe the same token.
+    await requireAdministrator();
+    if (input.platform !== "facebook" && input.platform !== "instagram") throw new Error("منصة غير صالحة");
+    const config = getMetaConfig();
+    if (!config) throw new Error("أكمل إعداد تطبيق Meta أولاً");
+    const conn = await prisma.metaConnection.findUnique({ where: { id: "default" } });
+    const pages = Array.isArray(conn?.pages) ? conn.pages as unknown as PageAsset[] : [];
+    const page = pages.find(asset => asset.id === input.pageId);
+    if (!conn?.userAccessToken || !page?.access_token) throw new Error("اربط الصفحة المطلوبة من إعداد اتصال Meta أولاً");
+    const result = await inspectInboxConnection({ pageId: page.id, platform: input.platform,
+      pageToken: page.access_token, userToken: conn.userAccessToken, appId: config.appId, appSecret: config.appSecret });
+    console.info("[social-inbox] Page connection check", { pageId: page.id, platform: input.platform,
+      appId: config.appId, connectionUpdatedAt: conn.updatedAt?.toISOString(),
+      tokenFingerprint: inboxTokenFingerprint(page.access_token, config.appSecret), status: result.status });
+    return result;
+  });
+}
+
+/** Capture the exact sending credential before reconnection replaces it. Never retry a send. */
+async function diagnoseSend<T>(ctx: InboxContext, operation: () => Promise<T>) {
+  try { return await operation(); }
+  catch (error) {
+    if (error instanceof GraphError) {
+      console.warn("[social-inbox] Send failed", { pageId: ctx.pageId, platform: ctx.platform,
+        appId: getMetaConfig()?.appId, tokenFingerprint: inboxTokenFingerprint(ctx.token, ctx.secret),
+        status: error.status, code: error.code, subcode: error.subcode,
+        traceId: error.traceId && /^[A-Za-z0-9_-]{1,150}$/.test(error.traceId) ? error.traceId : undefined });
+    }
+    throw error;
+  }
+}
+
 async function attempt<T>(fn: () => Promise<T>) {
   try { return { ok: true as const, data: await fn() }; }
   catch (err) {
@@ -173,7 +208,7 @@ async function attempt<T>(fn: () => Promise<T>) {
     const message = err instanceof GraphError
       ? err.outcomeUnknown ? "لم نستلم تأكيد الإرسال من Meta؛ تحقّق من المحادثة قبل إعادة المحاولة"
       : err.code === 190 ? "انتهت صلاحية الاتصال بـ Meta؛ أعد الربط من التسويق"
-      : err.code === 551 ? `رفضت Meta تسليم الرسالة (551${err.subcode ? `/${err.subcode}` : ""}). إذا تكرر الرفض مع عدة زبائن، راجع وضع التطبيق وإتاحة pages_messaging وقيود الصفحة في Meta؛ لا يحدد هذا الرمز وحده السبب.`
+      : err.code === 551 ? `تعذّر الرد على هذه المحادثة عبر تطبيق Meta (551${err.subcode ? `/${err.subcode}` : ""}). يمكنك متابعة الرد من Meta Business Suite؛ قد ينجح هناك مع استمرار رفض الإرسال عبر التطبيق. الرمز وحده لا يثبت أن الزبون حظر الصفحة. قبل إعادة الربط، افتح «الصفحة والمنصة» ثم «فحص اتصال المراسلة». إذا فشل مع معظم الزبائن، راجع وضع التطبيق وصلاحيات المراسلة.${err.traceId && /^[A-Za-z0-9_-]{1,150}$/.test(err.traceId) ? ` مرجع دعم Meta: ${err.traceId}` : ""}`
       : [10, 200].includes(err.code ?? 0) ? "Meta رفضت الوصول: راجع أذونات الرسائل/التعليقات وموافقة التطبيق وصلاحيات الصفحة"
       : `تعذر إكمال الطلب لدى Meta (رمز ${err.code ?? err.status}). راجع إعدادات الاتصال ثم أعد التحديث.`
       : err instanceof Error ? err.message : "تعذر إكمال الطلب";
@@ -194,6 +229,9 @@ export async function getSocialInboxDetail(input: { pageId: string; platform: So
     const ctx = await context(input.pageId, input.platform);
     if (input.kind === "messages") {
       const detail = await readInboxMessages(ctx, input.handle, input.after);
+      if (detail.window?.mode === "private-reply" && detail.window.canReply && detail.window.originMessageId &&
+        await hasInboxReplyForOrigin(ctx, resourceId(ctx, "conversation", input.handle), detail.window.originMessageId))
+        detail.window = { ...detail.window, canReply: false, reason: "private-reply-sent" };
       return { ...detail, items: await applyInboxDelivery(ctx, detail.recipientId, detail.items) };
     }
     if (input.kind !== "comments" && input.kind !== "replies") throw new Error("قسم غير صالح");
@@ -204,7 +242,7 @@ export async function getSocialInboxDetail(input: { pageId: string; platform: So
 export async function getSocialInboxDelivery(input: { pageId: string; platform: SocialPlatform; handle: string }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
-    const detail = await readInboxMessages(ctx, input.handle);
+    const detail = await readInboxMessages(ctx, input.handle, undefined, false);
     const items = await applyInboxDelivery(ctx, detail.recipientId, detail.items);
     return items.filter(item => item.outgoing).map(({ id, time, deliveryStatus }) => ({ id, time, deliveryStatus }));
   });
@@ -215,7 +253,11 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
     const ctx = await context(input.pageId, input.platform);
     if (typeof input.text !== "string" || !input.text.trim() || input.text.length > 1000) throw new Error("اكتب رداً لا يتجاوز 1000 حرف");
     if (input.kind === "messages") {
-      const sent = await sendInboxMessage(ctx, input.handle, input.text.trim());
+      const conversationId = resourceId(ctx, "conversation", input.handle);
+      const sent = await diagnoseSend(ctx, () => sendInboxMessage(ctx, input.handle, input.text.trim(), async noticeId => {
+        if (await hasInboxReplyForOrigin(ctx, conversationId, noticeId))
+          throw new Error("سبق إرسال الرد الخاص على هذا التعليق؛ انتظر رد الزبون أو حدّث المحادثة.");
+      }));
       try {
         await saveInboxReply(ctx, resourceId(ctx, "conversation", input.handle), sent, input.text.trim());
         return { ...sent, stateSaved: true };
@@ -225,7 +267,7 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
       }
     }
     if (input.kind !== "comments") throw new Error("قسم غير صالح");
-    return { id: await sendInboxComment(ctx, input.handle, input.text.trim()) };
+    return { id: await diagnoseSend(ctx, () => sendInboxComment(ctx, input.handle, input.text.trim())) };
   });
 }
 
@@ -250,7 +292,7 @@ export async function sendSocialInboxMedia(input: { pageId: string; platform: So
     const ctx = await context(input.pageId, input.platform);
     const conversationId = resourceId(ctx, "conversation", input.handle);
     const media = verifyInboxMedia({ pageId: ctx.pageId, platform: ctx.platform, userId: ctx.userId, conversationId }, input.ticket, ctx.secret);
-    const sent = await sendInboxMediaMessage(ctx, input.handle, media);
+    const sent = await diagnoseSend(ctx, () => sendInboxMediaMessage(ctx, input.handle, media));
     let stateSaved = true;
     try { await saveInboxReply(ctx, conversationId, sent, media.kind === "image" ? "صورة" : "فيديو"); }
     catch { stateSaved = false; }

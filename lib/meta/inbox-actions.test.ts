@@ -1,4 +1,4 @@
-import { getSocialInboxSetup, getSocialInboxList, getSocialInboxOrigin, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, getSocialInboxUploadScope, markSocialInboxRead, searchSocialInboxProducts, searchSocialInboxOrdersByPhone, prepareSocialInboxOrder, approveSocialInboxOrder } from "../actions/social-inbox.actions";
+import { checkSocialInboxConnection, getSocialInboxSetup, getSocialInboxList, getSocialInboxDetail, getSocialInboxOrigin, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, getSocialInboxUploadScope, markSocialInboxRead, searchSocialInboxProducts, searchSocialInboxOrdersByPhone, prepareSocialInboxOrder, approveSocialInboxOrder } from "../actions/social-inbox.actions";
 import { submitQuickOrder } from "../orders/quick-order";
 import { signInboxMedia } from "./inbox-media-ticket";
 import { getAvailableStocks } from "../inventory";
@@ -17,7 +17,7 @@ jest.mock("@/db/prisma", () => ({ prisma: { metaConnection: { findUnique: jest.f
   order: { findMany: jest.fn() },
   socialPost: { findFirst: jest.fn() },
   socialInboxOrder: { findMany: jest.fn() },
-  socialInboxState: { findMany: jest.fn(), upsert: jest.fn() } } }));
+  socialInboxState: { findMany: jest.fn(), findUnique: jest.fn(), upsert: jest.fn() } } }));
 jest.mock("../inventory", () => ({ getAvailableStocks: jest.fn() }));
 jest.mock("./inbox-delivery-storage", () => ({ applyInboxDelivery: async (_ctx: unknown, _recipient: unknown, items: unknown) => items }));
 jest.mock("@/lib/constants", () => ({ SERVER_URL: "https://store.example", iraqGovernorates: ["Baghdad"] }));
@@ -32,6 +32,63 @@ beforeEach(() => {
   jest.mocked(prisma.socialInboxState.findMany).mockResolvedValue([]);
   jest.mocked(prisma.socialInboxOrder.findMany).mockResolvedValue([]);
   jest.mocked(prisma.socialPost.findFirst).mockResolvedValue(null);
+});
+
+it("authorizes a connection health check before reading any credentials", async () => {
+  admin.mockRejectedValueOnce(new Error("غير مصرح"));
+  expect((await checkSocialInboxConnection({ pageId: "page1", platform: "facebook" })).ok).toBe(false);
+  expect(find).not.toHaveBeenCalled(); expect(graphGet).not.toHaveBeenCalled();
+});
+it("refuses health checks for an unapproved Page before calling Graph", async () => {
+  expect((await checkSocialInboxConnection({ pageId: "otherPage", platform: "facebook" })).ok).toBe(false);
+  expect(graphGet).not.toHaveBeenCalled(); expect(graphPost).not.toHaveBeenCalled();
+});
+it("checks the requested Page token and logs a safe fingerprint without sending or altering credentials", async () => {
+  jest.mocked(graphGet).mockResolvedValueOnce({ data: { is_valid: true, app_id: "123", type: "PAGE", profile_id: "page1", scopes: ["pages_messaging"] } })
+    .mockResolvedValueOnce({ id: "page1" }).mockResolvedValueOnce({ data: [{ permission: "pages_messaging", status: "granted" }] });
+  const log = jest.spyOn(console, "info").mockImplementation(() => {});
+  try {
+    const result = await checkSocialInboxConnection({ pageId: "page1", platform: "facebook" });
+    expect(result).toMatchObject({ ok: true, data: { status: "healthy" } });
+    expect(graphGet).toHaveBeenCalledWith("me", "PRIVATE_PAGE", { fields: "id" }, expect.anything());
+    expect(graphPost).not.toHaveBeenCalled();
+    expect(JSON.stringify([result, log.mock.calls])).not.toContain("PRIVATE");
+  } finally { log.mockRestore(); }
+});
+
+describe("comment private-reply receipts", () => {
+  function source() {
+    const at = Date.now() - 3600000;
+    jest.mocked(graphGet).mockResolvedValueOnce({ data: [
+      { id: "copy", from: { id: "customer" }, message: "السعر؟", created_time: new Date(at + 2000).toISOString() },
+      { id: "notice", from: { id: "customer" }, created_time: new Date(at).toISOString(),
+        message: "Facebook created this chat because Customer commented on your post. See comment(https://facebook.com/story.php?comment_id=123)" },
+    ] }).mockResolvedValueOnce({ id: "post1_123", message: "السعر؟", created_time: new Date(at - 6000).toISOString(),
+      object: { id: "post1" }, can_reply_privately: true })
+      .mockResolvedValueOnce({ id: "post1", from: { id: "page1" }, message: "Product" });
+    const ctx = { pageId: "page1", platform: "facebook" as const, token: "PRIVATE_PAGE", secret: "secret", userId: "admin1" };
+    return { pageId: "page1", platform: "facebook" as const, kind: "messages" as const,
+      handle: resourceHandle(ctx, "conversation", "thread1"), text: "Reply" };
+  }
+  it("blocks a repeated private reply when Meta history still lags behind the saved confirmation", async () => {
+    const input = source();
+    jest.mocked(prisma.socialInboxState.findUnique).mockResolvedValue({ lastReplyMessageId: "sent1", previousMessageIds: ["copy", "notice"] } as never);
+    expect(await replyToSocialInbox(input)).toMatchObject({ ok: false, message: expect.stringContaining("سبق إرسال") });
+    expect(graphPost).not.toHaveBeenCalled(); expect(prisma.socialInboxState.upsert).not.toHaveBeenCalled();
+  });
+  it("closes a stale private-reply window on detail reload using the confirmed receipt", async () => {
+    const input = source();
+    jest.mocked(prisma.socialInboxState.findUnique).mockResolvedValue({ lastReplyMessageId: "sent1", previousMessageIds: ["copy", "notice"] } as never);
+    expect(await getSocialInboxDetail(input)).toMatchObject({ ok: true, data: { window: { canReply: false, reason: "private-reply-sent" } } });
+    expect(graphPost).not.toHaveBeenCalled();
+  });
+  it("keeps a confirmed private send successful even if storing its receipt fails", async () => {
+    const input = source();
+    jest.mocked(graphPost).mockResolvedValue({ message_id: "sent1" });
+    jest.mocked(prisma.socialInboxState.upsert).mockRejectedValueOnce(new Error("Database unavailable"));
+    expect(await replyToSocialInbox(input)).toMatchObject({ ok: true, data: { id: "sent1", stateSaved: false, replyMode: "private-reply" } });
+    expect(graphPost).toHaveBeenCalledTimes(1);
+  });
 });
 
 it("rejects order phone lookup by a revoked operator before any database query", async () => {
@@ -75,12 +132,18 @@ it("reports 551 without claiming a customer block, logs only diagnostic codes, a
     const result = await replyToSocialInbox({ pageId: "page1", platform: "facebook", kind: "messages",
       handle: resourceHandle(ctx, "conversation", "thread1"), text: "PRIVATE_CUSTOMER_REPLY" });
     expect(result).toMatchObject({ ok: false, message: expect.stringContaining("551/1545041") });
+    expect(result).toMatchObject({ uncertain: false, message: expect.stringContaining("Meta Business Suite") });
+    expect(result).toMatchObject({ message: expect.stringContaining("مرجع دعم Meta: trace-for-support") });
     expect(result).toMatchObject({ message: expect.stringContaining("وضع التطبيق") });
     expect(prisma.socialInboxState.upsert).not.toHaveBeenCalled();
     expect(graphPost).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith("[social-inbox] Meta rejected request", {
       status: 400, code: 551, subcode: 1545041, traceId: "trace-for-support",
     });
+    expect(log).toHaveBeenCalledWith("[social-inbox] Send failed", expect.objectContaining({
+      pageId: "page1", platform: "facebook", appId: "123", tokenFingerprint: expect.stringMatching(/^[a-f0-9]{16}$/),
+      code: 551, traceId: "trace-for-support",
+    }));
     expect(JSON.stringify(log.mock.calls)).not.toContain("PRIVATE");
     expect(JSON.stringify(result)).not.toContain("PRIVATE");
   } finally { log.mockRestore(); }

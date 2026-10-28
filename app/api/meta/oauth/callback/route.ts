@@ -65,6 +65,11 @@ export async function GET(req: Request) {
     });
 
     const userToken = long.access_token;
+    const verified = await graphGet<{ data?: { app_id?: string; is_valid?: boolean } }>(
+      "debug_token", `${config.appId}|${config.appSecret}`, { input_token: userToken },
+    );
+    if (verified.data?.is_valid !== true || verified.data.app_id !== config.appId)
+      throw new Error("Meta authorization does not belong to this application");
     const expiresAt = long.expires_in
       ? new Date(Date.now() + long.expires_in * 1000)
       : null;

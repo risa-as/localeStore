@@ -14,6 +14,101 @@ const originText = "‏أنشأ فيسبوك هذه الدردشة نظرًا ل
 beforeEach(() => { jest.resetAllMocks(); jest.spyOn(Date, "now").mockReturnValue(NOW); });
 afterEach(() => jest.restoreAllMocks());
 
+describe("Facebook comment-started private replies", () => {
+  const at = NOW - 3600000;
+  const notice = { id: "notice", from: { id: "customer1" }, message: originText,
+    created_time: new Date(at).toISOString() };
+  const copy = { id: "copy", from: { id: "customer1" }, message: "25000 مع التوصیل",
+    created_time: new Date(at + 2000).toISOString() };
+  function source(messages = [copy, notice], comment = {}, originalPost = {}) {
+    get.mockResolvedValueOnce({ data: messages })
+      .mockResolvedValueOnce({ id: "456_123", message: copy.message, object: { id: "post1" },
+        created_time: new Date(at - 6000).toISOString(), can_reply_privately: true, ...comment })
+      .mockResolvedValueOnce({ id: "post1", from: { id: ctx.pageId }, message: "Original post", ...originalPost });
+  }
+  const handle = () => resourceHandle(ctx, "conversation", "thread1");
+
+  it("excludes Meta's copy inserted two seconds after its notice and offers the seven-day private reply", async () => {
+    expect(replyWindow(ctx, [copy, notice])).toMatchObject({ canReply: false, reason: "comment-origin" });
+    source();
+    const detail = await readInboxMessages(ctx, handle());
+    expect(detail.window).toMatchObject({ canReply: true, mode: "private-reply", originMessageId: "notice",
+      expiresAt: new Date(at - 6000 + 7 * 86400000).toISOString() });
+    expect(detail.items.find(item => item.id === "copy")?.commentCopy).toBe(true);
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("uses the verified comment ID rather than PSID for the first reply, without a fallback POST", async () => {
+    source(); post.mockResolvedValue({ message_id: "sent1" });
+    const guard = jest.fn().mockResolvedValue(undefined);
+    await expect(sendInboxMessage(ctx, handle(), "reply", guard)).resolves.toMatchObject({
+      id: "sent1", previousMessageIds: ["copy", "notice"], replyMode: "private-reply", originMessageId: "notice",
+    });
+    expect(guard).toHaveBeenCalledWith("notice");
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith("page1/messages", ctx.token, {
+      recipient: { comment_id: "456_123" }, message: { text: "reply" },
+    });
+  });
+  it("never retries or falls back to a normal DM if the private send is rejected", async () => {
+    source(); post.mockRejectedValue(new Error("Rejected"));
+    await expect(sendInboxMessage(ctx, handle(), "reply")).rejects.toThrow("Rejected");
+    expect(post).toHaveBeenCalledTimes(1);
+  });
+  it("honors a persisted reply guard before any external write", async () => {
+    source();
+    await expect(sendInboxMessage(ctx, handle(), "reply", async () => { throw new Error("Already sent"); }))
+      .rejects.toThrow("Already sent");
+    expect(post).not.toHaveBeenCalled();
+  });
+  it.each(["image", "video"] as const)("refuses %s as the first private reply", async kind => {
+    source();
+    await expect(sendInboxMediaMessage(ctx, handle(), { kind, url: "https://demo.ufs.sh/f/media", name: "file", size: 10 }))
+      .rejects.toThrow("نصي فقط");
+    expect(post).not.toHaveBeenCalled();
+  });
+  it.each([
+    { label: "Meta disallows private replies", comment: { can_reply_privately: false } },
+    { label: "a native Meta reply was already sent", comment: { private_reply_conversation: { id: "thread1" } } },
+    { label: "the seven-day deadline passed", comment: { created_time: new Date(NOW - 7 * 86400000).toISOString() } },
+    { label: "source date is missing", comment: { created_time: undefined } },
+    { label: "post belongs to another Page", comment: {}, originalPost: { from: { id: "foreign" } } },
+  ])("does not send when $label", async ({ comment, originalPost }) => {
+    source(undefined, comment, originalPost);
+    await expect(sendInboxMessage(ctx, handle(), "reply")).rejects.toThrow();
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("waits for the customer when an outgoing reply is already in Meta history", async () => {
+    source([{ id: "sent", from: { id: ctx.pageId }, message: "Reply", created_time: new Date(at + 10000).toISOString() }, copy, notice]);
+    const detail = await readInboxMessages(ctx, handle());
+    expect(detail.window).toMatchObject({ canReply: false, mode: "private-reply", reason: "private-reply-sent" });
+  });
+  it("fails closed when the source comment cannot be fetched", async () => {
+    get.mockResolvedValueOnce({ data: [copy, notice] }).mockRejectedValueOnce(new Error("Unavailable"));
+    await expect(sendInboxMessage(ctx, handle(), "reply")).rejects.toThrow("تعذر تأكيد");
+    expect(post).not.toHaveBeenCalled();
+  });
+  it("accepts a genuine first DM shortly after the notice when it differs from the source comment", async () => {
+    source([{ ...copy, message: "مرحبا أريد الحجز" }, notice]); post.mockResolvedValue({ message_id: "sent" });
+    await sendInboxMessage(ctx, handle(), "reply");
+    expect(post).toHaveBeenCalledWith("page1/messages", ctx.token, {
+      recipient: { id: "customer1" }, messaging_type: "RESPONSE", message: { text: "reply" },
+    });
+  });
+  it("lets a later real DM open the 24-hour window even if it repeats the comment text", async () => {
+    const real = { ...copy, id: "real", created_time: new Date(at + 600000).toISOString() };
+    get.mockResolvedValueOnce({ data: [real, copy, notice] }); post.mockResolvedValue({ message_id: "sent" });
+    await sendInboxMessage(ctx, handle(), "reply");
+    expect(get).toHaveBeenCalledTimes(1);
+    expect(post).toHaveBeenCalledWith("page1/messages", ctx.token, expect.objectContaining({ recipient: { id: "customer1" } }));
+  });
+  it("does not try to mark a comment-only conversation as seen through the DM API", async () => {
+    source();
+    expect(await markInboxConversationRead(ctx, handle(), "copy"))
+      .toMatchObject({ marked: true, metaSyncRequired: false, metaSynced: false });
+    expect(post).not.toHaveBeenCalled();
+  });
+});
+
 it.each(["facebook", "instagram"] as const)("retains the actual author identity for %s comment grouping", async platform => {
   const context = { ...ctx, platform };
   get.mockResolvedValue({ data: [{ id: "comment1", from: { id: "customer1", name: "Same Name" }, username: "unique_user", message: "السعر؟", text: "السعر؟" }] });
@@ -195,7 +290,7 @@ describe("social inbox boundaries", () => {
       commentUrl: "https://facebook.com/story.php?comment_id=123" });
     expect(result.items[0].outgoing).toBeUndefined();
     expect(result.items[0].text).not.toContain("https://");
-    expect(result.window).toMatchObject({ canReply: false, reason: "comment-origin" });
+    expect(result.window).toMatchObject({ canReply: false, mode: "private-reply", reason: "comment-unavailable" });
   });
 
   it("does not treat a prefilled comment or its system notice as an inbound DM", async () => {
@@ -204,7 +299,7 @@ describe("social inbox boundaries", () => {
     expect(replyWindow(ctx, [notice, commentCopy]).canReply).toBe(false);
     expect(replyWindow(ctx, [notice, commentCopy, incoming(0.5)]).canReply).toBe(true);
     get.mockResolvedValue({ data: [notice, commentCopy] });
-    await expect(sendInboxMessage(ctx, resourceHandle(ctx, "conversation", "thread1"), "reply")).rejects.toThrow("مغلقة");
+    await expect(sendInboxMessage(ctx, resourceHandle(ctx, "conversation", "thread1"), "reply")).rejects.toThrow("تعذر تأكيد");
     expect(post).not.toHaveBeenCalled();
   });
 

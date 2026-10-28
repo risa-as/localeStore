@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getSocialInboxList, getSocialInboxDetail, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, markSocialInboxRead,
   type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
-import type { InboxItem, InboxPage, SocialPlatform } from "@/lib/meta/inbox";
+import type { InboxItem, InboxPage, InboxReplyWindow, SocialPlatform } from "@/lib/meta/inbox";
 import { reconcileConversation, type ConversationReceipt } from "@/lib/meta/inbox-state";
 import ItemBody from "@/components/admin/social-inbox-item";
 import SocialInboxTools from "@/components/admin/social-inbox-tools";
@@ -27,11 +27,12 @@ import { groupInboxComments, type SelectedOrderFields } from "@/lib/meta/inbox-w
 import SocialInboxSelection from "@/components/admin/social-inbox-selection";
 import SocialInboxCommentGroup from "@/components/admin/social-inbox-comment-group";
 import SocialInboxOrderLookup from "@/components/admin/social-inbox-order-lookup";
+import SocialInboxConnectionCheck from "@/components/admin/social-inbox-connection-check";
 
 type Setup = Awaited<ReturnType<typeof getSocialInboxSetup>>;
 type Kind = "messages" | "comments";
 type MediaDraft = { file: File; preview: string; uploaded?: UploadedInboxMedia };
-type Detail = InboxPage & { window?: { expiresAt: string | null; canReply: boolean; reason?: "comment-origin" } | null };
+type Detail = InboxPage & { window?: InboxReplyWindow | null };
 const EMPTY: InboxPage = { items: [], after: null };
 const date = (value: string) => value && Number.isFinite(Date.parse(value))
   ? new Date(value).toLocaleString("ar-IQ", { dateStyle: "medium", timeStyle: "short" }) : "";
@@ -67,6 +68,7 @@ export default function SocialInboxClient({ setup }: { setup: Setup }) {
             <Button size="sm" disabled={sending} aria-pressed={platform === "facebook"} variant={platform === "facebook" ? "default" : "outline"} onClick={() => setPlatform("facebook")}>فيسبوك</Button>
             <Button size="sm" disabled={sending || !page?.igId} aria-pressed={platform === "instagram"} variant={platform === "instagram" ? "default" : "outline"} onClick={() => setPlatform("instagram")}>إنستغرام</Button>
           </div>{!page?.igId && <p className="text-xs text-muted-foreground">إنستغرام يحتاج حساباً احترافياً مرتبطاً بالصفحة ومصرّحاً للتطبيق.</p>}</>}
+          {!!pageId && setup.connected && setup.configured && <SocialInboxConnectionCheck key={`${pageId}:${platform}`} pageId={pageId} platform={platform} />}
           <Button asChild size="sm" variant="outline" className="w-full"><Link href={`/${locale}/admin/marketing`}>إعداد اتصال Meta <ExternalLink className="size-3" /></Link></Button>
         </PopoverContent>
       </Popover>
@@ -218,7 +220,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
             setList(prev => ({ ...prev, items: prev.items.map(conversation =>
               reconcileConversation(conversation, receipts.current[conversation.id])) }));
           }
-          if (platform !== "facebook" || result.data.metaSynced) {
+          if (platform !== "facebook" || result.data.metaSynced || result.data.metaSyncRequired === false) {
             metaReadReceipts.current[item.id] = messageId;
           } else {
             warning = "قُرئت الرسائل داخل النظام، لكن Meta لم تؤكد مزامنة القراءة. أعد المزامنة؛ لا حاجة لإعادة إرسال الرد.";
@@ -293,7 +295,14 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   const bookingKey = `${pageId}:${platform}:${selected?.id || ""}`;
   const draft = drafts[draftKey] || "";
   const pendingMedia = kind === "messages" && destination ? mediaDrafts[destination.id] : undefined;
-  const canReply = kind === "comments" || (!!detail.window?.canReply && !!detail.window.expiresAt && Date.parse(detail.window.expiresAt) > now);
+  const privateReply = kind === "messages" && detail.window?.mode === "private-reply";
+  const privateReplyLabel = !privateReply ? "الرد متاح"
+    : detail.window?.reason === "private-reply-expired" ? "انتهت مهلة التعليق"
+      : detail.window?.reason === "comment-unavailable" ? "الرد غير متاح" : "رد خاص على التعليق";
+  const privateReplyConsumed = privateReply && (outbox.entries[outboxScope] || []).some(entry => entry.conversationId === selected?.id &&
+    !!detail.window?.originMessageId && entry.previousMessageIds.includes(detail.window.originMessageId) && entry.item.deliveryStatus !== "failed");
+  const canReply = kind === "comments" || (!privateReplyConsumed && !!detail.window?.canReply && !!detail.window.expiresAt && Date.parse(detail.window.expiresAt) > now);
+  const canSendMedia = canReply && !privateReply;
   function updateMedia(id: string, item?: MediaDraft) {
     const previous = mediaDraftsRef.current[id];
     if (previous && previous.preview !== item?.preview) URL.revokeObjectURL(previous.preview);
@@ -302,7 +311,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     mediaDraftsRef.current = next; setMediaDrafts(next);
   }
   function selectMedia(file?: File) {
-    if (!file || !destination || kind !== "messages" || busy || !canReply) return;
+    if (!file || !destination || kind !== "messages" || busy || !canSendMedia) return;
     try {
       inboxMediaKind(file);
       updateMedia(destination.id, { file, preview: URL.createObjectURL(file) });
@@ -326,6 +335,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   async function send(openNext = false) {
     if (!destination || sendingNow.current || busy || loadingDetail || (!draft.trim() && !pendingMedia) || !canReply) return;
     if (kind === "messages") {
+      if (privateReply && pendingMedia) { setReplyError("الرد الأول على التعليق نصي فقط؛ أزل المرفق ثم أرسل ردك."); return; }
       // Capture this destination and draft; the operator may keep typing or switch conversations.
       sendingNow.current = true;
       queueMicrotask(() => { sendingNow.current = false; });
@@ -362,6 +372,11 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
         if (alive.current) {
           receipts.current[to.id] = { readMessageId: reply.id, reply, previousMessageIds };
           if (selectedId.current === to.id) {
+            if ("replyMode" in result.data && result.data.replyMode === "private-reply") {
+              const originMessageId = result.data.originMessageId;
+              setDetail(prev => ({ ...prev, window: prev.window && prev.window.originMessageId === originMessageId
+                ? { ...prev.window, canReply: false, reason: "private-reply-sent" } : prev.window }));
+            }
             if ("stateSaved" in result.data && !result.data.stateSaved)
               setNotice("أُرسلت الرسالة، لكن تعذر حفظ حالة المتابعة. لا تُعد إرسالها.");
             if (openNext) {
@@ -411,9 +426,14 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     { value: "answered", label: "تم الرد عليها", matches: (item: InboxItem) => item.outgoing === true },
   ];
   const visible = matching.filter(filters.find(option => option.value === filter)?.matches || filters[0].matches);
-  const detailItems = kind === "messages" ? mergeOutbox(detail.items, scopeEntries.filter(entry => entry.conversationId === selected?.id)).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)) : detail.items;
+  const detailItems = kind === "messages" ? mergeOutbox(detail.items, scopeEntries.filter(entry => entry.conversationId === selected?.id)).filter(item => !item.commentCopy).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)) : detail.items;
   const commentGroups = kind === "comments" ? groupInboxComments(detail.items) : [];
-  const replyWindowText = detail.window?.reason === "comment-origin"
+  const replyWindowText = privateReply
+    ? privateReplyConsumed || detail.window?.reason === "private-reply-sent" ? "الرد الخاص على التعليق لا يفتح نافذة المحادثة؛ انتظر رسالة خاصة جديدة من الزبون قبل إرسال المزيد."
+      : detail.window?.reason === "private-reply-expired" ? "انتهت مهلة الرد الخاص على هذا التعليق (7 أيام)."
+        : canReply ? `متاح رد خاص نصي واحد على التعليق حتى ${date(detail.window!.expiresAt!)}. تبدأ نافذة الرد العادي عندما يرسل الزبون رسالة خاصة.`
+          : "تعذر تأكيد إتاحة الرد الخاص على التعليق؛ حدّث المحادثة أو تابعها من Meta."
+    : detail.window?.reason === "comment-origin"
     ? "هذه المحادثة بدأت من تعليق؛ إشعار فيسبوك لا يفتح نافذة الرد العادي. استخدم عرض التعليق لمتابعته."
     : detail.window?.expiresAt ? canReply ? `الرد متاح حتى ${date(detail.window.expiresAt)}`
       : "انتهت نافذة الرد العادي (24 ساعة من آخر رسالة واردة)" : "افتح الرسائل للتحقق من نافذة الرد";
@@ -456,7 +476,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
           {selected && <Button className="lg:hidden" variant="ghost" size="sm" onClick={() => setMobileDetail(false)} aria-label="العودة إلى القائمة"><ArrowRight className="size-4" /></Button>}
           <div className="min-w-0 flex-1"><h2 className="font-semibold text-sm truncate">{selected?.title || "مساحة المحادثة"}</h2>
             {selected && <p className="text-[11px] text-muted-foreground">{platform === "facebook" ? "فيسبوك" : "إنستغرام"} · {kind === "messages" ? "محادثة خاصة" : "تعليقات عامة"}</p>}</div>
-          {selected && kind === "messages" && canReply && <Popover><PopoverTrigger asChild><button type="button" aria-label="تفاصيل نافذة الرد" className="rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 px-2 py-1 text-[11px] whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">الرد متاح</button></PopoverTrigger><PopoverContent dir="rtl" className="text-xs max-w-[calc(100vw-2rem)]">{replyWindowText}</PopoverContent></Popover>}
+          {selected && kind === "messages" && (canReply || privateReply) && <Popover><PopoverTrigger asChild><button type="button" aria-label="تفاصيل نافذة الرد" className={`rounded-full px-2 py-1 text-[11px] whitespace-nowrap focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${canReply ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400"}`}>{privateReply && (privateReplyConsumed || detail.window?.reason === "private-reply-sent") ? "بانتظار رد الزبون" : privateReplyLabel}</button></PopoverTrigger><PopoverContent dir="rtl" className="text-xs max-w-[calc(100vw-2rem)]">{replyWindowText}</PopoverContent></Popover>}
           {selected?.url && <a className="text-xs shrink-0" href={selected.url} target="_blank" rel="noopener noreferrer" aria-label="فتح المنشور"><ExternalLink className="size-4" /></a>}
           {selected && kind === "messages" && <SocialInboxOrderLookup key={`lookup:${selected.id}`} messages={detail.items} selectedPhone={bookingFields[bookingKey]?.phoneNumber} disabled={busy || loadingDetail} />}
           {selected && kind === "messages" && <SocialInboxOrder key={selected.id} scope={{ pageId, platform, handle: selected.handle }} suggestedProduct={orderProducts[selected.id]} disabled={busy || loadingDetail} onWorking={value => { setBusy(value); onSending(value); }} selectedFields={bookingFields[bookingKey]} onSelectedFieldChange={(field, value) => onBookingField(bookingKey, field, value)} />}
@@ -493,7 +513,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               onBookingField(bookingKey, field, value);
               setNotice(`أُضيف ${field === "phoneNumber" ? "رقم الهاتف" : "العنوان"} إلى مسودة الحجز. افتح «تجهيز طلب» للمراجعة.`);
             }} />}
-            {kind === "messages" ? !canReply && <p className="text-xs text-amber-700 dark:text-amber-400">{replyWindowText}</p> : target ? <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate">ردّ عام على {target.title}: {target.text}</span><Button disabled={busy} size="sm" variant="ghost" aria-label="إلغاء الرد على التعليق" onClick={() => setTarget(null)}><X className="size-3" /></Button></div> : <p className="text-xs text-muted-foreground">اختر «ردّ على التعليق» لتحديد التعليق المستهدف.</p>}
+            {kind === "messages" ? (!canReply || privateReply) && <p className={`text-xs ${canReply ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>{replyWindowText}</p> : target ? <div className="flex items-center justify-between gap-2 text-xs"><span className="truncate">ردّ عام على {target.title}: {target.text}</span><Button disabled={busy} size="sm" variant="ghost" aria-label="إلغاء الرد على التعليق" onClick={() => setTarget(null)}><X className="size-3" /></Button></div> : <p className="text-xs text-muted-foreground">اختر «ردّ على التعليق» لتحديد التعليق المستهدف.</p>}
             {destination && <>{pendingMedia && <div className="flex items-center gap-3 rounded-lg border bg-muted/20 p-2" aria-label="معاينة المرفق">
               {pendingMedia.file.type.startsWith("image/") ? <Image unoptimized src={pendingMedia.preview} alt="معاينة الصورة المختارة" width={64} height={48} className="h-12 w-16 rounded object-contain" />
                 : <video src={pendingMedia.preview} controls preload="metadata" className="h-16 w-24 rounded object-contain" aria-label="معاينة الفيديو المختار" />}
@@ -505,8 +525,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
             </div>}<Textarea ref={composer} aria-label="نص الرد" placeholder={kind === "messages" ? "اكتب ردّك…" : "اكتب رداً عاماً على التعليق…"} value={draft} maxLength={1000} disabled={busy || !canReply || loadingDetail} onChange={e => { onDraft(draftKey, e.target.value); if (notice) setNotice(""); }} onKeyDown={e => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} rows={2} className="min-h-14 max-h-28 resize-none bg-muted/20 shadow-none focus-visible:ring-1" />
               {draft.trim().startsWith("/") && <Button size="sm" variant="outline" onClick={() => setToolsOpen(true)}>اختيار الرد الجاهز المطابق للاختصار</Button>}
               <div className="flex justify-between items-center gap-2 text-[11px] text-muted-foreground"><div className="flex items-center gap-2">{kind === "messages" && <>
-                <input ref={filePicker} type="file" accept={INBOX_MEDIA_ACCEPT} className="sr-only" aria-label="اختيار صورة أو فيديو" disabled={busy || !canReply || loadingDetail} onChange={e => { selectMedia(e.target.files?.[0]); e.target.value = ""; }} />
-                <Button size="icon" variant="ghost" className="size-8" title="إرفاق صورة (حتى 8MB) أو فيديو MP4 (حتى 25MB)" aria-label="إرفاق صورة أو فيديو" disabled={busy || !canReply || loadingDetail} onClick={() => filePicker.current?.click()}><Paperclip /></Button>
+                <input ref={filePicker} type="file" accept={INBOX_MEDIA_ACCEPT} className="sr-only" aria-label="اختيار صورة أو فيديو" disabled={busy || !canSendMedia || loadingDetail} onChange={e => { selectMedia(e.target.files?.[0]); e.target.value = ""; }} />
+                <Button size="icon" variant="ghost" className="size-8" title={privateReply ? "الرد الأول على التعليق نصي فقط" : "إرفاق صورة (حتى 8MB) أو فيديو MP4 (حتى 25MB)"} aria-label="إرفاق صورة أو فيديو" disabled={busy || !canSendMedia || loadingDetail} onClick={() => filePicker.current?.click()}><Paperclip /></Button>
               </>}<span>{draft.length}/1000 · {kind === "comments" ? "رد علني" : "رسالة خاصة"}<span className="hidden md:inline"> · Ctrl + Enter للإرسال</span></span></div>
                 <div className="flex gap-px rounded-lg overflow-hidden shrink-0"><Button size="sm" className="rounded-none shadow-none" disabled={busy || (!draft.trim() && !pendingMedia) || !canReply || loadingDetail} onClick={() => void send()}>{busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}{pendingMedia ? "إرسال المرفق" : "إرسال"}</Button>
                   <DropdownMenu dir="rtl"><DropdownMenuTrigger asChild><Button size="sm" className="rounded-none px-2 shadow-none" aria-label="خيارات الإرسال" disabled={busy || (!draft.trim() && !pendingMedia) || !canReply || loadingDetail}><ChevronDown /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => void send(true)}><SkipForward className="size-4" />إرسال وفتح التالي</DropdownMenuItem></DropdownMenuContent></DropdownMenu>

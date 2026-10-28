@@ -13,6 +13,7 @@ export type InboxItem = {
   id: string; handle: string; title: string; text: string; time: string;
   outgoing?: boolean; unread?: number; url?: string; lastMessageId?: string;
   system?: "comment-origin"; commentUrl?: string;
+  commentCopy?: boolean;
   deliveryStatus?: DeliveryStatus;
   sendError?: string;
   authorId?: string;
@@ -20,7 +21,11 @@ export type InboxItem = {
   attachments?: { name: string; url: string; kind?: "image" | "sticker" | "audio" | "video" | "file"; width?: number; height?: number }[];
 };
 export type InboxPage = { items: InboxItem[]; after: string | null };
-export type InboxOrigin = { comment: InboxItem; post: InboxItem | null; commentUnavailable?: boolean; products?: InboxProduct[] };
+export type InboxOrigin = { comment: InboxItem; post: InboxItem | null; commentUnavailable?: boolean; products?: InboxProduct[];
+  privateReply?: { commentId: string; createdAt: string; allowed: boolean; alreadyReplied: boolean; noticeId: string } };
+export type InboxReplyWindow = { recipient: string | null; expiresAt: string | null; canReply: boolean;
+  reason?: "comment-origin" | "private-reply-sent" | "private-reply-expired" | "comment-unavailable";
+  mode?: "private-reply"; originMessageId?: string };
 export type GraphPage<T> = {
   data?: T[];
   paging?: { next?: string; cursors?: { after?: string } };
@@ -87,7 +92,7 @@ export function commentOriginNotice(value = "") {
   const candidate = safeSocialUrl(match?.[0]);
   const host = candidate ? new URL(candidate).hostname : "";
   const commentUrl = /^(?:[a-z0-9-]+\.)*facebook\.com$/i.test(host) ? candidate : undefined;
-  return { text: text.replace(/(?:عرض التعليق|View comment)\s*\(https?:\/\/[^\s<>()]+\)/iu, "").trim(), commentUrl };
+  return { text: text.replace(/(?:عرض التعليق|View comment|See comment)\s*\(https?:\/\/[^\s<>()]+\)/iu, "").trim(), commentUrl };
 }
 
 function inlineMediaUrl(value?: string) {
@@ -126,17 +131,55 @@ function latestMessage(messages: Message[]) {
   return [...messages].sort((a, b) => (Date.parse(b.created_time || "") || 0) - (Date.parse(a.created_time || "") || 0))[0];
 }
 
-export function replyWindow(ctx: InboxContext, messages: Message[], now = Date.now()) {
+const messageText = (text = "") => text.normalize("NFKC").replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "").replace(/\s+/g, " ").trim();
+function latestOrigin(ctx: InboxContext, messages: Message[]) {
+  return ctx.platform === "facebook" ? latestMessage(messages.filter(m => commentOriginNotice(m.message))) : undefined;
+}
+
+function copiedComment(ctx: InboxContext, messages: Message[], origin?: InboxOrigin | null) {
+  const notice = latestOrigin(ctx, messages);
+  if (!notice) return undefined;
+  const at = Date.parse(notice.created_time || "");
+  const first = messages.filter(m => m.from?.id && !own(ctx, m.from.id) && !commentOriginNotice(m.message) && Date.parse(m.created_time || "") > at)
+    .sort((a, b) => Date.parse(a.created_time || "") - Date.parse(b.created_time || ""))[0];
+  // Meta inserts a comment copy a few seconds AFTER the system notice. Until its
+  // source can be verified, that first near-simultaneous item is not evidence of a DM.
+  if (!first || Date.parse(first.created_time || "") > at + 60000 || first.attachments?.data?.length || first.sticker) return undefined;
+  return !origin || origin.commentUnavailable || messageText(first.message) === messageText(origin.comment.text) ? first.id : undefined;
+}
+
+export function replyWindow(ctx: InboxContext, messages: Message[], now = Date.now(), origin?: InboxOrigin | null): InboxReplyWindow {
   const notices = ctx.platform === "facebook" ? messages.filter(m => commentOriginNotice(m.message)) : [];
   const originAt = Math.max(...notices.map(m => Date.parse(m.created_time || "")).filter(Number.isFinite), -Infinity);
+  const copyId = copiedComment(ctx, messages, origin);
   const incoming = messages.filter(m => m.from?.id && !own(ctx, m.from.id) &&
-      !(ctx.platform === "facebook" && commentOriginNotice(m.message)) && Date.parse(m.created_time || "") > originAt)
+      m.id !== copyId && !(ctx.platform === "facebook" && commentOriginNotice(m.message)) && Date.parse(m.created_time || "") > originAt)
     .map(m => ({ recipient: m.from!.id, at: Date.parse(m.created_time || "") }))
     .filter(m => Number.isFinite(m.at) && m.at <= now)
     .sort((a, b) => b.at - a.at)[0];
   const expires = incoming ? incoming.at + 86400000 : null;
   return { recipient: incoming?.recipient ?? null, expiresAt: expires ? new Date(expires).toISOString() : null,
     canReply: !!expires && expires > now, reason: !incoming && notices.length ? "comment-origin" as const : undefined };
+}
+
+async function resolveInboxReply(ctx: InboxContext, messages: Message[]) {
+  const initial = replyWindow(ctx, messages);
+  if (initial.reason !== "comment-origin") return { window: initial, copyId: undefined, commentId: undefined };
+  const notice = latestOrigin(ctx, messages)!;
+  const origin = await inboxOriginFromHistory(ctx, messages, notice.id);
+  const standard = replyWindow(ctx, messages, Date.now(), origin);
+  const copyId = copiedComment(ctx, messages, origin);
+  if (standard.reason !== "comment-origin") return { window: standard, copyId, commentId: undefined };
+  const source = origin?.privateReply;
+  const created = Date.parse(source?.createdAt || "");
+  const expiry = created + 7 * 86400000;
+  const alreadyReplied = !!source?.alreadyReplied || messages.some(m => own(ctx, m.from?.id) && Date.parse(m.created_time || "") >= created);
+  const canReply = !!origin?.post && !!source?.allowed && !alreadyReplied && created <= Date.now() && expiry > Date.now();
+  const window: InboxReplyWindow = { ...standard, canReply, mode: "private-reply", originMessageId: notice.id,
+    expiresAt: Number.isFinite(expiry) ? new Date(expiry).toISOString() : null,
+    reason: alreadyReplied ? "private-reply-sent" : Number.isFinite(expiry) && expiry <= Date.now() ? "private-reply-expired"
+      : canReply ? "comment-origin" : "comment-unavailable" };
+  return { window, copyId, commentId: source?.commentId };
 }
 
 const messageFields = (ctx: InboxContext) => `id,message,from,created_time,attachments${ctx.platform === "facebook" ? ",sticker" : ""}`;
@@ -160,7 +203,7 @@ export async function listInboxConversations(ctx: InboxContext, after?: string):
   }), after: next(res) };
 }
 
-export async function readInboxMessages(ctx: InboxContext, handle: string, after?: string) {
+export async function readInboxMessages(ctx: InboxContext, handle: string, after?: string, withReplyContext = true) {
   const id = resourceId(ctx, "conversation", handle);
   const res = await graphGet<GraphPage<Message>>(`${path(id)}/messages`, ctx.token,
     { ...params(after), fields: messageFields(ctx) });
@@ -169,10 +212,11 @@ export async function readInboxMessages(ctx: InboxContext, handle: string, after
     const conversation = await graphGet<{ participants?: { data?: Person[] } }>(path(id), ctx.token, { fields: "participants" });
     recipientId = conversation.participants?.data?.find(person => !own(ctx, person.id))?.id;
   }
+  const reply = after || !withReplyContext ? null : await resolveInboxReply(ctx, res.data ?? []);
   // Older pagination pages must never extend the reply window.
-  return { items: (res.data ?? []).map(m => messageItem(ctx, m)), after: next(res),
+  return { items: (res.data ?? []).map(m => ({ ...messageItem(ctx, m), ...(m.id === reply?.copyId ? { commentCopy: true } : {}) })), after: next(res),
     recipientId,
-    window: after ? null : replyWindow(ctx, res.data ?? []),
+    window: reply?.window ?? null,
     latestMessageId: after ? undefined : latestMessage(res.data ?? [])?.id };
 }
 
@@ -182,16 +226,21 @@ export async function readInboxOrigin(ctx: InboxContext, handle: string, message
   if (ctx.platform !== "facebook") return null;
   const history = await graphGet<GraphPage<Message>>(`${path(id)}/messages`, ctx.token,
     { fields: "id,message,from,created_time", limit: "100" });
-  const link = (history.data || []).filter(message => !messageId || message.id === messageId)
-    .map(message => commentOriginNotice(message.message)?.commentUrl).find(Boolean);
+  return inboxOriginFromHistory(ctx, history.data || [], messageId);
+}
+
+async function inboxOriginFromHistory(ctx: InboxContext, history: Message[], messageId?: string): Promise<InboxOrigin | null> {
+  const notice = history.filter(message => !messageId || message.id === messageId)
+    .find(message => commentOriginNotice(message.message)?.commentUrl);
+  const link = notice && commentOriginNotice(notice.message)?.commentUrl;
   if (!link) return null;
   const sourceUrl = new URL(link);
   const commentId = sourceUrl.searchParams.get("comment_id");
   if (!commentId || !/^\d{1,100}$/.test(commentId)) return null;
-  let source: Comment & { object?: { id?: string } } = { id: commentId };
+  let source: Comment & { object?: { id?: string }; can_reply_privately?: boolean; private_reply_conversation?: { id?: string } } = { id: commentId };
   let commentUnavailable = false;
   try {
-    source = await graphGet<typeof source>(path(commentId), ctx.token, { fields: "id,message,from,created_time,object{id}" });
+    source = await graphGet<typeof source>(path(commentId), ctx.token, { fields: "id,message,from,created_time,object{id},can_reply_privately,private_reply_conversation" });
   } catch (error) {
     if (error instanceof GraphError && error.code === 190) throw error;
     // Deleted/restricted comments must not prevent loading an accessible post.
@@ -237,7 +286,9 @@ export async function readInboxOrigin(ctx: InboxContext, handle: string, message
       // The comment remains useful when its post is unavailable to this app.
     }
   }
-  return { comment, post, ...(commentUnavailable ? { commentUnavailable: true } : {}) };
+  return { comment, post, ...(commentUnavailable ? { commentUnavailable: true } : {}),
+    privateReply: { commentId: source.id, createdAt: source.created_time || "", allowed: source.can_reply_privately === true,
+      alreadyReplied: !!source.private_reply_conversation, noticeId: notice!.id } };
 }
 
 /** Only acknowledge the message the administrator actually loaded, never a newer arrival. */
@@ -248,6 +299,9 @@ export async function markInboxConversationRead(ctx: InboxContext, handle: strin
   const res = await graphGet<GraphPage<Message>>(`${path(id)}/messages`, ctx.token,
     { fields: "id,message,from,created_time", limit: "100" });
   if (latestMessage(res.data ?? [])?.id !== observedMessageId) return { marked: false };
+  const reply = await resolveInboxReply(ctx, res.data ?? []);
+  if (reply.window.mode === "private-reply")
+    return { marked: true, messageId: observedMessageId, metaSynced: false, metaSyncRequired: false };
   const recipient = (res.data ?? []).find(message => message.from?.id && !own(ctx, message.from.id))?.from?.id;
   let metaSynced = false;
   if (ctx.platform === "facebook" && recipient) {
@@ -260,26 +314,35 @@ export async function markInboxConversationRead(ctx: InboxContext, handle: strin
   return { marked: true, messageId: observedMessageId, metaSynced };
 }
 
-export async function sendInboxMessage(ctx: InboxContext, handle: string, text: string) {
-  return sendInboxContent(ctx, handle, { text });
+export async function sendInboxMessage(ctx: InboxContext, handle: string, text: string, beforePrivateReply?: (noticeId: string) => Promise<void>) {
+  return sendInboxContent(ctx, handle, { text }, beforePrivateReply);
 }
 
 export async function sendInboxMediaMessage(ctx: InboxContext, handle: string, media: InboxMedia) {
   return sendInboxContent(ctx, handle, { attachment: { type: media.kind, payload: { url: media.url } } });
 }
 
-async function sendInboxContent(ctx: InboxContext, handle: string, message: Record<string, unknown>) {
+async function sendInboxContent(ctx: InboxContext, handle: string, message: Record<string, unknown>, beforePrivateReply?: (noticeId: string) => Promise<void>) {
   const id = resourceId(ctx, "conversation", handle);
   // Re-read on the server at send time; never accept a client recipient/window.
   const res = await graphGet<GraphPage<Message>>(`${path(id)}/messages`, ctx.token,
     { fields: "id,message,from,created_time", limit: "100" });
-  const window = replyWindow(ctx, res.data ?? []);
-  if (!window.canReply || !window.recipient)
+  const { window, commentId } = await resolveInboxReply(ctx, res.data ?? []);
+  if (window.mode === "private-reply" && !window.canReply)
+    throw new Error(window.reason === "private-reply-sent" ? "أُرسل الرد الخاص على التعليق؛ انتظر رسالة خاصة جديدة من الزبون قبل المتابعة."
+      : window.reason === "private-reply-expired" ? "انتهت مهلة الرد الخاص على التعليق (7 أيام). افتح المصدر في فيسبوك."
+      : "تعذر تأكيد إتاحة الرد الخاص على هذا التعليق؛ حدّث المحادثة أو تابعها من Meta.");
+  if (!window.canReply || (window.mode !== "private-reply" && !window.recipient))
     throw new Error("نافذة الرد العادي مغلقة أو لم نجد رسالة واردة حديثة. افتح المحادثة في Meta Business Suite.");
+  if (window.mode === "private-reply" && (message.attachment || !commentId))
+    throw new Error("الرد الأول على التعليق نصي فقط؛ أرسل الصور والفيديو بعد أن يرد الزبون برسالة خاصة.");
+  if (window.mode === "private-reply") await beforePrivateReply?.(window.originMessageId!);
   const sent = await graphPost<{ message_id?: string }>(`${path(ctx.pageId)}/messages`, ctx.token,
-    { recipient: { id: window.recipient }, messaging_type: "RESPONSE", message });
+    window.mode === "private-reply" ? { recipient: { comment_id: commentId }, message }
+      : { recipient: { id: window.recipient }, messaging_type: "RESPONSE", message });
   if (!sent?.message_id) throw new Error("لم تؤكد Meta إرسال الرسالة؛ تحقّق من المحادثة قبل إعادة المحاولة");
-  return { id: sent.message_id, previousMessageIds: (res.data ?? []).map(message => message.id) };
+  return { id: sent.message_id, previousMessageIds: (res.data ?? []).map(message => message.id),
+    ...(window.mode === "private-reply" ? { replyMode: "private-reply" as const, originMessageId: window.originMessageId } : {}) };
 }
 
 export async function listInboxPosts(ctx: InboxContext, after?: string): Promise<InboxPage> {
