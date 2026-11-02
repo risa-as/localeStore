@@ -415,6 +415,43 @@ function iraqBounds(from: Date, to: Date) {
   };
 }
 
+/**
+ * أرقام الفترة من دوال صفحة الأرباح — ثقيلة (8 أشهر ≈ ثوانٍ عدة لأنها تعيد
+ * حساب تكلفة الدفعات لكل المنتجات)، وكل المنتجات تخرج من نداء واحد. لذلك
+ * تُحفظ مؤقتاً 5 دقائق لكل نافذة، فاختيار منتج آخر لا يعيد الحساب.
+ */
+const PERIOD_TTL_MS = 5 * 60_000;
+type PeriodNumbers = [
+  Awaited<ReturnType<typeof getOrderProfitStats>>,
+  Awaited<ReturnType<typeof getExpenseStatsForPeriod>>,
+];
+const periodCache = new Map<string, { at: number; value: Promise<PeriodNumbers> }>();
+
+function loadPeriod(from: Date, to: Date): Promise<PeriodNumbers> {
+  const key = `${from.toISOString().slice(0, 10)}|${to.toISOString().slice(0, 10)}`;
+  const hit = periodCache.get(key);
+  if (hit && Date.now() - hit.at < PERIOD_TTL_MS) return hit.value;
+  const value = Promise.all([getOrderProfitStats({ from, to }), getExpenseStatsForPeriod(from, to)]);
+  periodCache.set(key, { at: Date.now(), value });
+  // نداء فاشل لا يبقى في الذاكرة.
+  value.catch(() => periodCache.delete(key));
+  for (const [k, v] of periodCache) if (Date.now() - v.at >= PERIOD_TTL_MS) periodCache.delete(k);
+  return value;
+}
+
+/** تحذير المزامنة نفسه الذي تعرضه صفحة الأرباح. */
+function syncWarnings(lastSync: Awaited<ReturnType<typeof getLastSync>> | null): HistoryWarning[] {
+  const warnings: HistoryWarning[] = [];
+  if (!lastSync) return warnings;
+  const stale = lastSync.date
+    ? Math.floor((Date.now() - new Date(`${lastSync.date}T12:00:00.000Z`).getTime()) / 86400_000)
+    : null;
+  if (lastSync.ranAt === null) warnings.push({ kind: "sync", text: "لم تُشغَّل مزامنة الصرف الإعلاني بعد — تكلفة الإعلان الفعلية غير مكتملة." });
+  else if (!lastSync.ok) warnings.push({ kind: "sync", text: `فشلت آخر مزامنة للصرف الإعلاني (${lastSync.date ?? ""}) — تكلفة الإعلان قد تكون ناقصة والربح أعلى من الحقيقة.` });
+  else if (stale !== null && stale > 2) warnings.push({ kind: "sync", text: `آخر مزامنة للصرف الإعلاني قبل ${stale} يوماً — تكلفة الإعلان قد تكون ناقصة.` });
+  return warnings;
+}
+
 export type HistoryWarning = { kind: "sync" | "fx" | "sample"; text: string };
 
 export type ProductHistoryStats = {
@@ -447,9 +484,8 @@ export type HistoryReport = {
  */
 async function loadHistory(from: Date, to: Date, minOrders: number, productIds?: string[]): Promise<HistoryReport> {
   const { start, end } = iraqBounds(from, to);
-  const [profit, expenses, lastSync, items] = await Promise.all([
-    getOrderProfitStats({ from, to }),
-    getExpenseStatsForPeriod(from, to),
+  const [[profit, expenses], lastSync, items] = await Promise.all([
+    loadPeriod(from, to),
     getLastSync().catch(() => null),
     prisma.orderItem.findMany({
       where: {
@@ -527,16 +563,7 @@ async function loadHistory(from: Date, to: Date, minOrders: number, productIds?:
     };
   }
 
-  const warnings: HistoryWarning[] = [];
-  const DAY = 86400_000;
-  if (lastSync) {
-    const stale = lastSync.date
-      ? Math.floor((Date.now() - new Date(`${lastSync.date}T12:00:00.000Z`).getTime()) / DAY)
-      : null;
-    if (lastSync.ranAt === null) warnings.push({ kind: "sync", text: "لم تُشغَّل مزامنة الصرف الإعلاني بعد — تكلفة الإعلان الفعلية غير مكتملة." });
-    else if (!lastSync.ok) warnings.push({ kind: "sync", text: `فشلت آخر مزامنة للصرف الإعلاني (${lastSync.date ?? ""}) — تكلفة الإعلان قد تكون ناقصة والربح أعلى من الحقيقة.` });
-    else if (stale !== null && stale > 2) warnings.push({ kind: "sync", text: `آخر مزامنة للصرف الإعلاني قبل ${stale} يوماً — تكلفة الإعلان قد تكون ناقصة.` });
-  }
+  const warnings = syncWarnings(lastSync);
   if (expenses.droppedNoFxCount > 0) {
     warnings.push({ kind: "fx", text: `${expenses.droppedNoFxCount} إدخال إعلاني بالدولار بلا سعر صرف يغطيه — مستبعد من الحساب.` });
   }
@@ -589,48 +616,83 @@ export type ReorderAlert = {
   hasOpenCandidate: boolean;
 };
 
+/**
+ * سرعة خروج القطع من المخزن لكل منتج — نفس تعريف loadHistory (مسلَّم + في
+ * الطريق ÷ أيام البيع الفعلية) لكن باستعلام خفيف واحد بدل حساب الأرباح كاملاً.
+ */
+async function loadVelocity(from: Date, to: Date) {
+  const { end, start } = iraqBounds(from, to);
+  const items = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        createdAt: { gte: start, lte: end },
+        status: { in: [...REVENUE_STATUSES, ...RETURN_STATUSES, ...IN_TRANSIT_STATUSES] },
+      },
+    },
+    select: { productId: true, qty: true, order: { select: { status: true, createdAt: true } } },
+  });
+  const windowDays = Math.round((to.getTime() - from.getTime()) / 86400_000) + 1;
+  const acc = new Map<string, { units: number; firstAt: number }>();
+  for (const i of items) {
+    const a = acc.get(i.productId) ?? { units: 0, firstAt: Infinity };
+    if (!RETURN_STATUSES.includes(i.order.status)) a.units += i.qty;
+    a.firstAt = Math.min(a.firstAt, i.order.createdAt.getTime());
+    acc.set(i.productId, a);
+  }
+  const out = new Map<string, number>();
+  for (const [id, a] of acc) {
+    const days = Math.min(windowDays, Math.max(1, Math.ceil((end.getTime() - a.firstAt) / 86400_000)));
+    out.set(id, a.units / days);
+  }
+  return { perDay: out, windowDays };
+}
+
 /** منتجات تقترب من النفاد قبل أن تصل شحنة جديدة — للوحة القيادة. */
 export async function getReorderAlerts(): Promise<{ alerts: ReorderAlert[]; warnings: HistoryWarning[]; windowDays: number }> {
   await requireAdministrator();
   const settings = await loadSettings();
   const to = iraqDay();
   const from = iraqDay(-(settings.historyWindowDays - 1));
-  const [report, open, internal] = await Promise.all([
-    loadHistory(from, to, settings.minHistoryOrders),
+  const [velocity, lastSync, open] = await Promise.all([
+    loadVelocity(from, to),
+    getLastSync().catch(() => null),
     prisma.importCandidate.findMany({
       where: { productId: { not: null }, status: { notIn: ["converted", "rejected"] } },
       select: { productId: true },
     }),
-    prisma.product.findMany({ where: { NOT: EXCLUDE_INTERNAL_PRODUCTS }, select: { id: true } }),
   ]);
+  const products = await prisma.product.findMany({
+    where: { ...EXCLUDE_INTERNAL_PRODUCTS, id: { in: [...velocity.perDay.keys()] } },
+    select: { id: true, name: true, stock: true },
+  });
   const openIds = new Set(open.map((o) => o.productId));
-  const hidden = new Set(internal.map((p) => p.id));
   // الإنذار المبكر: من سينفد خلال مدة الشحن + أسبوعين.
   const horizon = settings.leadTimeDays + 14;
   const alerts: ReorderAlert[] = [];
-  for (const s of Object.values(report.products)) {
-    if (hidden.has(s.productId) || s.unitsPerDay <= 0) continue;
+  for (const p of products) {
+    const unitsPerDay = velocity.perDay.get(p.id) ?? 0;
+    if (unitsPerDay <= 0) continue;
     const r = reorderAdvice({
-      stock: s.stock,
-      unitsPerDay: s.unitsPerDay,
+      stock: p.stock,
+      unitsPerDay,
       leadTimeDays: settings.leadTimeDays,
       coverDays: settings.reorderCoverDays,
     });
     if (r.daysToStockout === null || r.daysToStockout > horizon) continue;
     alerts.push({
-      productId: s.productId,
-      name: s.name,
-      stock: s.stock,
-      unitsPerDay: s.unitsPerDay,
+      productId: p.id,
+      name: p.name,
+      stock: p.stock,
+      unitsPerDay,
       daysToStockout: r.daysToStockout,
       daysUntilOrder: r.daysUntilOrder,
       suggestedQty: r.suggestedQty,
       orderNow: r.orderNow,
-      hasOpenCandidate: openIds.has(s.productId),
+      hasOpenCandidate: openIds.has(p.id),
     });
   }
   alerts.sort((a, b) => (a.daysToStockout ?? 0) - (b.daysToStockout ?? 0));
-  return { alerts, warnings: report.warnings, windowDays: report.windowDays };
+  return { alerts, warnings: syncWarnings(lastSync), windowDays: velocity.windowDays };
 }
 
 /** سعر الصرف الساري — يُعبّأ افتراضياً في كل منتج جديد. */
@@ -730,6 +792,8 @@ export async function convertImportCandidate(id: string, data: ArrivalInput) {
       });
     });
 
+    // دفعة جديدة تغيّر تكلفة البضاعة المحسوبة — لا تُعرض أرقام قديمة من الذاكرة.
+    periodCache.clear();
     revalidateImportPages(id);
     revalidatePath("/admin/batches");
     revalidatePath("/admin/products");
