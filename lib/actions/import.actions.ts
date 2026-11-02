@@ -275,7 +275,8 @@ function candidateData(p: z.output<typeof candidateSchema>) {
   return {
     name: p.name,
     kind: p.kind,
-    productId: p.kind === "reimport" ? p.productId ?? null : p.productId ?? null,
+    // منتج جديد لا يرتبط بمنتج إلا عند الوصول — حتى لا يبقى ربط قديم من اختيار سابق.
+    productId: p.kind === "reimport" ? p.productId ?? null : null,
     supplierName: p.supplierName || null,
     supplierUrl: p.supplierUrl || null,
     notes: p.notes || null,
