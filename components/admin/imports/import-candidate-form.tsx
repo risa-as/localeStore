@@ -666,13 +666,13 @@ export default function ImportCandidateForm({
                       {history.reorder.orderNow
                         ? "اطلب الآن — المخزون سينفد قبل وصول شحنة جديدة."
                         : `يجب الطلب خلال ${fmtNum(history.reorder.daysUntilOrder)} يوم تقريباً.`}{" "}
-                      الكمية المقترحة: <strong>{fmtNum(Math.max(history.reorder.suggestedQty, num(f.moq)))}</strong> قطعة (تغطي {settings.reorderCoverDays} يوماً بعد الوصول).
+                      الكمية المقترحة: <strong>{fmtNum(history.reorder.suggestedQty)}</strong> قطعة (تغطي {settings.reorderCoverDays} يوماً بعد الوصول).
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={locked}
-                      onClick={() => set("quantity")(String(Math.max(history.reorder!.suggestedQty, num(f.moq))))}
+                      onClick={() => set("quantity")(String(history.reorder!.suggestedQty))}
                     >
                       استخدم الكمية المقترحة
                     </Button>
@@ -695,7 +695,6 @@ export default function ImportCandidateForm({
         <Section title="الشراء من الصين">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field id="ic-qty" label="الكمية" unit="قطعة" step="1" value={f.quantity} onChange={set("quantity")} disabled={locked} />
-            <Field id="ic-moq" label="الحد الأدنى للمورد" unit="قطعة" step="1" value={f.moq} onChange={set("moq")} disabled={locked} />
             <Field id="ic-unit" label="سعر القطعة" unit="$" value={f.unitPriceUsd} onChange={set("unitPriceUsd")} hint={usdHint(f.unitPriceUsd)} disabled={locked} />
             <Field id="ic-ship" label="الشحن الدولي للشحنة كاملة" unit="$" value={f.intlShippingUsd} onChange={set("intlShippingUsd")} hint={usdHint(f.intlShippingUsd)} disabled={locked} />
             <Field id="ic-ali" label="عمولة علي بابا" unit="٪" value={f.alibabaFeePct} onChange={set("alibabaFeePct")} hint="على البضاعة + الشحن" disabled={locked} />
