@@ -219,8 +219,14 @@ function Field({
       <Label htmlFor={id} className="text-xs">
         {label}
       </Label>
-      {/* الوحدة في خانة مستقلة بجانب الحقل — لو رُسمت داخله تغطي الرقم في الاتجاه العربي. */}
-      <div className="flex items-stretch">
+      {/* الحقل والوحدة إطار واحد: الحدود والزوايا على الغلاف، فلا تتأثر باتجاه
+          الحقل (ltr للأرقام) ولا تغطي الوحدة الرقم. */}
+      <div
+        className={cn(
+          "flex h-9 items-stretch overflow-hidden rounded-md border border-input shadow-sm focus-within:ring-1 focus-within:ring-ring",
+          disabled && "opacity-50",
+        )}
+      >
         <Input
           id={id}
           type="number"
@@ -230,10 +236,10 @@ function Field({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={cn("min-w-0 text-right tabular-nums", unit && "rounded-e-none")}
+          className="h-full min-w-0 rounded-none border-0 text-right tabular-nums shadow-none focus-visible:ring-0 disabled:opacity-100"
         />
         {unit && (
-          <span className="flex shrink-0 items-center whitespace-nowrap rounded-e-md border border-s-0 border-input bg-muted px-2.5 text-[11px] text-muted-foreground">
+          <span className="flex shrink-0 items-center whitespace-nowrap border-s border-input bg-muted px-2.5 text-[11px] text-muted-foreground">
             {unit}
           </span>
         )}
