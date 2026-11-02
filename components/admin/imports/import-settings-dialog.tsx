@@ -23,7 +23,6 @@ type Key = keyof ImportSettingsDTO;
 const FIELDS: { key: Key; label: string; hint?: string; group: string }[] = [
   { key: "alibabaFeePct", label: "عمولة علي بابا (٪)", hint: "على البضاعة + الشحن", group: "العمولات" },
   { key: "cardFeePct", label: "عمولة البطاقة (٪)", hint: "تشمل فرق صرف البنك", group: "العمولات" },
-  { key: "cardFixedUsd", label: "رسوم البطاقة الثابتة ($)", hint: "لكل عملية دفع", group: "العمولات" },
   { key: "opsCostPerUnitKiqd", label: "تكاليف التشغيل للقطعة (بالألف)", hint: "تغليف وما شابه — 0.05 = 50 د.ع", group: "التكاليف والبيع" },
   { key: "defaultDeliveryRatePct", label: "نسبة نجاح التوصيل الافتراضية (٪)", group: "التكاليف والبيع" },
   { key: "defaultCpaUsd", label: "تكلفة الإعلان لكل طلب الافتراضية ($)", group: "التكاليف والبيع" },

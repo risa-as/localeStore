@@ -121,7 +121,8 @@ function initialState(
       intlShippingUsd: s(i.intlShippingUsd),
       alibabaFeePct: s(i.alibabaFeePct),
       cardFeePct: s(i.cardFeePct),
-      cardFixedUsd: s(i.cardFixedUsd),
+      // عمولة البطاقة النسبية تكفي — الرسوم الثابتة لم تعد تُدخل.
+      cardFixedUsd: "0",
       fxRate: s(i.fxRate),
       customsKiqd: s(i.customsKiqd),
       oneOffKiqd: s(i.oneOffKiqd),
@@ -147,7 +148,7 @@ function initialState(
     intlShippingUsd: "0",
     alibabaFeePct: s(settings.alibabaFeePct),
     cardFeePct: s(settings.cardFeePct),
-    cardFixedUsd: s(settings.cardFixedUsd),
+    cardFixedUsd: "0",
     fxRate: s(fx),
     customsKiqd: "0",
     oneOffKiqd: "0",
@@ -699,7 +700,6 @@ export default function ImportCandidateForm({
             <Field id="ic-ship" label="الشحن الدولي للشحنة كاملة" unit="$" value={f.intlShippingUsd} onChange={set("intlShippingUsd")} hint={usdHint(f.intlShippingUsd)} disabled={locked} />
             <Field id="ic-ali" label="عمولة علي بابا" unit="٪" value={f.alibabaFeePct} onChange={set("alibabaFeePct")} hint="على البضاعة + الشحن" disabled={locked} />
             <Field id="ic-card" label="عمولة البطاقة" unit="٪" value={f.cardFeePct} onChange={set("cardFeePct")} hint="على كل ما يُدفع بالبطاقة" disabled={locked} />
-            <Field id="ic-cardfix" label="رسوم البطاقة الثابتة" unit="$" value={f.cardFixedUsd} onChange={set("cardFixedUsd")} disabled={locked} />
             <Field
               id="ic-fx"
               label="سعر الصرف (للبضاعة والإعلانات)"
