@@ -1,0 +1,257 @@
+"use client";
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AlertTriangle, PackageSearch, RotateCcw, Wallet, TrendingUp, Timer } from "lucide-react";
+import type { CandidateDTO, HistoryWarning, ReorderAlert } from "@/lib/actions/import.actions";
+import {
+  COMMITTED_STATUSES,
+  IMPORT_STATUSES,
+  IMPORT_STATUS_LABELS,
+  type ImportStatus,
+} from "@/lib/import-status";
+import { cn } from "@/lib/utils";
+import { SIGNAL_STYLES, STATUS_STYLES, fmtK, fmtNum, fmtPct, profitTone } from "./format";
+
+type Filter = "active" | "all" | ImportStatus;
+type Sort = "newest" | "margin" | "roi" | "profit";
+
+/** الملتزم يُعرض بلقطته الثابتة، وغيره بالحساب الحي. */
+function shown(c: CandidateDTO) {
+  return COMMITTED_STATUSES.includes(c.status) && c.snapshot
+    ? { result: c.snapshot.result, signal: c.snapshot.signal, frozen: true }
+    : { result: c.result, signal: c.signal, frozen: false };
+}
+
+function Stat({ label, value, sub, icon: Icon, tone }: { label: string; value: string; sub?: string; icon: React.ElementType; tone?: string }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+      </div>
+      <p className={cn("text-xl font-bold tracking-tight", tone)}>{value}</p>
+      {sub && <p className="text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
+export default function ImportsDashboard({
+  candidates,
+  alerts,
+  warnings,
+  windowDays,
+}: {
+  candidates: CandidateDTO[];
+  alerts: ReorderAlert[];
+  warnings: HistoryWarning[];
+  windowDays: number;
+}) {
+  const router = useRouter();
+  const [filter, setFilter] = useState<Filter>("active");
+  const [sort, setSort] = useState<Sort>("newest");
+
+  const committed = candidates.filter((c) => COMMITTED_STATUSES.includes(c.status));
+  const capital = committed.reduce((s, c) => s + shown(c).result.capitalKiqd, 0);
+  const expectedProfit = committed.reduce((s, c) => s + shown(c).result.totalProfitKiqd, 0);
+  const studying = candidates.filter((c) => c.status === "idea" || c.status === "studying").length;
+  const urgent = alerts.filter((a) => a.orderNow).length;
+
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const c of candidates) m.set(c.status, (m.get(c.status) ?? 0) + 1);
+    return m;
+  }, [candidates]);
+
+  const rows = useMemo(() => {
+    const list = candidates.filter((c) =>
+      filter === "all" ? true : filter === "active" ? c.status !== "converted" && c.status !== "rejected" : c.status === filter,
+    );
+    const key = (c: CandidateDTO) => {
+      const r = shown(c).result;
+      return sort === "margin" ? r.marginPct : sort === "roi" ? r.roiPct : sort === "profit" ? r.totalProfitKiqd : new Date(c.createdAt).getTime();
+    };
+    return [...list].sort((a, b) => key(b) - key(a));
+  }, [candidates, filter, sort]);
+
+  const chips: { key: Filter; label: string; count: number }[] = [
+    { key: "active", label: "النشطة", count: candidates.filter((c) => c.status !== "converted" && c.status !== "rejected").length },
+    { key: "all", label: "الكل", count: candidates.length },
+    ...IMPORT_STATUSES.map((s) => ({ key: s as Filter, label: IMPORT_STATUS_LABELS[s], count: counts.get(s) ?? 0 })).filter((c) => c.count > 0),
+  ];
+
+  return (
+    <div className="space-y-6">
+      {warnings.length > 0 && (
+        <div className="space-y-1 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+          {warnings.map((w, i) => (
+            <p key={i} className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {w.text}
+            </p>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="رأس المال الملتزم" value={fmtK(capital)} sub={`${committed.length} منتج موافَق عليه أو في الطريق`} icon={Wallet} />
+        <Stat label="الربح المتوقع للملتزم" value={fmtK(expectedProfit)} sub="لو بيعت الكمية كاملة" icon={TrendingUp} tone={profitTone(expectedProfit)} />
+        <Stat label="قيد الدراسة" value={String(studying)} sub="أفكار ومنتجات تُدرس" icon={PackageSearch} />
+        <Stat label="يجب طلبها الآن" value={String(urgent)} sub={`ستنفد قبل وصول شحنة جديدة`} icon={Timer} tone={urgent > 0 ? "text-red-600 dark:text-red-400" : undefined} />
+      </div>
+
+      {alerts.length > 0 && (
+        <section className="space-y-3 rounded-xl border bg-card p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <RotateCcw className="h-4 w-4" />
+              تنبيهات إعادة الطلب
+            </h2>
+            <p className="text-xs text-muted-foreground">سرعة البيع من آخر {windowDays} يوماً</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="py-2 text-start font-medium">المنتج</th>
+                  <th className="py-2 text-center font-medium">المخزون</th>
+                  <th className="py-2 text-center font-medium">بيع/يوم</th>
+                  <th className="py-2 text-center font-medium">ينفد خلال</th>
+                  <th className="py-2 text-center font-medium">الكمية المقترحة</th>
+                  <th className="py-2 text-end font-medium" />
+                </tr>
+              </thead>
+              <tbody>
+                {alerts.map((a) => (
+                  <tr key={a.productId} className="border-b last:border-0">
+                    <td className="py-2 font-medium">
+                      <span className="line-clamp-1">{a.name}</span>
+                    </td>
+                    <td className="py-2 text-center">{a.stock}</td>
+                    <td className="py-2 text-center">{fmtNum(a.unitsPerDay, 1)}</td>
+                    <td className="py-2 text-center">
+                      <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", a.orderNow ? "bg-red-500/15 text-red-700 dark:text-red-400" : "bg-amber-500/15 text-amber-700 dark:text-amber-400")}>
+                        {fmtNum(a.daysToStockout)} يوم
+                      </span>
+                    </td>
+                    <td className="py-2 text-center">{fmtNum(a.suggestedQty)}</td>
+                    <td className="py-2 text-end">
+                      {a.hasOpenCandidate ? (
+                        <span className="text-xs text-muted-foreground">لديه طلب مفتوح</span>
+                      ) : (
+                        <Link href={`/admin/imports/new?productId=${a.productId}`} className="text-xs font-semibold text-primary underline-offset-4 hover:underline">
+                          ابدأ إعادة استيراد
+                        </Link>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-1.5">
+            {chips.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                onClick={() => setFilter(c.key)}
+                className={cn(
+                  "rounded-lg border px-3 py-1 text-xs font-medium transition-colors",
+                  filter === c.key ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
+                )}
+              >
+                {c.label} <span className="opacity-70">({c.count})</span>
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            ترتيب حسب
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value as Sort)}
+              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
+            >
+              <option value="newest">الأحدث</option>
+              <option value="margin">هامش الربح</option>
+              <option value="roi">العائد على رأس المال</option>
+              <option value="profit">إجمالي الربح المتوقع</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="overflow-x-auto rounded-xl border">
+          <table className="w-full min-w-[900px] text-sm">
+            <thead className="bg-muted/50">
+              <tr className="text-xs text-muted-foreground">
+                <th className="px-3 py-2.5 text-start font-semibold">المنتج</th>
+                <th className="px-3 py-2.5 text-start font-semibold">المرحلة</th>
+                <th className="px-3 py-2.5 text-center font-semibold">الكمية</th>
+                <th className="px-3 py-2.5 text-end font-semibold">التكلفة الواصلة</th>
+                <th className="px-3 py-2.5 text-end font-semibold">سعر البيع</th>
+                <th className="px-3 py-2.5 text-end font-semibold">ربح القطعة</th>
+                <th className="px-3 py-2.5 text-center font-semibold">الهامش</th>
+                <th className="px-3 py-2.5 text-center font-semibold">العائد</th>
+                <th className="px-3 py-2.5 text-end font-semibold">رأس المال</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                    لا توجد منتجات هنا. اضغط «منتج مرشح جديد» للبدء.
+                  </td>
+                </tr>
+              ) : (
+                rows.map((c) => {
+                  const { result: r, signal, frozen } = shown(c);
+                  return (
+                    <tr
+                      key={c.id}
+                      onClick={() => router.push(`/admin/imports/${c.id}`)}
+                      className="cursor-pointer border-t hover:bg-muted/30"
+                    >
+                      <td className="px-3 py-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SIGNAL_STYLES[signal].dot)} title={SIGNAL_STYLES[signal].label} />
+                          <div className="min-w-0">
+                            <Link href={`/admin/imports/${c.id}`} className="line-clamp-1 font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                              {c.name}
+                            </Link>
+                            <p className="text-[11px] text-muted-foreground">
+                              {c.kind === "reimport" ? `إعادة استيراد${c.productName ? ` · ${c.productName}` : ""}` : "منتج جديد"}
+                              {frozen && " · لقطة ثابتة"}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <span className={cn("whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[c.status])}>
+                          {IMPORT_STATUS_LABELS[c.status]}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">{fmtNum(c.inputs.quantity)}</td>
+                      <td className="px-3 py-2.5 text-end">{fmtK(r.landedPerUnitKiqd)}</td>
+                      <td className="px-3 py-2.5 text-end">{fmtK(c.inputs.sellingPriceKiqd)}</td>
+                      <td className={cn("px-3 py-2.5 text-end font-semibold", profitTone(r.profitPerUnitKiqd))}>{fmtK(r.profitPerUnitKiqd)}</td>
+                      <td className="px-3 py-2.5 text-center">{fmtPct(r.marginPct, 0)}</td>
+                      <td className="px-3 py-2.5 text-center">{fmtPct(r.roiPct, 0)}</td>
+                      <td className="px-3 py-2.5 text-end">{fmtK(r.capitalKiqd)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          الأرقام مقرّبة لأقرب 250 د.ع للعرض فقط — الحساب نفسه بدقة كاملة. المنتجات الموافَق عليها تُعرض بلقطتها الثابتة لحظة الموافقة.
+        </p>
+      </section>
+    </div>
+  );
+}
