@@ -219,7 +219,8 @@ function Field({
       <Label htmlFor={id} className="text-xs">
         {label}
       </Label>
-      <div className="relative">
+      {/* الوحدة في خانة مستقلة بجانب الحقل — لو رُسمت داخله تغطي الرقم في الاتجاه العربي. */}
+      <div className="flex items-stretch">
         <Input
           id={id}
           type="number"
@@ -229,10 +230,10 @@ function Field({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className={cn(unit && "pe-16")}
+          className={cn("min-w-0 text-right tabular-nums", unit && "rounded-e-none")}
         />
         {unit && (
-          <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-[11px] text-muted-foreground">
+          <span className="flex shrink-0 items-center whitespace-nowrap rounded-e-md border border-s-0 border-input bg-muted px-2.5 text-[11px] text-muted-foreground">
             {unit}
           </span>
         )}
@@ -519,25 +520,11 @@ export default function ImportCandidateForm({
               </select>
             </div>
           )}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1 sm:col-span-2">
-              <Label htmlFor="ic-name" className="text-xs">
-                اسم المنتج
-              </Label>
-              <Input id="ic-name" value={f.name} disabled={locked} onChange={(e) => set("name")(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ic-supplier" className="text-xs">
-                المورد
-              </Label>
-              <Input id="ic-supplier" value={f.supplierName} disabled={locked} onChange={(e) => set("supplierName")(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="ic-url" className="text-xs">
-                رابط المنتج على علي بابا
-              </Label>
-              <Input id="ic-url" dir="ltr" value={f.supplierUrl} disabled={locked} onChange={(e) => set("supplierUrl")(e.target.value)} />
-            </div>
+          <div className="space-y-1">
+            <Label htmlFor="ic-name" className="text-xs">
+              اسم المنتج
+            </Label>
+            <Input id="ic-name" value={f.name} disabled={locked} onChange={(e) => set("name")(e.target.value)} />
           </div>
         </Section>
 
