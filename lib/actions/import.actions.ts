@@ -24,6 +24,7 @@ import {
 } from "../import-status";
 import { REVENUE_STATUSES } from "../constants/order-statuses";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "../constants/internal-products";
+import { getAvailableStocks } from "../inventory";
 import { getOrderProfitStats } from "./order.actions";
 import { getExpenseStatsForPeriod } from "./expense.actions";
 import { getCurrentFx, getLastSync } from "./adspend.actions";
@@ -524,6 +525,8 @@ async function loadHistory(from: Date, to: Date, minOrders: number, productIds?:
       select: { productId: true, costPrice: true, createdAt: true },
     }),
   ]);
+  // Product.stock هو مجموع الدفعات المستلمة لا المتبقي — المتبقي من نفس دالة المتجر.
+  const available = await getAvailableStocks(products);
   const latestBatch = new Map<string, { cost: number; at: Date }>();
   for (const b of batches) if (!latestBatch.has(b.productId)) latestBatch.set(b.productId, { cost: Number(b.costPrice), at: b.createdAt });
 
@@ -557,7 +560,7 @@ async function loadHistory(from: Date, to: Date, minOrders: number, productIds?:
       derived,
       unitsPerDay: (history.deliveredUnits + (c?.transitUnits ?? 0)) / activeDays,
       activeDays,
-      stock: p.stock,
+      stock: available.get(p.id) ?? 0,
       latestBatchCostKiqd: lb ? lb.cost : null,
       latestBatchAt: lb ? lb.at.toISOString() : null,
       lowConfidence: derived.resolvedOrders < minOrders,
@@ -703,7 +706,7 @@ export async function getReorderAlerts(): Promise<ReorderAlertsReport> {
     (excludedReason ? excluded : alerts).push(row);
   }
   alerts.sort((a, b) => b.lostProfitKiqd - a.lostProfitKiqd || b.monthlyProfitKiqd - a.monthlyProfitKiqd);
-  excluded.sort((a, b) => (a.daysToStockout ?? 0) - (b.daysToStockout ?? 0));
+  excluded.sort((a, b) => b.lostProfitKiqd - a.lostProfitKiqd || b.monthlyProfitKiqd - a.monthlyProfitKiqd);
   return {
     alerts,
     excluded,
@@ -729,7 +732,8 @@ export async function getProductsForImport(): Promise<{ id: string; name: string
     select: { id: true, name: true, price: true, stock: true },
     orderBy: { name: "asc" },
   });
-  return rows.map((r) => ({ id: r.id, name: r.name, price: Number(r.price), stock: r.stock }));
+  const available = await getAvailableStocks(rows);
+  return rows.map((r) => ({ id: r.id, name: r.name, price: Number(r.price), stock: available.get(r.id) ?? 0 }));
 }
 
 // ─── الوصول: إضافة الشحنة إلى المخزون ──────────────────────────────────────
