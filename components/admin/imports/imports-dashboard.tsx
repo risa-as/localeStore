@@ -1,9 +1,14 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, PackageSearch, RotateCcw, Wallet, TrendingUp, Timer } from "lucide-react";
-import type { CandidateDTO, HistoryWarning, ReorderAlert } from "@/lib/actions/import.actions";
+import { AlertTriangle, ChevronDown, Loader2, PackageSearch, RotateCcw, Wallet, TrendingUp, Timer } from "lucide-react";
+import {
+  getReorderAlerts,
+  type CandidateDTO,
+  type ReorderAlert,
+  type ReorderAlertsReport,
+} from "@/lib/actions/import.actions";
 import {
   COMMITTED_STATUSES,
   IMPORT_STATUSES,
@@ -38,18 +43,40 @@ function Stat({ label, value, sub, icon: Icon, tone }: { label: string; value: s
 
 export default function ImportsDashboard({
   candidates,
-  alerts,
-  warnings,
-  windowDays,
+  settingsVersion,
 }: {
   candidates: CandidateDTO[];
-  alerts: ReorderAlert[];
-  warnings: HistoryWarning[];
-  windowDays: number;
+  /** يتغير مع الإعدادات فتُعاد حسابات التنبيهات. */
+  settingsVersion: string;
 }) {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>("active");
   const [sort, setSort] = useState<Sort>("newest");
+  const [showExcluded, setShowExcluded] = useState(false);
+
+  // التنبيهات تحتاج أرقام صفحة الأرباح لفترة طويلة (ثوانٍ في أول مرة)، فتُحمَّل
+  // بعد ظهور الصفحة حتى لا تتأخر بقية اللوحة.
+  // النتيجة مربوطة بنسخة الإعدادات التي حُسبت بها، فتغيير الإعدادات يعيد
+  // حالة «جارٍ الحساب» تلقائياً دون تصفير الحالة داخل المؤثر.
+  const [loaded, setLoaded] = useState<{ version: string; data: ReorderAlertsReport | null; error: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    getReorderAlerts()
+      .then((data) => {
+        if (alive) setLoaded({ version: settingsVersion, data, error: false });
+      })
+      .catch(() => {
+        if (alive) setLoaded({ version: settingsVersion, data: null, error: true });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [settingsVersion]);
+  const current = loaded?.version === settingsVersion ? loaded : null;
+  const reorder = current?.data ?? null;
+  const reorderError = current?.error ?? false;
+  const alerts = reorder?.alerts ?? [];
+  const warnings = reorder?.warnings ?? [];
 
   const committed = candidates.filter((c) => COMMITTED_STATUSES.includes(c.status));
   const capital = committed.reduce((s, c) => s + shown(c).result.capitalKiqd, 0);
@@ -97,60 +124,58 @@ export default function ImportsDashboard({
         <Stat label="رأس المال الملتزم" value={fmtK(capital)} sub={`${committed.length} منتج موافَق عليه أو في الطريق`} icon={Wallet} />
         <Stat label="الربح المتوقع للملتزم" value={fmtK(expectedProfit)} sub="لو بيعت الكمية كاملة" icon={TrendingUp} tone={profitTone(expectedProfit)} />
         <Stat label="قيد الدراسة" value={String(studying)} sub="أفكار ومنتجات تُدرس" icon={PackageSearch} />
-        <Stat label="يجب طلبها الآن" value={String(urgent)} sub={`ستنفد قبل وصول شحنة جديدة`} icon={Timer} tone={urgent > 0 ? "text-red-600 dark:text-red-400" : undefined} />
+        <Stat
+          label="يجب طلبها الآن"
+          value={reorder ? String(urgent) : "…"}
+          sub={reorder ? `مربحة (هامش ≥ ${reorder.targetMarginPct}٪) وستنفد قبل وصول شحنة` : "جارٍ الحساب…"}
+          icon={Timer}
+          tone={urgent > 0 ? "text-red-600 dark:text-red-400" : undefined}
+        />
       </div>
 
-      {alerts.length > 0 && (
-        <section className="space-y-3 rounded-xl border bg-card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <RotateCcw className="h-4 w-4" />
-              تنبيهات إعادة الطلب
-            </h2>
-            <p className="text-xs text-muted-foreground">سرعة البيع من آخر {windowDays} يوماً</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead>
-                <tr className="border-b text-xs text-muted-foreground">
-                  <th className="py-2 text-start font-medium">المنتج</th>
-                  <th className="py-2 text-center font-medium">المخزون</th>
-                  <th className="py-2 text-center font-medium">بيع/يوم</th>
-                  <th className="py-2 text-center font-medium">ينفد خلال</th>
-                  <th className="py-2 text-center font-medium">الكمية المقترحة</th>
-                  <th className="py-2 text-end font-medium" />
-                </tr>
-              </thead>
-              <tbody>
-                {alerts.map((a) => (
-                  <tr key={a.productId} className="border-b last:border-0">
-                    <td className="py-2 font-medium">
-                      <span className="line-clamp-1">{a.name}</span>
-                    </td>
-                    <td className="py-2 text-center">{a.stock}</td>
-                    <td className="py-2 text-center">{fmtNum(a.unitsPerDay, 1)}</td>
-                    <td className="py-2 text-center">
-                      <span className={cn("rounded-md px-2 py-0.5 text-xs font-semibold", a.orderNow ? "bg-red-500/15 text-red-700 dark:text-red-400" : "bg-amber-500/15 text-amber-700 dark:text-amber-400")}>
-                        {fmtNum(a.daysToStockout)} يوم
-                      </span>
-                    </td>
-                    <td className="py-2 text-center">{fmtNum(a.suggestedQty)}</td>
-                    <td className="py-2 text-end">
-                      {a.hasOpenCandidate ? (
-                        <span className="text-xs text-muted-foreground">لديه طلب مفتوح</span>
-                      ) : (
-                        <Link href={`/admin/imports/new?productId=${a.productId}`} className="text-xs font-semibold text-primary underline-offset-4 hover:underline">
-                          ابدأ إعادة استيراد
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      <section className="space-y-3 rounded-xl border bg-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 font-semibold">
+            <RotateCcw className="h-4 w-4" />
+            تنبيهات إعادة الطلب
+          </h2>
+          {reorder && (
+            <p className="text-xs text-muted-foreground">
+              تنفد خلال {reorder.horizonDays} يوماً (مدة الشحن + أسبوعان) · {reorder.minHistoryOrders} طلب على الأقل · هامش ≥ {reorder.targetMarginPct}٪ · آخر {reorder.windowDays} يوماً
+            </p>
+          )}
+        </div>
+        {reorderError ? (
+          <p className="text-sm text-red-600">تعذّر حساب التنبيهات.</p>
+        ) : !reorder ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> جارٍ حساب المبيعات والأرباح الفعلية…
+          </p>
+        ) : (
+          <>
+            {reorder.alerts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                لا يوجد منتج يحقق الشروط وسينفد خلال {reorder.horizonDays} يوماً. منتجاتك الأكثر مبيعاً مخزونها يكفي أطول من ذلك.
+              </p>
+            ) : (
+              <AlertsTable rows={reorder.alerts} />
+            )}
+            {reorder.excluded.length > 0 && (
+              <div className="space-y-2 border-t pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowExcluded((v) => !v)}
+                  className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                >
+                  <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", showExcluded && "rotate-180")} />
+                  منتجات ستنفد لكنها لا تحقق الشروط ({reorder.excluded.length})
+                </button>
+                {showExcluded && <AlertsTable rows={reorder.excluded} excluded />}
+              </div>
+            )}
+          </>
+        )}
+      </section>
 
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -252,6 +277,86 @@ export default function ImportsDashboard({
           الأرقام مقرّبة لأقرب 250 د.ع للعرض فقط — الحساب نفسه بدقة كاملة. المنتجات الموافَق عليها تُعرض بلقطتها الثابتة لحظة الموافقة.
         </p>
       </section>
+    </div>
+  );
+}
+
+function AlertsTable({ rows, excluded }: { rows: ReorderAlert[]; excluded?: boolean }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className={cn("w-full min-w-[820px] text-sm", excluded && "text-muted-foreground")}>
+        <thead>
+          <tr className="border-b text-xs text-muted-foreground">
+            <th className="py-2 text-start font-medium">المنتج</th>
+            <th className="py-2 text-center font-medium">المخزون</th>
+            <th className="py-2 text-center font-medium">بيع/شهر</th>
+            <th className="py-2 text-center font-medium">ينفد خلال</th>
+            <th className="py-2 text-center font-medium">الهامش</th>
+            <th className="py-2 text-center font-medium">ربح شهري</th>
+            {excluded ? (
+              <th className="py-2 text-start font-medium">سبب الاستبعاد</th>
+            ) : (
+              <>
+                <th className="py-2 text-center font-medium">ربح يضيع</th>
+                <th className="py-2 text-center font-medium">الكمية المقترحة</th>
+              </>
+            )}
+            <th className="py-2 text-end font-medium" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((a) => (
+            <tr key={a.productId} className="border-b last:border-0">
+              <td className="py-2 font-medium">
+                <span className="line-clamp-1">{a.name}</span>
+              </td>
+              <td className="py-2 text-center">{a.stock}</td>
+              <td className="py-2 text-center">{fmtNum(a.unitsPerDay * 30, 1)}</td>
+              <td className="py-2 text-center">
+                <span
+                  className={cn(
+                    "rounded-md px-2 py-0.5 text-xs font-semibold",
+                    excluded
+                      ? "bg-muted"
+                      : a.orderNow
+                        ? "bg-red-500/15 text-red-700 dark:text-red-400"
+                        : "bg-amber-500/15 text-amber-700 dark:text-amber-400",
+                  )}
+                >
+                  {fmtNum(a.daysToStockout)} يوم
+                </span>
+              </td>
+              <td className="py-2 text-center">{fmtPct(a.marginPct, 0)}</td>
+              <td className={cn("py-2 text-center", !excluded && profitTone(a.monthlyProfitKiqd))}>{fmtK(a.monthlyProfitKiqd)}</td>
+              {excluded ? (
+                <td className="py-2 text-xs">{a.excludedReason}</td>
+              ) : (
+                <>
+                  <td className="py-2 text-center">{a.lostProfitKiqd > 0 ? fmtK(a.lostProfitKiqd) : "—"}</td>
+                  <td className="py-2 text-center">{fmtNum(a.suggestedQty)}</td>
+                </>
+              )}
+              <td className="py-2 text-end">
+                {a.hasOpenCandidate ? (
+                  <span className="text-xs text-muted-foreground">لديه طلب مفتوح</span>
+                ) : (
+                  <Link
+                    href={`/admin/imports/new?productId=${a.productId}`}
+                    className="text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                  >
+                    ابدأ إعادة استيراد
+                  </Link>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {!excluded && (
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          «ربح يضيع» = ربح الأيام التي يبقى فيها المنتج نافداً إذا طلبته اليوم. الترتيب حسبه ثم حسب الربح الشهري.
+        </p>
+      )}
     </div>
   );
 }

@@ -4,11 +4,7 @@ import Link from "next/link";
 import { Metadata } from "next";
 import { Plus, Ship } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  getImportCandidates,
-  getImportSettings,
-  getReorderAlerts,
-} from "@/lib/actions/import.actions";
+import { getImportCandidates, getImportSettings } from "@/lib/actions/import.actions";
 import ImportsDashboard from "@/components/admin/imports/imports-dashboard";
 import ImportSettingsDialog from "@/components/admin/imports/import-settings-dialog";
 
@@ -18,12 +14,7 @@ export default async function ImportsPage() {
   const session = await auth();
   if (session?.user?.role !== "admin") redirect("/unauthorized");
 
-  const [settings, candidates, reorder] = await Promise.all([
-    getImportSettings(),
-    getImportCandidates(),
-    // تنبيهات إعادة الطلب ثانوية — فشلها لا يُسقط اللوحة.
-    getReorderAlerts().catch(() => ({ alerts: [], warnings: [], windowDays: 0 })),
-  ]);
+  const [settings, candidates] = await Promise.all([getImportSettings(), getImportCandidates()]);
 
   return (
     <div className="w-full min-w-0 space-y-6">
@@ -50,12 +41,8 @@ export default async function ImportsPage() {
         </div>
       </div>
 
-      <ImportsDashboard
-        candidates={candidates}
-        alerts={reorder.alerts}
-        warnings={reorder.warnings}
-        windowDays={reorder.windowDays}
-      />
+      {/* تنبيهات إعادة الطلب تُحمَّل داخل اللوحة بعد ظهور الصفحة. */}
+      <ImportsDashboard candidates={candidates} settingsVersion={JSON.stringify(settings)} />
     </div>
   );
 }

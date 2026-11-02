@@ -615,85 +615,104 @@ export type ReorderAlert = {
   suggestedQty: number;
   orderNow: boolean;
   hasOpenCandidate: boolean;
+  /** طلبات محسومة (مسلَّم + راجع) في الفترة. */
+  resolvedOrders: number;
+  /** الهامش الفعلي بعد الإعلان كما في صفحة الأرباح. */
+  marginPct: number;
+  profitPerUnitKiqd: number;
+  /** ربح شهر من البيع بالسرعة الحالية. */
+  monthlyProfitKiqd: number;
+  /** ربح يضيع لو طُلبت الشحنة اليوم ووصلت بعد نفاد المخزون. */
+  lostProfitKiqd: number;
+  /** سبب الاستبعاد من التنبيهات الرئيسية (null = مؤهَّل). */
+  excludedReason: string | null;
+};
+
+export type ReorderAlertsReport = {
+  alerts: ReorderAlert[];
+  /** منتجات ستنفد لكنها لا تحقق شرط المبيعات أو الهامش. */
+  excluded: ReorderAlert[];
+  warnings: HistoryWarning[];
+  windowDays: number;
+  targetMarginPct: number;
+  minHistoryOrders: number;
+  horizonDays: number;
 };
 
 /**
- * سرعة خروج القطع من المخزن لكل منتج — نفس تعريف loadHistory (مسلَّم + في
- * الطريق ÷ أيام البيع الفعلية) لكن باستعلام خفيف واحد بدل حساب الأرباح كاملاً.
+ * منتجات تقترب من النفاد قبل أن تصل شحنة جديدة — للوحة القيادة. المؤهَّل منها:
+ * مبيعات كافية (حد «أقل عدد طلبات للثقة») وهامش فعلي بعد الإعلان ≥ «هامش
+ * الربح المستهدف» في الإعدادات. الترتيب حسب الربح الذي يضيع لو تأخر الطلب.
  */
-async function loadVelocity(from: Date, to: Date) {
-  const { end, start } = iraqBounds(from, to);
-  const items = await prisma.orderItem.findMany({
-    where: {
-      order: {
-        createdAt: { gte: start, lte: end },
-        status: { in: [...REVENUE_STATUSES, ...RETURN_STATUSES, ...IN_TRANSIT_STATUSES] },
-      },
-    },
-    select: { productId: true, qty: true, order: { select: { status: true, createdAt: true } } },
-  });
-  const windowDays = Math.round((to.getTime() - from.getTime()) / 86400_000) + 1;
-  const acc = new Map<string, { units: number; firstAt: number }>();
-  for (const i of items) {
-    const a = acc.get(i.productId) ?? { units: 0, firstAt: Infinity };
-    if (!RETURN_STATUSES.includes(i.order.status)) a.units += i.qty;
-    a.firstAt = Math.min(a.firstAt, i.order.createdAt.getTime());
-    acc.set(i.productId, a);
-  }
-  const out = new Map<string, number>();
-  for (const [id, a] of acc) {
-    const days = Math.min(windowDays, Math.max(1, Math.ceil((end.getTime() - a.firstAt) / 86400_000)));
-    out.set(id, a.units / days);
-  }
-  return { perDay: out, windowDays };
-}
-
-/** منتجات تقترب من النفاد قبل أن تصل شحنة جديدة — للوحة القيادة. */
-export async function getReorderAlerts(): Promise<{ alerts: ReorderAlert[]; warnings: HistoryWarning[]; windowDays: number }> {
+export async function getReorderAlerts(): Promise<ReorderAlertsReport> {
   await requireAdministrator();
   const settings = await loadSettings();
   const to = iraqDay();
   const from = iraqDay(-(settings.historyWindowDays - 1));
-  const [velocity, lastSync, open] = await Promise.all([
-    loadVelocity(from, to),
-    getLastSync().catch(() => null),
+  const [report, open, internal] = await Promise.all([
+    loadHistory(from, to, settings.minHistoryOrders),
     prisma.importCandidate.findMany({
       where: { productId: { not: null }, status: { notIn: ["converted", "rejected"] } },
       select: { productId: true },
     }),
+    prisma.product.findMany({ where: { NOT: EXCLUDE_INTERNAL_PRODUCTS }, select: { id: true } }),
   ]);
-  const products = await prisma.product.findMany({
-    where: { ...EXCLUDE_INTERNAL_PRODUCTS, id: { in: [...velocity.perDay.keys()] } },
-    select: { id: true, name: true, stock: true },
-  });
   const openIds = new Set(open.map((o) => o.productId));
+  const hidden = new Set(internal.map((p) => p.id));
   // الإنذار المبكر: من سينفد خلال مدة الشحن + أسبوعين.
   const horizon = settings.leadTimeDays + 14;
   const alerts: ReorderAlert[] = [];
-  for (const p of products) {
-    const unitsPerDay = velocity.perDay.get(p.id) ?? 0;
-    if (unitsPerDay <= 0) continue;
+  const excluded: ReorderAlert[] = [];
+  for (const s of Object.values(report.products)) {
+    if (hidden.has(s.productId) || s.unitsPerDay <= 0) continue;
     const r = reorderAdvice({
-      stock: p.stock,
-      unitsPerDay,
+      stock: s.stock,
+      unitsPerDay: s.unitsPerDay,
       leadTimeDays: settings.leadTimeDays,
       coverDays: settings.reorderCoverDays,
     });
     if (r.daysToStockout === null || r.daysToStockout > horizon) continue;
-    alerts.push({
-      productId: p.id,
-      name: p.name,
-      stock: p.stock,
-      unitsPerDay,
+    const d = s.derived;
+    const marginPct = d.sellingPriceKiqd > 0 ? (d.profitPerUnitKiqd / d.sellingPriceKiqd) * 100 : 0;
+    const gapDays = Math.max(0, settings.leadTimeDays - r.daysToStockout);
+    const excludedReason =
+      d.resolvedOrders < settings.minHistoryOrders
+        ? `مبيعات قليلة (${d.resolvedOrders} طلب من ${settings.minHistoryOrders})`
+        : d.profitPerUnitKiqd <= 0
+          ? "خاسر بعد الإعلان"
+          : marginPct < settings.targetMarginPct
+            ? `الهامش ${marginPct.toFixed(0)}٪ أقل من ${settings.targetMarginPct}٪`
+            : null;
+    const row: ReorderAlert = {
+      productId: s.productId,
+      name: s.name,
+      stock: s.stock,
+      unitsPerDay: s.unitsPerDay,
       daysToStockout: r.daysToStockout,
       daysUntilOrder: r.daysUntilOrder,
       suggestedQty: r.suggestedQty,
       orderNow: r.orderNow,
-      hasOpenCandidate: openIds.has(p.id),
-    });
+      hasOpenCandidate: openIds.has(s.productId),
+      resolvedOrders: d.resolvedOrders,
+      marginPct,
+      profitPerUnitKiqd: d.profitPerUnitKiqd,
+      monthlyProfitKiqd: s.unitsPerDay * 30 * d.profitPerUnitKiqd,
+      lostProfitKiqd: Math.max(0, s.unitsPerDay * gapDays * d.profitPerUnitKiqd),
+      excludedReason,
+    };
+    (excludedReason ? excluded : alerts).push(row);
   }
-  alerts.sort((a, b) => (a.daysToStockout ?? 0) - (b.daysToStockout ?? 0));
-  return { alerts, warnings: syncWarnings(lastSync), windowDays: velocity.windowDays };
+  alerts.sort((a, b) => b.lostProfitKiqd - a.lostProfitKiqd || b.monthlyProfitKiqd - a.monthlyProfitKiqd);
+  excluded.sort((a, b) => (a.daysToStockout ?? 0) - (b.daysToStockout ?? 0));
+  return {
+    alerts,
+    excluded,
+    warnings: report.warnings,
+    windowDays: report.windowDays,
+    targetMarginPct: settings.targetMarginPct,
+    minHistoryOrders: settings.minHistoryOrders,
+    horizonDays: horizon,
+  };
 }
 
 /** سعر الصرف الساري — يُعبّأ افتراضياً في كل منتج جديد. */
