@@ -40,8 +40,12 @@ it("skips an Instagram comment whose private reply Meta rejects, without posting
   expect(post).toHaveBeenCalledTimes(1);
 });
 
-it("stops on rate limits and unknown outcomes instead of skipping", async () => {
+it("stops on rate limits, missing permissions and unknown outcomes instead of skipping", async () => {
   post.mockRejectedValueOnce(new GraphError(368));
+  await expect(replyToComment(ig, handle(ig), both)).rejects.toThrow();
+  post.mockRejectedValueOnce(new GraphError(200));
+  await expect(replyToComment(ig, handle(ig), both)).rejects.toThrow();
+  post.mockRejectedValueOnce(new GraphError(10));
   await expect(replyToComment(ig, handle(ig), both)).rejects.toThrow();
   post.mockRejectedValueOnce(new GraphError(undefined, true));
   await expect(replyToComment(ig, handle(ig), both)).rejects.toThrow();

@@ -21,7 +21,7 @@ export type CommentReply = {
 export const MAX_COMMENT_REPLIES = 20;
 
 export const DEFAULT_COMMENT_REPLIES: CommentReply[] = [
-  { id: "price-private", label: "السعر بالخاص", keywords: ["سعر", "بكم", "شكد", "كم", "price"],
+  { id: "price-private", label: "السعر بالخاص", keywords: ["سعر", "اسعار", "بكم", "شكد", "كم السعر", "price"],
     publicText: "راسلناك بالخاص {الاسم} 🌷\n---\nوصلتك رسالة بالخاص بكل التفاصيل 🌷\n---\nتم الرد بالخاص، نورتنا 🌷",
     privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\nللطلب من هنا: {الرابط}" },
   { id: "price-public", label: "السعر علني", keywords: [],
@@ -59,13 +59,23 @@ export function normalizeArabic(text: string) {
     .replace(/\s+/g, " ").trim();
 }
 
-/** The first reply whose keyword appears in the comment, or null. */
+const words = (text: string) => normalizeArabic(text).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+// Attached Arabic prefixes: «السعر», «بالسعر», «وبكم» still match «سعر» / «بكم».
+const PREFIXES = ["وال", "بال", "فال", "كال", "ال", "لل", "و", "ب", "ف", "ل"];
+const wordStartsWith = (word: string, keyword: string) => word.startsWith(keyword) ||
+  PREFIXES.some(prefix => word.length > prefix.length && word.startsWith(prefix) && word.slice(prefix.length).startsWith(keyword));
+
+/**
+ * The first reply with a keyword at the START of a word in the comment, or null.
+ * Matching inside words is avoided on purpose: «كم» must not match «عليكم».
+ */
 export function matchCommentReply(text: string, replies: CommentReply[]) {
-  const haystack = normalizeArabic(text);
-  if (!haystack) return null;
+  const comment = words(text);
+  if (!comment.length) return null;
   return replies.find(reply => reply.keywords.some(keyword => {
-    const needle = normalizeArabic(keyword);
-    return !!needle && haystack.includes(needle);
+    const parts = words(keyword);
+    return parts.length > 0 && comment.some((_, start) =>
+      parts.every((part, offset) => start + offset < comment.length && wordStartsWith(comment[start + offset], part)));
   })) || null;
 }
 

@@ -21,6 +21,16 @@ it("matches the first reply whose keyword appears", () => {
   expect(matchCommentReply("اي شي", [reply({ keywords: ["", "  "] })])).toBeNull();
 });
 
+it("matches keywords at word starts only, so greetings never get the price reply", () => {
+  const match = (text: string) => matchCommentReply(text, DEFAULT_COMMENT_REPLIES)?.id ?? null;
+  for (const text of ["السلام عليكم", "كمان وحدة", "نحبكم", "عجبكم المنتج"]) expect(match(text)).not.toBe("price-private");
+  for (const text of ["السعر؟", "بالسعر", "سعره شكد", "بكم", "وبكم هذا", "الاسعار", "كم السعر"]) expect(match(text)).toBe("price-private");
+  expect(match("شكراً لكم")).toBe("thanks");
+  expect(match("السلام عليكم")).toBeNull();
+  expect(matchCommentReply("اريد كم السعر", [reply({ id: "two", keywords: ["كم السعر"] })])?.id).toBe("two");
+  expect(matchCommentReply("السعر كم", [reply({ id: "two", keywords: ["كم السعر"] })])).toBeNull();
+});
+
 it("splits variants on --- lines and rotates them", () => {
   const text = "أول\n---\nثاني\n  ---  \nثالث";
   expect(replyVariants(text)).toEqual(["أول", "ثاني", "ثالث"]);

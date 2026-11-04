@@ -416,7 +416,8 @@ export async function sendCommentPrivateReply(ctx: InboxContext, handle: string,
     sent = await graphPost<{ message_id?: string }>(`${path(ctx.pageId)}/messages`, ctx.token,
       { recipient: { comment_id: id }, message: { text } });
   } catch (error) {
-    if (error instanceof GraphError && !error.outcomeUnknown && !RATE_LIMIT_CODES.includes(error.code ?? 0) && error.code !== 190)
+    // Missing permission (10, 200) or expired login (190) affects every comment: stop, don't skip.
+    if (error instanceof GraphError && !error.outcomeUnknown && !RATE_LIMIT_CODES.includes(error.code ?? 0) && ![10, 190, 200].includes(error.code ?? 0))
       throw new CommentReplySkip("private-rejected", `رفضت Meta الرسالة الخاصة على هذا التعليق (رمز ${error.code ?? error.status}).`);
     throw error;
   }
