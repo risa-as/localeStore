@@ -39,7 +39,7 @@ it("formats the store's thousand-dinar prices and does not invent missing produc
   expect(money(18)).toContain(new Intl.NumberFormat("ar-IQ").format(18000));
   const missing = expandQuickReply("{الاسم} {السعر} {الرابط}", "زبون");
   expect(missing.missing).toEqual(["السعر", "الرابط"]);
-  expect(missing.text).toBe("زبون {السعر} {الرابط}");
+  expect(missing.text).toBe("بيك {السعر} {الرابط}");
   expect(expandQuickReply("{السعر} {التوصيل} {الرابط}", "زبون", product)).toEqual({
     text: `${money(18)} ${money(4)} ${product.url}`, missing: [],
   });

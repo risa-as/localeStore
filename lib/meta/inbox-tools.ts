@@ -29,7 +29,8 @@ export const GENERAL_QUICK_REPLIES = groupQuickReplies(DEFAULT_QUICK_REPLIES).ge
 // Product prices in this store are stored in thousands of Iraqi dinars.
 export const money = (value: number) => `${new Intl.NumberFormat("ar-IQ").format(Math.round(value * 1000))} د.ع`;
 export function expandQuickReply(text: string, name: string, product?: InboxProduct | null) {
-  const values: Record<string, string | undefined> = { الاسم: name || "بيك", المنتج: product?.name,
+  // «زبون» is the inbox placeholder when Meta hides the name: never greet someone as «زبون».
+  const values: Record<string, string | undefined> = { الاسم: name && name !== "زبون" ? name : "بيك", المنتج: product?.name,
     السعر: product ? money(product.price) : undefined, الرابط: product?.url,
     التوصيل: product ? product.shippingPrice === 0 ? "مجاني" : money(product.shippingPrice) : undefined,
     "السعر مع التوصيل": product ? money(product.price + product.shippingPrice) : undefined,

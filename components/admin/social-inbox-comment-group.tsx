@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Ban, Eye, EyeOff, Loader2, Lock, MoreHorizontal, Sparkles, Trash2 } from "lucide-react";
+import { Ban, CheckCheck, ChevronDown, Eye, EyeOff, Loader2, Lock, MessagesSquare, MoreHorizontal, Reply, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import ItemBody from "./social-inbox-item";
 import SocialInboxOrder from "./social-inbox-order";
 import type { CommentGroup } from "@/lib/meta/inbox-workflow";
 import type { InboxItem, SocialPlatform } from "@/lib/meta/inbox";
@@ -27,8 +26,14 @@ const INTENT_STYLE: Partial<Record<CommentIntent, string>> = {
   complaint: "bg-red-500/15 text-red-800 dark:text-red-300",
 };
 const intentLabel = (intent: CommentIntent) => COMMENT_INTENTS.find(item => item.value === intent)?.label ?? "";
+const when = (value: string) => value && Number.isFinite(Date.parse(value))
+  ? new Date(value).toLocaleString("ar-IQ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";
 
-export default function SocialInboxCommentGroup({ group, platform, pageId, postHandle, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate, onOrdered, onWorking }: {
+/** The replies under the open comment, shown inside its card. */
+export type CommentThread = { id: string; items: InboxItem[]; after: string | null; loading: boolean; error: string };
+
+export default function SocialInboxCommentGroup({ group, platform, pageId, postHandle, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate, onOrdered, onWorking, thread, onCloseThread, onMoreReplies }: {
+  thread: CommentThread | null; onCloseThread: () => void; onMoreReplies: () => void;
   group: CommentGroup; platform: SocialPlatform; pageId: string; postHandle: string; targetId?: string; handled: Set<string>; disabled: boolean; moderatingId?: string | null;
   /** An order was registered from this comment. */
   onOrdered: (item: InboxItem) => void; onWorking: (working: boolean) => void;
@@ -54,55 +59,104 @@ export default function SocialInboxCommentGroup({ group, platform, pageId, postH
     setPending(null);
   }
 
-  return <div className={`rounded-xl border bg-background overflow-hidden ${repeated ? "border-primary/20" : ""}`} role="group" aria-label={repeated ? `تعليقات ${group.items[0].title} على المنشور` : `تعليق ${group.items[0].title}`}>
-    {repeated && <div className="px-3 py-2 bg-muted/40 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold">{group.items[0].title}</span><span className="rounded-full border bg-background px-2 py-0.5">{group.items.length} تعليقات على المنشور نفسه</span><span className="text-muted-foreground">راجعها معاً قبل الرد</span></div>}
-    <div className="divide-y">{group.items.map(item => {
+  return <div className={`rounded-xl border border-border/60 bg-background shadow-sm ${repeated ? "border-primary/25" : ""}`} role="group" aria-label={repeated ? `تعليقات ${group.items[0].title} على المنشور` : `تعليق ${group.items[0].title}`}>
+    {repeated && <div className="rounded-t-xl px-3 py-2 bg-muted/40 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold">{group.items[0].title}</span><span className="rounded-full border bg-background px-2 py-0.5">{group.items.length} تعليقات على المنشور نفسه</span><span className="text-muted-foreground">راجعها معاً قبل الرد</span></div>}
+    <div className="divide-y divide-border/60">{group.items.map(item => {
       const suggested = item.outgoing ? null : matchCommentReply(item.text, replies, item.intent);
-      return <div key={item.id} ref={targetId === item.id ? targetRef : undefined} className={`p-3 ${targetId === item.id ? "bg-primary/5 ring-1 ring-inset ring-primary" : ""}`}>
-      <div className={item.hidden ? "opacity-60" : undefined}><ItemBody item={item} compact /></div>
-      {!item.outgoing && replies.length > 0 && <div className="flex flex-wrap items-center gap-1.5 mt-2" role="group" aria-label="ردود بنقرة واحدة">
-        {replies.map(reply => {
-          const expanded = expandCommentReply(reply, item.title, product);
-          const isSuggested = suggested?.id === reply.id;
-          return <Button key={reply.id} size="sm" variant={isSuggested ? "default" : "secondary"} className="h-7 gap-1 px-2 text-xs"
-            disabled={disabled || expanded.missing.length > 0}
-            title={expanded.missing.length ? `يحتاج ${expanded.missing.join("، ")} — اختر منتج المنشور`
-              : [expanded.privateText && `رسالة خاصة:\n${expanded.privateText}`, expanded.publicText && `رد علني:\n${expanded.publicText}`].filter(Boolean).join("\n\n")}
-            onClick={() => onQuickReply(item, reply)}>
-            {sendingId === `${item.id}:${reply.id}` ? <Loader2 className="size-3 animate-spin" /> : isSuggested ? <Sparkles className="size-3" /> : reply.privateText.trim() ? <Lock className="size-3" /> : null}
-            {reply.label}
-          </Button>;
-        })}
-      </div>}
-      <div className="flex flex-wrap items-center gap-2 mt-2">
-        <Button disabled={disabled} size="sm" variant="outline" onClick={() => onReply(item)}>ردّ على التعليق</Button>
-        <Button disabled={disabled} size="sm" variant="ghost" onClick={() => onThread(item)}>عرض الردود</Button>
-        {!item.outgoing && item.intent === "order" && <SocialInboxOrder scope={{ pageId, platform, handle: item.handle }} source={{ kind: "comment", postHandle }}
-          suggestedProduct={product || undefined} disabled={disabled} onWorking={onWorking} onApproved={() => onOrdered(item)} />}
-        <DropdownMenu dir="rtl">
-          <DropdownMenuTrigger asChild>
-            <Button disabled={disabled} size="sm" variant="ghost" className="px-2" aria-label="إدارة التعليق">
-              {moderatingId === item.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {!item.outgoing && (item.hidden
-              ? <DropdownMenuItem onSelect={() => onModerate(item, "unhide")}><Eye className="size-4" />إظهار التعليق</DropdownMenuItem>
-              : <DropdownMenuItem onSelect={() => onModerate(item, "hide")}><EyeOff className="size-4" />إخفاء التعليق</DropdownMenuItem>)}
-            <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPending({ item, action: "delete" })}><Trash2 className="size-4" />حذف التعليق</DropdownMenuItem>
-            {!item.outgoing && platform === "facebook" && <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setDeleteAll(true); setPending({ item, action: "block" }); }}><Ban className="size-4" />حظر {item.title} من الصفحة</DropdownMenuItem>
-            </>}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        {item.intent && item.intent !== "other" && <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${INTENT_STYLE[item.intent] || "bg-muted text-muted-foreground"}`}>{intentLabel(item.intent)}</span>}
-        {item.ordered && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white">سُجّل الطلب</span>}
-        {item.answered && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد</span>}
-        {item.hidden && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title="لا يراه إلا صاحبه وأصدقاؤه والصفحة"><EyeOff className="size-3" />مخفي</span>}
-        {handled.has(item.id) && <span className="text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد في هذه الجلسة</span>}
-      </div>
-    </div>; })}</div>
+      // Suggested reply first, then the next three; the rest stay in «ردود أخرى».
+      const ordered = suggested ? [suggested, ...replies.filter(reply => reply.id !== suggested.id)] : replies;
+      const shown = ordered.slice(0, 4), more = ordered.slice(4);
+      const threadOpen = thread?.id === item.id;
+      const replyButton = (reply: CommentReply, asMenuItem = false) => {
+        const expanded = expandCommentReply(reply, item.title, product);
+        const isSuggested = suggested?.id === reply.id;
+        const blocked = disabled || expanded.missing.length > 0;
+        const title = expanded.missing.length ? `يحتاج ${expanded.missing.join("، ")} — اختر منتج المنشور`
+          : [expanded.privateText && `رسالة خاصة:\n${expanded.privateText}`, expanded.publicText && `رد علني:\n${expanded.publicText}`].filter(Boolean).join("\n\n");
+        const icon = sendingId === `${item.id}:${reply.id}` ? <Loader2 className="size-3 animate-spin" />
+          : isSuggested ? <Sparkles className="size-3" /> : reply.privateText.trim() ? <Lock className="size-3" /> : null;
+        if (asMenuItem) return <DropdownMenuItem key={reply.id} disabled={blocked} title={title} onSelect={() => onQuickReply(item, reply)}>{icon}{reply.label}</DropdownMenuItem>;
+        return <Button key={reply.id} size="sm" variant={isSuggested ? "default" : "outline"} title={title} disabled={blocked}
+          className={`h-7 gap-1 rounded-full px-3 text-xs ${isSuggested ? "shadow-sm" : "bg-background"}`} onClick={() => onQuickReply(item, reply)}>
+          {icon}{reply.label}
+        </Button>;
+      };
+      return <div key={item.id} ref={targetId === item.id ? targetRef : undefined}
+        className={`relative p-3 space-y-2.5 transition-colors first:rounded-t-xl last:rounded-b-xl ${targetId === item.id ? "bg-primary/[0.04]" : ""}`}>
+        {targetId === item.id && <span aria-hidden="true" className="absolute inset-y-3 start-0 w-1 rounded-full bg-primary/70" />}
+        {/* Header: who, when, and what the comment is about */}
+        <div className="flex items-start gap-2.5">
+          <span aria-hidden="true" className={`flex size-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${item.outgoing ? "bg-emerald-600 text-white" : "bg-muted text-foreground"}`}>
+            {(item.outgoing ? "ص" : item.title.trim()[0] || "ز")}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-sm font-semibold">{item.outgoing ? "الصفحة" : item.title}</span>
+              <time className="text-[11px] text-muted-foreground" dateTime={item.time || undefined}>{when(item.time)}</time>
+              {item.intent && item.intent !== "other" && <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${INTENT_STYLE[item.intent] || "bg-muted text-muted-foreground"}`}>{intentLabel(item.intent)}</span>}
+              {item.ordered && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white">سُجّل الطلب</span>}
+              {(item.answered || handled.has(item.id)) && <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400"><CheckCheck className="size-3" />تم الرد</span>}
+              {item.hidden && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title="لا يراه إلا صاحبه وأصدقاؤه والصفحة"><EyeOff className="size-3" />مخفي</span>}
+            </div>
+            <p dir="auto" className={`mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 ${item.hidden ? "text-muted-foreground line-through decoration-muted-foreground/40" : ""}`}>{item.text}</p>
+          </div>
+        </div>
+
+        {/* One-click replies */}
+        {!item.outgoing && replies.length > 0 && <div className="ms-10 flex flex-wrap items-center gap-1.5" role="group" aria-label="ردود بنقرة واحدة">
+          {shown.map(reply => replyButton(reply))}
+          {more.length > 0 && <DropdownMenu dir="rtl">
+            <DropdownMenuTrigger asChild><Button size="sm" variant="ghost" className="h-7 gap-1 rounded-full px-3 text-xs" disabled={disabled}>ردود أخرى ({more.length})<ChevronDown className="size-3" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="start">{more.map(reply => replyButton(reply, true))}</DropdownMenuContent>
+          </DropdownMenu>}
+        </div>}
+
+        {/* Actions */}
+        <div className="ms-10 flex flex-wrap items-center gap-1.5">
+          <Button disabled={disabled} size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={() => onReply(item)}><Reply className="size-3.5" />ردّ بنص خاص</Button>
+          <Button disabled={disabled} size="sm" variant={threadOpen ? "secondary" : "ghost"} className="h-7 gap-1 px-2 text-xs"
+            onClick={() => threadOpen ? onCloseThread() : onThread(item)}>
+            <MessagesSquare className="size-3.5" />{threadOpen ? "إخفاء الردود" : "الردود"}
+          </Button>
+          {!item.outgoing && item.intent === "order" && <SocialInboxOrder scope={{ pageId, platform, handle: item.handle }} source={{ kind: "comment", postHandle }}
+            suggestedProduct={product || undefined} disabled={disabled} onWorking={onWorking} onApproved={() => onOrdered(item)} />}
+          <DropdownMenu dir="rtl">
+            <DropdownMenuTrigger asChild>
+              <Button disabled={disabled} size="sm" variant="ghost" className="h-7 px-2" aria-label="إدارة التعليق">
+                {moderatingId === item.id ? <Loader2 className="size-4 animate-spin" /> : <MoreHorizontal className="size-4" />}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {!item.outgoing && (item.hidden
+                ? <DropdownMenuItem onSelect={() => onModerate(item, "unhide")}><Eye className="size-4" />إظهار التعليق</DropdownMenuItem>
+                : <DropdownMenuItem onSelect={() => onModerate(item, "hide")}><EyeOff className="size-4" />إخفاء التعليق</DropdownMenuItem>)}
+              <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setPending({ item, action: "delete" })}><Trash2 className="size-4" />حذف التعليق</DropdownMenuItem>
+              {!item.outgoing && platform === "facebook" && <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => { setDeleteAll(true); setPending({ item, action: "block" }); }}><Ban className="size-4" />حظر {item.title} من الصفحة</DropdownMenuItem>
+              </>}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* The conversation under this comment */}
+        {threadOpen && <div className="ms-10 space-y-2 border-s-2 border-border ps-3" aria-label={`ردود على تعليق ${item.title}`}>
+          {thread.loading && !thread.items.length ? <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="size-3 animate-spin" />جارٍ تحميل الردود…</p>
+            : thread.items.length ? thread.items.map(reply => <div key={reply.id}
+              className={`w-fit max-w-[92%] rounded-2xl rounded-ss-sm px-3 py-2 ${reply.outgoing
+                ? "bg-emerald-50 dark:bg-emerald-950/40"
+                : "bg-muted/60"}`}>
+              <div className="mb-0.5 flex items-center gap-2 text-[11px]">
+                <span className={`font-semibold ${reply.outgoing ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{reply.outgoing ? "الصفحة" : reply.title}</span>
+                <time className="text-muted-foreground" dateTime={reply.time || undefined}>{when(reply.time)}</time>
+              </div>
+              <p dir="auto" className="whitespace-pre-wrap break-words text-sm leading-6">{reply.text}</p>
+            </div>)
+            : <p className="text-xs text-muted-foreground">لا توجد ردود بعد على هذا التعليق.</p>}
+          {thread.error && <p role="alert" className="text-xs text-destructive">{thread.error}</p>}
+          {thread.after && <Button disabled={thread.loading || disabled} variant="ghost" size="sm" className="h-7 text-xs" onClick={onMoreReplies}>تحميل ردود أقدم</Button>}
+        </div>}
+      </div>; })}</div>
 
     <Dialog open={!!pending} onOpenChange={open => { if (!open) setPending(null); }}>
       <DialogContent dir="rtl" className="sm:max-w-md">

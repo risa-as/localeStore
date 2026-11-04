@@ -744,6 +744,9 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}
                 moderatingId={moderatingId} onModerate={(item, action, alsoDelete) => void moderateComment(item, action, alsoDelete)}
                 replies={commentReplies.replies} product={postProduct} sendingId={sendingKey} onQuickReply={(item, reply) => void quickReply(item, reply)}
+                thread={thread && group.items.some(item => item.id === thread.id) ? { id: thread.id, items: replies.items, after: replies.after, loading: loadingReplies, error: "" } : null}
+                onCloseThread={() => { ++replySeq.current; setLoadingReplies(false); setThread(null); }}
+                onMoreReplies={() => { if (thread && replies.after) void loadReplies(thread, replies.after); }}
                 pageId={pageId} postHandle={selected.handle} onWorking={working => { setBusy(working); onSending(working); }}
                 onOrdered={item => {
                   // Show it as ordered and open it with the "we received your details" reply ready.
@@ -757,11 +760,6 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               {item.deliveryStatus === "failed" && !!item.text && <Button size="sm" variant="ghost" className="h-6 mt-1 text-xs" onClick={() => { onDraft(draftKey, draft.trim() ? `${draft.trimEnd()}\n${item.text}`.slice(0, 1000) : item.text); requestAnimationFrame(() => composer.current?.focus()); }}>إعادة النص إلى المسودة</Button>}
               {item.system && kind === "messages" && platform === "facebook" && <SocialInboxOrigin key={`${selected.id}:${selected.handle}:${item.id}`} pageId={pageId} platform={platform} handle={selected.handle} messageId={item.id} disabled={busy} onProduct={product => setOrderProducts(prev => ({ ...prev, [selected.id]: product }))} />}
             </div>)}
-          {thread && kind === "comments" && <div className="border-t p-3 mt-3 space-y-2 bg-muted/20">
-            <div className="flex justify-between gap-2"><h3 className="font-medium text-sm">ردود على تعليق {thread.title}</h3><Button disabled={busy} size="sm" variant="ghost" onClick={() => { ++replySeq.current; setLoadingReplies(false); setThread(null); }}>إغلاق</Button></div>
-            {loadingReplies && !replies.items.length ? <Loading /> : replies.items.length ? replies.items.map(item => <div key={item.id} className="rounded-lg border bg-background p-3"><ItemBody item={item} /></div>) : <p className="text-sm text-muted-foreground">لا ردود محمّلة</p>}
-            {replies.after && <Button disabled={loadingReplies || busy} variant="outline" size="sm" onClick={() => void loadReplies(thread, replies.after!)}>تحميل ردود إضافية</Button>}
-          </div>}
           </div>
           <div className="border-t p-3 space-y-2 shrink-0 max-h-[45%] overflow-auto bg-card">
             {kind === "messages" && <SocialInboxSelection key={selected.id} container={messageArea} disabled={busy || loadingDetail} onApply={(field, value) => {
