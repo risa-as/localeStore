@@ -545,13 +545,22 @@ export async function sendCommentPrivateReply(ctx: InboxContext, handle: string,
  * result says so and only the public part may be retried.
  */
 export async function replyToComment(ctx: InboxContext, handle: string,
-  input: { publicText: string; privateText: string; skipIfReplied: boolean }) {
+  input: { publicText: string; privateText: string; skipIfReplied: boolean; privateRequired?: boolean }) {
   const { publicText, privateText } = input;
   try {
     if (input.skipIfReplied && await pageRepliedToComment(ctx, handle))
       throw new CommentReplySkip("replied", "سبق الرد على هذا التعليق من الصفحة.");
-    const privateId = privateText ? await sendCommentPrivateReply(ctx, handle, privateText) : undefined;
+    let privateId: string | undefined;
+    let privateSkipped: string | undefined;
+    try {
+      privateId = privateText ? await sendCommentPrivateReply(ctx, handle, privateText) : undefined;
+    } catch (error) {
+      // A public reply that stands on its own still goes out when only the private message is refused.
+      if (!(error instanceof CommentReplySkip) || input.privateRequired !== false || !publicText) throw error;
+      privateSkipped = error.message;
+    }
     if (!publicText) return { status: "sent" as const, privateId };
+    if (privateSkipped) return { status: "sent" as const, publicId: await sendInboxComment(ctx, handle, publicText), privateSkipped };
     try {
       return { status: "sent" as const, privateId, publicId: await sendInboxComment(ctx, handle, publicText) };
     } catch (error) {

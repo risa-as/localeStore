@@ -349,15 +349,17 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   }
 
   /** One click: private message first (if any), then the public reply, then the next waiting comment. */
-  async function quickReply(item: InboxItem, reply: CommentReply) {
-    if (busy || sendingNow.current) return;
+  // `afterOrder`: sent right after an order was registered, while the order dialog is still finishing.
+  async function quickReply(item: InboxItem, reply: CommentReply, afterOrder = false) {
+    if ((busy && !afterOrder) || sendingNow.current) return;
     const expanded = expandCommentReply(reply, item.title, postProduct, variantTurn.current++);
     if (expanded.missing.length) { setReplyError(`هذا الرد يحتاج ${expanded.missing.join("، ")}؛ اختر منتج المنشور أولاً.`); return; }
+    if (expanded.needsOrder && !item.ordered) { setReplyError("هذا الرد يذكر تفاصيل الطلب؛ سجّل الطلب أولاً بزر «تسجيل الطلب»."); return; }
     sendingNow.current = true; pauseRefresh();
     setBusy(true); onSending(true); setSendingKey(`${item.id}:${reply.id}`); setReplyError(""); setNotice("");
     try {
       const result = await replyToSocialInboxComment({ pageId, platform, handle: item.handle,
-        publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: false });
+        publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: false, privateRequired: reply.privateRequired });
       if (!alive.current) return;
       if (!result.ok) { setReplyError(result.message); return; }
       const data = result.data;
@@ -371,6 +373,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
       recordCommentReply(item, data.publicId, expanded.publicText);
       const next = nextAwaiting(detail.items.filter(entry => !entry.hidden && !entry.answered), item.id, handledNow);
       setNotice(`${data.privateId ? "أُرسلت الرسالة الخاصة و" : ""}نُشر الرد على ${item.title}.${next ? "" : " لا تعليقات أخرى بانتظار الرد ضمن المحمّل."}`);
+      if ("privateSkipped" in data && data.privateSkipped) setReplyError(`نُشر الرد العلني فقط؛ لم تُرسل الرسالة الخاصة: ${data.privateSkipped}`);
       if (next) selectTarget(next); else setTarget(null);
     } catch { if (alive.current) setReplyError("لم نستلم تأكيد Meta؛ تحقّق من التعليق قبل إعادة المحاولة"); }
     finally { sendingNow.current = false; if (alive.current) { setBusy(false); setSendingKey(null); } onSending(false); }
@@ -394,8 +397,9 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
         const expanded = expandCommentReply(reply, item.title, product, index);
         if (expanded.missing.length) { stop = `الرد يحتاج ${expanded.missing.join("، ")}.`; break; }
         setSendingKey(`${item.id}:${reply.id}`);
+        if (expanded.needsOrder && !item.ordered) { done++; skipped++; show(true); continue; }
         const result = await replyToSocialInboxComment({ pageId, platform, handle: item.handle,
-          publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: true });
+          publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: true, privateRequired: reply.privateRequired });
         if (!alive.current) return;
         if (!result.ok) { stop = `توقف بعد اعتراض Meta: ${result.message}`; break; }
         done++;
@@ -749,9 +753,13 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
                 onMoreReplies={() => { if (thread && replies.after) void loadReplies(thread, replies.after); }}
                 pageId={pageId} postHandle={selected.handle} onWorking={working => { setBusy(working); onSending(working); }}
                 onOrdered={item => {
-                  // Show it as ordered and open it with the "we received your details" reply ready.
-                  setDetail(prev => ({ ...prev, items: prev.items.map(entry => entry.id === item.id ? { ...entry, ordered: true } : entry) }));
-                  selectTarget({ ...item, ordered: true });
+                  const ordered = { ...item, ordered: true };
+                  setDetail(prev => ({ ...prev, items: prev.items.map(entry => entry.id === item.id ? ordered : entry) }));
+                  // Confirm at once: public «تم الحجز…» plus a private message with the saved order details.
+                  const confirmation = commentReplies.replies.find(reply => reply.intents.includes("order"));
+                  if (confirmation && !item.answered && !handledComments.has(item.id))
+                    setTimeout(() => void quickReply(ordered, confirmation, true), 0);
+                  else selectTarget(ordered);
                 }}
                 onReply={selectTarget}
                 onThread={item => { setThread(item); setReplies(EMPTY); void loadReplies(item); }} />)}

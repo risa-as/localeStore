@@ -1,5 +1,6 @@
 import { expandQuickReply, type InboxProduct } from "./inbox-tools";
 import type { CommentIntent } from "./comment-intent";
+import { ORDER_FIELDS, usesOrderFields } from "./order-reply";
 
 /**
  * A customizable comment reply. One definition drives all comment tools:
@@ -19,6 +20,11 @@ export type CommentReply = {
   publicText: string;
   /** Private message to the commenter, sent BEFORE the public reply. Empty = none. */
   privateText: string;
+  /**
+   * true: post the public reply only if the private message went out (for «راسلناك بالخاص»).
+   * false: the public reply stands on its own and is posted anyway.
+   */
+  privateRequired: boolean;
 };
 
 export const MAX_COMMENT_REPLIES = 20;
@@ -29,28 +35,32 @@ export const MAX_COMMENT_REPLIES = 20;
  * Several variants per reply so bulk replies are not identical.
  */
 export const DEFAULT_COMMENT_REPLIES: CommentReply[] = [
-  { id: "price-public", label: "السعر", keywords: [], intents: ["price"], privateText: "",
-    publicText: "{الاسم} سعر القطعة {السعر} والتوصيل {التوصيل} 🌷\nللحجز اكتب رقم الهاتف والعنوان هنا أو اطلب من الرابط: {الرابط}\n---\n"
-      + "{الاسم} السعر {السعر مع التوصيل} مع التوصيل لكل المحافظات 🌷\nللحجز اكتب رقمك وعنوانك بتعليق\n---\n"
-      + "أهلاً {الاسم} 🌷 السعر {السعر} + التوصيل {التوصيل}\nاكتب رقم الهاتف والمحافظة والمنطقة ونثبت طلبك" },
-  { id: "price-private", label: "السعر بالخاص", keywords: [], intents: [],
+  { id: "price-public", label: "السعر", keywords: [], intents: ["price"], privateRequired: false,
+    publicText: "{الاسم} {المنتج}\nالسعر {السعر} والتوصيل {التوصيل}\n{العروض}\nللحجز اكتب رقم الهاتف والعنوان (المحافظة والمنطقة) 🌷\n---\n"
+      + "أهلاً {الاسم} 🌷 سعر {المنتج} {السعر} + التوصيل {التوصيل}\n{العروض}\nاكتب رقمك وعنوانك ونثبت طلبك\n---\n"
+      + "{الاسم} {المنتج} بـ {السعر} والتوصيل {التوصيل} 🌷\n{العروض}\nللحجز أرسل رقم هاتفك وعنوانك",
+    privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\n{العروض}\n\nللحجز أرسل رقم هاتفك وعنوانك (المحافظة والمنطقة وأقرب نقطة دالة) هنا 🌷" },
+  { id: "price-private", label: "السعر بالخاص", keywords: [], intents: [], privateRequired: true,
     publicText: "{الاسم} راسلناك بالخاص بكل التفاصيل 🌷\n---\n{الاسم} وصلتك رسالة بالخاص 🌷\n---\nتم الرد بالخاص {الاسم}، نورتنا 🌷",
     privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\n{العروض}\n\nللحجز أرسل رقم هاتفك وعنوانك هنا، أو اطلب مباشرة من الرابط:\n{الرابط}" },
-  { id: "order-received", label: "وصلتنا معلوماتك", keywords: [], intents: ["order"], privateText: "",
-    publicText: "{الاسم} وصلتنا معلوماتك ✅ راح نثبت طلبك ويتصل بيك المندوب قبل التوصيل 🌷\n---\n"
-      + "شكراً {الاسم} 🌷 استلمنا رقمك وعنوانك، راح نتواصل وياك لتأكيد الطلب ✅" },
-  { id: "booking-how", label: "طريقة الحجز", keywords: [], intents: ["booking"], privateText: "",
-    publicText: "{الاسم} حاضرين 🌷 اكتب رقم هاتفك والعنوان (المحافظة والمنطقة) بتعليق ونثبت طلبك\n---\n"
-      + "{الاسم} للحجز أرسل رقمك وعنوانك هنا أو بالخاص، أو اطلب مباشرة من الرابط: {الرابط} 🌷" },
-  { id: "offers", label: "العروض والأسعار الثابتة", keywords: [], intents: ["bargain"], privateText: "",
+  { id: "order-received", label: "تم الحجز", keywords: [], intents: ["order"], privateRequired: false,
+    publicText: "{الاسم} تم الحجز ✅ وسوف يصل الطلب لك خلال 24 ساعة 🌷\n---\n"
+      + "تم الحجز {الاسم} ✅ طلبك يوصلك خلال 24 ساعة إن شاء الله 🌷",
+    privateText: "تم الحجز ✅\n\nتفاصيل طلبك:\nالمنتج: {منتجات الطلب}\nالسعر مع التوصيل: {مجموع الطلب}\nالعنوان: {العنوان}\nرقم الهاتف: {رقم الهاتف}\n\n"
+      + "سوف يصل الطلب لك خلال 24 ساعة إن شاء الله 🌷\nإذا كان هناك أي خطأ في المعلومات راسلنا هنا." },
+  { id: "booking-how", label: "طريقة الحجز", keywords: [], intents: ["booking"], privateRequired: false,
+    publicText: "{الاسم} حاضرين 🌷 {المنتج}\nالسعر {السعر} والتوصيل {التوصيل}\n{العروض}\nاكتب رقم هاتفك والعنوان (المحافظة والمنطقة) ونثبت طلبك\n---\n"
+      + "{الاسم} {المنتج} بـ {السعر} والتوصيل {التوصيل} 🌷\n{العروض}\nللحجز أرسل رقمك وعنوانك بتعليق أو بالخاص",
+    privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\n{العروض}\n\nلتثبيت حجزك أرسل رقم هاتفك وعنوانك (المحافظة والمنطقة وأقرب نقطة دالة) هنا 🌷" },
+  { id: "offers", label: "العروض والأسعار الثابتة", keywords: [], intents: ["bargain"], privateText: "", privateRequired: false,
     publicText: "{الاسم} الأسعار ثابتة 🌷 سعر القطعة {السعر} والتوصيل {التوصيل}\n{العروض}\nللحجز اكتب رقمك وعنوانك" },
-  { id: "delivery", label: "التوصيل", keywords: [], intents: ["delivery"], privateText: "",
+  { id: "delivery", label: "التوصيل", keywords: [], intents: ["delivery"], privateText: "", privateRequired: false,
     publicText: "{الاسم} نوصل لكل محافظات العراق 🚚 التوصيل {التوصيل} ويوصلك خلال 48 ساعة إن شاء الله، والدفع عند الاستلام 🌷\nللحجز اكتب رقمك وعنوانك" },
-  { id: "followup", label: "متابعة الطلب", keywords: [], intents: ["followup"], privateText: "",
+  { id: "followup", label: "متابعة الطلب", keywords: [], intents: ["followup"], privateText: "", privateRequired: false,
     publicText: "{الاسم} نعتذر عن التأخير 🙏 راسلنا برقم هاتفك بالخاص حتى نتابع طلبك فوراً" },
-  { id: "greeting", label: "رد السلام", keywords: [], intents: ["greeting"], privateText: "",
+  { id: "greeting", label: "رد السلام", keywords: [], intents: ["greeting"], privateText: "", privateRequired: false,
     publicText: "وعليكم السلام {الاسم} 🌷 تفضل، شلون نكدر نخدمك؟" },
-  { id: "thanks", label: "شكراً", keywords: [], intents: ["praise"], privateText: "",
+  { id: "thanks", label: "شكراً", keywords: [], intents: ["praise"], privateText: "", privateRequired: false,
     publicText: "شكراً {الاسم} 🌷 نورتنا\n---\nتسلم {الاسم} 🌷\n---\nالله يحفظك {الاسم} 🌷" },
 ];
 
@@ -75,8 +85,9 @@ export function decodeCommentReplies(raw: string | null): CommentReply[] {
       strings(item.keywords, 40) && typeof item.publicText === "string" && item.publicText.length <= 3000 &&
       typeof item.privateText === "string" && item.privateText.length <= 1000 &&
       (item.intents === undefined || strings(item.intents, 20))))
-      // Replies saved before intents existed have none.
-      return saved.map(item => ({ ...item, intents: Array.isArray(item.intents) ? item.intents : [] }));
+      // Replies saved before intents existed have none; before privateRequired, a private part always gated the public one.
+      return saved.map(item => ({ ...item, intents: Array.isArray(item.intents) ? item.intents : [],
+        privateRequired: typeof item.privateRequired === "boolean" ? item.privateRequired : true }));
   } catch { /* Fall back to the defaults when storage is empty or malformed. */ }
   return defaults();
 }
@@ -147,6 +158,8 @@ export function expandCommentReply(reply: CommentReply, name: string, product: I
   const privatePart = expandQuickReply(fillName(reply.privateText.trim(), name), name, product);
   // An empty {العروض} must not leave a gap of blank lines.
   const tidy = (text: string) => text.replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n").replace(/(^|\n)[ \t]*\n(?=[^\n]*$)/, "$1").trim();
+  // Order fields are filled on the server from the registered order, so they are not "missing" here.
   return { publicText: tidy(publicPart.text), privateText: tidy(privatePart.text),
-    missing: [...new Set([...publicPart.missing, ...privatePart.missing])] };
+    missing: [...new Set([...publicPart.missing, ...privatePart.missing])].filter(field => !ORDER_FIELDS.includes(field)),
+    needsOrder: usesOrderFields(reply.publicText) || usesOrderFields(reply.privateText) };
 }

@@ -1,4 +1,4 @@
-import { checkSocialInboxConnection, getSocialInboxSetup, getSocialInboxList, getSocialInboxDetail, getSocialInboxOrigin, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, getSocialInboxUploadScope, markSocialInboxRead, searchSocialInboxProducts, searchSocialInboxOrdersByPhone, prepareSocialInboxOrder, approveSocialInboxOrder } from "../actions/social-inbox.actions";
+import { replyToSocialInboxComment, checkSocialInboxConnection, getSocialInboxSetup, getSocialInboxList, getSocialInboxDetail, getSocialInboxOrigin, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, getSocialInboxUploadScope, markSocialInboxRead, searchSocialInboxProducts, searchSocialInboxOrdersByPhone, prepareSocialInboxOrder, approveSocialInboxOrder } from "../actions/social-inbox.actions";
 import { submitQuickOrder } from "../orders/quick-order";
 import { signInboxMedia } from "./inbox-media-ticket";
 import { getAvailableStocks } from "../inventory";
@@ -16,7 +16,7 @@ jest.mock("@/db/prisma", () => ({ prisma: { metaConnection: { findUnique: jest.f
   product: { findMany: jest.fn() },
   order: { findMany: jest.fn() },
   socialPost: { findFirst: jest.fn() },
-  socialInboxOrder: { findMany: jest.fn() },
+  socialInboxOrder: { findMany: jest.fn(), findFirst: jest.fn() },
   socialInboxState: { findMany: jest.fn(), findUnique: jest.fn(), upsert: jest.fn() } } }));
 jest.mock("../inventory", () => ({ getAvailableStocks: jest.fn() }));
 jest.mock("./inbox-delivery-storage", () => ({ applyInboxDelivery: async (_ctx: unknown, _recipient: unknown, items: unknown) => items }));
@@ -335,5 +335,28 @@ describe("orders from comments", () => {
     jest.mocked(prisma.socialInboxOrder.findMany).mockResolvedValue([{ conversationId: "comment:c1" }] as never);
     const result = await getSocialInboxDetail({ pageId: "page1", platform: "facebook", kind: "comments", handle: resourceHandle(ctx, "post", "page1_post") });
     expect(result.ok && result.data.items.map(item => [item.id, !!item.ordered, item.intent])).toEqual([["c1", true, "order"], ["c2", false, "price"]]);
+  });
+});
+
+describe("order confirmations on comments", () => {
+  const ctx = { pageId: "page1", platform: "facebook" as const, token: "PRIVATE_PAGE", secret: "secret", userId: "admin1" };
+  const input = { pageId: "page1", platform: "facebook" as const, handle: resourceHandle(ctx, "comment", "c1"),
+    publicText: "تم الحجز ✅", privateText: "المنتج: {منتجات الطلب}\nالعنوان: {العنوان}\nالهاتف: {رقم الهاتف}", skipIfReplied: false, privateRequired: false };
+
+  it("refuses before an order is registered from the comment", async () => {
+    jest.mocked(prisma.socialInboxOrder.findFirst).mockResolvedValue(null);
+    expect(await replyToSocialInboxComment(input)).toMatchObject({ ok: true, data: { status: "skipped", reason: "no-order" } });
+    expect(graphPost).not.toHaveBeenCalled();
+  });
+
+  it("fills the private message from the saved order", async () => {
+    jest.mocked(prisma.socialInboxOrder.findFirst).mockResolvedValue({ order: { phoneNumber: "07701234567", governorate: "Baghdad",
+      address: "الدورة", totalPrice: 25, orderitems: [{ name: "منشار", qty: 1 }] } } as never);
+    jest.mocked(graphGet).mockResolvedValue({ can_reply_privately: true });
+    jest.mocked(graphPost).mockResolvedValueOnce({ message_id: "dm1" }).mockResolvedValueOnce({ id: "pub1" });
+    expect((await replyToSocialInboxComment(input)).ok).toBe(true);
+    expect(jest.mocked(prisma.socialInboxOrder.findFirst).mock.calls[0][0]).toMatchObject({ where: { conversationId: "comment:c1" } });
+    expect(jest.mocked(graphPost).mock.calls[0][2]).toEqual({ recipient: { comment_id: "c1" },
+      message: { text: "المنتج: منشار\nالعنوان: بغداد - الدورة\nالهاتف: 07701234567" } });
   });
 });

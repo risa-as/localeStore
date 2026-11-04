@@ -70,8 +70,10 @@ export default function SocialInboxCommentGroup({ group, platform, pageId, postH
       const replyButton = (reply: CommentReply, asMenuItem = false) => {
         const expanded = expandCommentReply(reply, item.title, product);
         const isSuggested = suggested?.id === reply.id;
-        const blocked = disabled || expanded.missing.length > 0;
-        const title = expanded.missing.length ? `يحتاج ${expanded.missing.join("، ")} — اختر منتج المنشور`
+        const needsOrder = expanded.needsOrder && !item.ordered;
+        const blocked = disabled || expanded.missing.length > 0 || needsOrder;
+        const title = needsOrder ? "يذكر تفاصيل الطلب — سجّل الطلب أولاً بزر «تسجيل الطلب»"
+          : expanded.missing.length ? `يحتاج ${expanded.missing.join("، ")} — اختر منتج المنشور`
           : [expanded.privateText && `رسالة خاصة:\n${expanded.privateText}`, expanded.publicText && `رد علني:\n${expanded.publicText}`].filter(Boolean).join("\n\n");
         const icon = sendingId === `${item.id}:${reply.id}` ? <Loader2 className="size-3 animate-spin" />
           : isSuggested ? <Sparkles className="size-3" /> : reply.privateText.trim() ? <Lock className="size-3" /> : null;

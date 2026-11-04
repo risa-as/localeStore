@@ -24,6 +24,7 @@ import { revalidatePath } from "next/cache";
 import { applyInboxDelivery } from "@/lib/meta/inbox-delivery-storage";
 import { selectedOrderValue } from "@/lib/meta/inbox-workflow";
 import { inspectInboxConnection, inboxTokenFingerprint } from "@/lib/meta/inbox-connection";
+import { fillOrderFields, usesOrderFields } from "@/lib/meta/order-reply";
 
 type PageAsset = { id: string; name: string; access_token?: string;
   instagram_business_account?: { id: string; username?: string } };
@@ -348,14 +349,26 @@ async function resolvePostProducts(ctx: InboxContext, postHandle: string, manual
 
 /** Public and/or private reply to a comment; see replyToComment for the send order. */
 export async function replyToSocialInboxComment(input: { pageId: string; platform: SocialPlatform; handle: string;
-  publicText: string; privateText: string; skipIfReplied: boolean }) {
+  publicText: string; privateText: string; skipIfReplied: boolean; privateRequired?: boolean }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
-    const publicText = typeof input.publicText === "string" ? input.publicText.trim() : "";
-    const privateText = typeof input.privateText === "string" ? input.privateText.trim() : "";
+    let publicText = typeof input.publicText === "string" ? input.publicText.trim() : "";
+    let privateText = typeof input.privateText === "string" ? input.privateText.trim() : "";
+    // Order details come from the order registered from this comment, never from the browser.
+    if (usesOrderFields(publicText) || usesOrderFields(privateText)) {
+      const saved = await prisma.socialInboxOrder.findFirst({
+        where: { pageId: ctx.pageId, platform: ctx.platform, conversationId: `comment:${resourceId(ctx, "comment", input.handle)}` },
+        orderBy: { createdAt: "desc" },
+        select: { order: { select: { phoneNumber: true, governorate: true, address: true, totalPrice: true, orderitems: { select: { name: true, qty: true } } } } } });
+      if (!saved) return { status: "skipped" as const, reason: "no-order" as const, message: "لم يُسجَّل طلب لهذا التعليق بعد؛ اضغط «تسجيل الطلب» أولاً." };
+      const order = { ...saved.order, totalPrice: Number(saved.order.totalPrice), items: saved.order.orderitems };
+      publicText = fillOrderFields(publicText, order);
+      privateText = fillOrderFields(privateText, order);
+    }
     if ((!publicText && !privateText) || publicText.length > 1000 || privateText.length > 1000)
       throw new Error("نص الرد فارغ أو يتجاوز 1000 حرف");
-    return diagnoseSend(ctx, () => replyToComment(ctx, input.handle, { publicText, privateText, skipIfReplied: input.skipIfReplied === true }));
+    return diagnoseSend(ctx, () => replyToComment(ctx, input.handle, { publicText, privateText,
+      skipIfReplied: input.skipIfReplied === true, privateRequired: input.privateRequired !== false }));
   });
 }
 

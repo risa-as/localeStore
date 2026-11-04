@@ -71,3 +71,11 @@ it("sends only the public reply when there is no private part", async () => {
   expect(get).toHaveBeenCalledWith("c1/replies", "T", { fields: "id,from,username", limit: "50" });
   expect(post).toHaveBeenCalledWith("c1/replies", "T", { message: "شكراً" });
 });
+
+it("still posts a self-contained public reply when only the private message is refused", async () => {
+  get.mockResolvedValue({ can_reply_privately: false });
+  post.mockResolvedValueOnce({ id: "pub1" });
+  await expect(replyToComment(fb, handle(fb), { ...both, privateRequired: false }))
+    .resolves.toMatchObject({ status: "sent", publicId: "pub1", privateSkipped: expect.stringContaining("7 أيام") });
+  expect(post).toHaveBeenCalledWith("c1/comments", "T", { message: "راسلناك بالخاص" });
+});

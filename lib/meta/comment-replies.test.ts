@@ -3,7 +3,7 @@ import { classifyComment } from "./comment-intent";
 import type { InboxProduct } from "./inbox-tools";
 
 const product: InboxProduct = { id: "p", name: "مسدس تنظيف", slug: "gun", image: null, price: 25, shippingPrice: 5, available: 0, url: "https://shop.test/ar/landing/gun" };
-const reply = (patch: Partial<CommentReply>): CommentReply => ({ id: "r", label: "r", keywords: [], intents: [], publicText: "", privateText: "", ...patch });
+const reply = (patch: Partial<CommentReply>): CommentReply => ({ id: "r", label: "r", keywords: [], intents: [], publicText: "", privateText: "", privateRequired: true, ...patch });
 
 it("normalizes the spellings customers type", () => {
   expect(normalizeArabic("السِّعـــر بكَم؟")).toBe("السعر بكم؟");
@@ -88,7 +88,7 @@ it("default replies cover the common comment kinds and fill without gaps", () =>
   expect(expandCommentReply(offers, "علي", { ...product, offers: "قطعتين ب45 الف" }).publicText).toContain("قطعتين ب45 الف");
   const price = expandCommentReply(DEFAULT_COMMENT_REPLIES[0], "علي", product, 1);
   expect(price.missing).toEqual([]);
-  expect(price.publicText).toContain("مع التوصيل");
+  expect(price.publicText).toContain(product.name);
 });
 
 it("keeps replies saved before intents existed and restores the suggested ones", () => {

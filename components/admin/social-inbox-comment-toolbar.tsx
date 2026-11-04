@@ -19,6 +19,8 @@ export type BulkState = { label: string; total: number; done: number; sent: numb
 export type BulkGroup = { reply: CommentReply; items: InboxItem[] };
 
 const FIELDS = ["الاسم", "المنتج", "السعر", "التوصيل", "السعر مع التوصيل", "العروض", "الرابط"];
+// Filled from the order registered from the comment (see order-reply.ts).
+const ORDER_CHIPS = ["منتجات الطلب", "مجموع الطلب", "العنوان", "رقم الهاتف"];
 export const BULK_LIMIT = 30;
 
 export default function SocialInboxCommentToolbar({ library, product, productSource, productLoading, productError, onChooseProduct,
@@ -94,7 +96,7 @@ export default function SocialInboxCommentToolbar({ library, product, productSou
           : <div className="space-y-2 text-sm">
             {preview.privateText && <div><p className="text-xs font-semibold mb-1">رسالة خاصة (تُرسل أولاً):</p><p dir="auto" className="whitespace-pre-wrap rounded-md border bg-muted/30 p-2">{preview.privateText}</p></div>}
             {preview.publicText && <div><p className="text-xs font-semibold mb-1">رد علني:</p><p dir="auto" className="whitespace-pre-wrap rounded-md border bg-muted/30 p-2">{preview.publicText}</p></div>}
-            <p className="text-[11px] text-muted-foreground">معاينة أول تعليق ({chosen[0]?.title}). يتغير الاسم والصيغة لكل زبون.</p>
+            <p className="text-[11px] text-muted-foreground">معاينة أول تعليق ({chosen[0]?.title}). يتغير الاسم والصيغة لكل زبون{preview.needsOrder ? "، وتُملأ تفاصيل الطلب من الطلب المسجّل لكل تعليق" : ""}.</p>
           </div>)}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => setConfirm(null)}>إلغاء</Button>
@@ -144,7 +146,7 @@ function ProductPicker({ disabled, onPick }: { disabled: boolean; onPick: (produ
   </Popover>;
 }
 
-const blank = (): CommentReply => ({ id: crypto.randomUUID(), label: "", keywords: [], intents: [], publicText: "", privateText: "" });
+const blank = (): CommentReply => ({ id: crypto.randomUUID(), label: "", keywords: [], intents: [], publicText: "", privateText: "", privateRequired: true });
 const intentLabel = (intent: CommentIntent) => COMMENT_INTENTS.find(item => item.value === intent)?.label ?? intent;
 
 function ReplyEditor({ open, onOpenChange, library }: { open: boolean; onOpenChange: (open: boolean) => void; library: CommentReplyLibrary }) {
@@ -201,7 +203,7 @@ function ReplyEditor({ open, onOpenChange, library }: { open: boolean; onOpenCha
       {edit && <form className="space-y-3 border-t pt-3" onSubmit={event => {
         event.preventDefault();
         const keywords = [...new Set(edit.keywordText.split(/[,،\n]/).map(word => word.trim()).filter(Boolean))].slice(0, 30);
-        const candidate: CommentReply = { id: edit.id, label: edit.label.trim(), keywords, intents: edit.intents, publicText: edit.publicText.trim(), privateText: edit.privateText.trim() };
+        const candidate: CommentReply = { id: edit.id, label: edit.label.trim(), keywords, intents: edit.intents, publicText: edit.publicText.trim(), privateText: edit.privateText.trim(), privateRequired: edit.privateRequired };
         if (!candidate.label) { setFeedback("اكتب اسماً للزر."); return; }
         if (!candidate.publicText && !candidate.privateText) { setFeedback("اكتب رداً علنياً أو رسالة خاصة على الأقل."); return; }
         if (replyVariants(candidate.publicText).some(variant => variant.length > 1000)) { setFeedback("كل صيغة للرد العلني يجب ألا تتجاوز 1000 حرف."); return; }
@@ -229,8 +231,14 @@ function ReplyEditor({ open, onOpenChange, library }: { open: boolean; onOpenCha
         <div className="space-y-1">
           <label className="block text-sm">رسالة خاصة للزبون <span className="text-xs text-muted-foreground">(اختياري — تُرسل أولاً، مرة واحدة لكل تعليق خلال 7 أيام)</span><Textarea maxLength={1000} rows={4} value={edit.privateText} onChange={e => setEdit({ ...edit, privateText: e.target.value })} /></label>
           <FieldButtons onAdd={field => addField("privateText", field)} />
+          <div className="flex flex-wrap gap-1 items-center"><span className="text-[11px] text-muted-foreground">من الطلب المسجّل:</span>
+            {ORDER_CHIPS.map(field => <Button key={field} type="button" size="sm" variant="outline" className="h-6 px-1.5 text-[11px]" onClick={() => addField("privateText", field)}>{`{${field}}`}</Button>)}</div>
+          {edit.privateText.trim() && <label className="flex items-center gap-2 text-xs">
+            <Checkbox checked={edit.privateRequired} onCheckedChange={value => setEdit({ ...edit, privateRequired: value === true })} />
+            لا تنشر الرد العلني إذا تعذّرت الرسالة الخاصة <span className="text-muted-foreground">(فعّله إذا كان الرد العلني يقول «راسلناك بالخاص»)</span>
+          </label>}
         </div>
-        <p className="text-[11px] text-muted-foreground">{"{المنتج} {السعر} {التوصيل} {السعر مع التوصيل} {العروض} {الرابط}"} تُملأ من منتج المنشور ({"{العروض}"} من حقل العروض في المنتج، ويُحذف السطر إن كان فارغاً).</p>
+        <p className="text-[11px] text-muted-foreground">{"{المنتج} {السعر} {التوصيل} {السعر مع التوصيل} {العروض} {الرابط}"} تُملأ من منتج المنشور ({"{العروض}"} من حقل العروض في المنتج، ويُحذف السطر إن كان فارغاً). {"{منتجات الطلب} {مجموع الطلب} {العنوان} {رقم الهاتف}"} تُملأ من الطلب المسجّل من التعليق، ولا يُرسل الرد قبل تسجيله.</p>
         <div className="flex gap-2"><Button type="submit">حفظ الرد</Button><Button type="button" variant="ghost" onClick={() => setEdit(null)}>إلغاء</Button></div>
       </form>}
       {feedback && <p role="status" className="text-xs">{feedback}</p>}
