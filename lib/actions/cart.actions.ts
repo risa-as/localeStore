@@ -9,7 +9,6 @@ import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { getTranslations } from "next-intl/server";
 import { computeOrderPricing } from "../pricing";
-import { getAvailableStock } from "../inventory";
 // Calculate cart prices
 const calcPrice = (items: CartItem[]) => {
   const itemsPrice = round2(
@@ -55,9 +54,8 @@ export async function addItemToCart(data: CartItem) {
     item.name = product.name;
     item.slug = product.slug;
     item.image = product.images[0] || item.image;
-    const existingQty = cart?.items.find((x: CartItem) => x.productId === item.productId)?.qty ?? 0;
-    const available = await getAvailableStock(product.id, product.stock);
-    if (existingQty + (existingQty ? 1 : item.qty) > available) throw new Error(t("notEnoughStock"));
+    // No stock check: orders are taken even when stock runs out, and the
+    // admin orders page flags them.
 
     // Create New Cart Object
     if (!cart) {
@@ -83,20 +81,12 @@ export async function addItemToCart(data: CartItem) {
         (x) => x.productId === item.productId
       );
       if (existItem) {
-        // Check stock
-        if (product.stock < existItem.qty + 1) {
-          throw new Error(t("notEnoughStock"));
-        }
         // Increase the quantity
         (cart.items as CartItem[]).find(
           (x) => x.productId === item.productId
         )!.qty = existItem.qty + 1;
       } else {
         // If Item does not exist in cart
-        // Check stock
-        if (product.stock < 1) {
-          throw new Error(t("notEnoughStock"));
-        }
         cart.items.push(item);
       }
       // Save to dattabase

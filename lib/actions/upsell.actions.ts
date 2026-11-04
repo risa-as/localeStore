@@ -2,7 +2,6 @@
 import { prisma } from "@/db/prisma";
 import { assertOrderAccess } from "@/lib/orders/access";
 import { reserveOrderStock } from "@/lib/orders/reservations";
-import { getAvailableStock } from "@/lib/inventory";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { recordOrderEvent } from "@/lib/orders/telemetry";
@@ -23,7 +22,6 @@ export async function getOrderSuggestions(orderId: string) {
   const products = await prisma.product.findMany({ where: { id: { in: ids }, isArchived: false }, take: 3 });
   const suggestions = [];
   for (const product of products) {
-    if (await getAvailableStock(product.id, product.stock) < 1) continue;
     const additionalShipping = Math.max(0, Number(product.shippingPrice) - Number(order.shippingPrice));
     suggestions.push({ id: product.id, name: product.name, image: product.images[0], colors: product.colors, price: Number(product.price), additionalShipping, totalIncrement: Number(product.price) + additionalShipping });
   }

@@ -2,11 +2,9 @@ import { Link } from "@/i18n/navigation";
 import { AccessibleImage } from "@/components/ui/accessible-image";
 import ProductPrice from "./product-price";
 import { Product } from "@/types";
-import { useTranslations } from "next-intl";
 import { Star } from "lucide-react";
 
 const ProductCard = ({ product, priority = false, returnTo }: { product: Product; priority?: boolean; returnTo?: string }) => {
-  const t = useTranslations("Product");
   const href = `/product/${product.slug}${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ""}`;
 
   return (
@@ -22,13 +20,6 @@ const ProductCard = ({ product, priority = false, returnTo }: { product: Product
             priority={priority}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-          {product.stock <= 0 && (
-            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-              <span className="bg-destructive text-white text-sm font-bold px-4 py-2 rounded-xl">
-                {t("outOfStock")}
-              </span>
-            </div>
-          )}
         </div>
       </Link>
 
@@ -56,14 +47,10 @@ const ProductCard = ({ product, priority = false, returnTo }: { product: Product
           </div> : <span />}
 
           {/* Price */}
-          {product.stock > 0 ? (
-            <ProductPrice
-              value={Number(product.price)}
-              className="text-base sm:text-lg font-extrabold"
-            />
-          ) : (
-            <span className="text-xs font-semibold text-destructive">{t("outOfStock")}</span>
-          )}
+          <ProductPrice
+            value={Number(product.price)}
+            className="text-base sm:text-lg font-extrabold"
+          />
         </div>
       </div>
     </article>
