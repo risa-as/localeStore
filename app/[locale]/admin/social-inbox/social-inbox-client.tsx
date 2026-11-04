@@ -10,7 +10,7 @@ import { MessageCircle, MessagesSquare, RefreshCw, Send, Loader2, ExternalLink, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getSocialInboxList, getSocialInboxDetail, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, markSocialInboxRead,
-  type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
+  moderateSocialInboxComment, type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
 import type { InboxItem, InboxPage, InboxReplyWindow, SocialPlatform } from "@/lib/meta/inbox";
 import { reconcileConversation, type ConversationReceipt } from "@/lib/meta/inbox-state";
 import ItemBody from "@/components/admin/social-inbox-item";
@@ -25,7 +25,7 @@ import { useSocialOutbox, InboxSendFailure } from "@/components/admin/use-social
 import { advanceDelivery, mergeOutbox } from "@/lib/meta/inbox-outbox";
 import { groupInboxComments, type SelectedOrderFields } from "@/lib/meta/inbox-workflow";
 import SocialInboxSelection from "@/components/admin/social-inbox-selection";
-import SocialInboxCommentGroup from "@/components/admin/social-inbox-comment-group";
+import SocialInboxCommentGroup, { type CommentAction } from "@/components/admin/social-inbox-comment-group";
 import SocialInboxOrderLookup from "@/components/admin/social-inbox-order-lookup";
 import SocialInboxConnectionCheck from "@/components/admin/social-inbox-connection-check";
 
@@ -117,6 +117,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   const [orderProducts, setOrderProducts] = useState<Record<string, InboxProduct | undefined>>({});
   const [mobileDetail, setMobileDetail] = useState(false);
   const [handledComments, setHandledComments] = useState<Set<string>>(new Set());
+  const [moderatingId, setModeratingId] = useState<string | null>(null);
   const [mediaDrafts, setMediaDrafts] = useState<Record<string, MediaDraft>>({});
   const mediaDraftsRef = useRef<Record<string, MediaDraft>>({});
   const filePicker = useRef<HTMLInputElement>(null);
@@ -288,6 +289,34 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
       else setReplyError(result.message);
     } catch { if (alive.current && seq === replySeq.current) setReplyError("تعذر تحميل الردود"); }
     finally { if (alive.current && seq === replySeq.current) setLoadingReplies(false); }
+  }
+
+  async function moderateComment(item: InboxItem, action: CommentAction, alsoDelete: InboxItem[] = []) {
+    // Drop any in-flight refresh so it cannot bring back a comment we just removed.
+    ++detailSeq.current; setLoadingDetail(false);
+    setBusy(true); setModeratingId(item.id); setReplyError(""); setNotice("");
+    try {
+      const result = await moderateSocialInboxComment({ pageId, platform, handle: item.handle, action });
+      if (!alive.current) return;
+      if (!result.ok) { setReplyError(result.message); return; }
+      const removed = new Set<string>(action === "delete" ? [item.id] : []);
+      let failed = 0;
+      for (const extra of alsoDelete) {
+        const deleted = await moderateSocialInboxComment({ pageId, platform, handle: extra.handle, action: "delete" });
+        if (deleted.ok) removed.add(extra.id); else failed++;
+      }
+      if (!alive.current) return;
+      setDetail(prev => ({ ...prev, items: prev.items.filter(entry => !removed.has(entry.id))
+        .map(entry => entry.id === item.id && (action === "hide" || action === "unhide") ? { ...entry, hidden: action === "hide" } : entry) }));
+      if (target && removed.has(target.id)) setTarget(null);
+      if (thread && removed.has(thread.id)) { ++replySeq.current; setLoadingReplies(false); setThread(null); }
+      setNotice(action === "hide" ? "أُخفي التعليق؛ لا يراه الآن إلا صاحبه وأصدقاؤه."
+        : action === "unhide" ? "أصبح التعليق ظاهراً للجميع."
+        : action === "delete" ? "حُذف التعليق."
+        : `حُظر ${item.title} من الصفحة${removed.size ? ` وحُذف ${removed.size} من تعليقاته` : ""}.`);
+      if (failed) setReplyError(`تعذر حذف ${failed} من تعليقاته؛ احذفها يدوياً بعد التحديث.`);
+    } catch { if (alive.current) setReplyError("لم نستلم تأكيد Meta؛ حدّث التعليقات للتحقق قبل إعادة المحاولة"); }
+    finally { if (alive.current) { setBusy(false); setModeratingId(null); } }
   }
 
   const destination = kind === "messages" ? selected : target;
@@ -494,7 +523,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
             {kind === "comments" && <details className="rounded-lg border bg-background p-2"><summary className="cursor-pointer text-xs font-semibold">المنشور الأصلي</summary><p dir="auto" className="text-sm whitespace-pre-wrap break-words mt-2 max-h-36 overflow-auto">{selected.text || "منشور بدون نص"}</p></details>}
             {loadingDetail && !detailItems.length ? <Loading /> : !detailItems.length ? <p className="text-sm text-muted-foreground">{detailError ? "تعذر تحميل المحتوى" : "لا يوجد محتوى متاح"}</p> : kind === "comments" ? <>
               <p className="text-[11px] text-muted-foreground">تُجمع تعليقات الزبون على هذا المنشور بحسب هويته. التجميع يشمل التعليقات المحمّلة{detail.after ? "؛ حمّل المزيد لإضافة الأقدم." : "."}</p>
-              {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} targetId={target?.id} handled={handledComments} disabled={busy}
+              {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}
+                moderatingId={moderatingId} onModerate={(item, action, alsoDelete) => void moderateComment(item, action, alsoDelete)}
                 onReply={item => { setTarget(item); setThread(item); setReplies(EMPTY); void loadReplies(item); }}
                 onThread={item => { setThread(item); setReplies(EMPTY); void loadReplies(item); }} />)}
             </> : detailItems.map(item => <div key={item.id} className={`rounded-2xl border px-3 py-2 [overflow-wrap:anywhere] ${item.system ? "bg-muted/30 border-dashed mx-auto max-w-xl" : item.outgoing ? "w-fit max-w-[90%] sm:max-w-[80%] ms-auto rounded-es-sm bg-emerald-50/80 border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60" : "w-fit max-w-[90%] sm:max-w-[80%] me-auto rounded-ee-sm bg-background"}`}>

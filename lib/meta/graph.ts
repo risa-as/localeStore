@@ -101,6 +101,17 @@ export async function graphPost<T = Record<string, unknown>>(
   return parse(res) as Promise<T>;
 }
 
+export async function graphDelete<T = Record<string, unknown>>(path: string, token: string): Promise<T> {
+  let res: Response;
+  try { res = await fetch(`${BASE}/${path.replace(/^\//, "")}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  }); } catch {
+    throw new GraphError(0, "لم نستلم تأكيد الحذف من Meta؛ حدّث التعليقات للتحقق قبل إعادة المحاولة", undefined, { outcomeUnknown: true });
+  }
+  return parse(res) as Promise<T>;
+}
+
 /**
  * تبادل التوكنات وتُستدعى بمعاملات في الرابط (لا Bearer) لأنها نقاط app-level:
  *   1) code → توكن قصير العمر

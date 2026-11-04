@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { graphGet, graphPost, GraphError } from "./graph";
+import { graphGet, graphPost, graphDelete, GraphError } from "./graph";
 import type { InboxMedia } from "./inbox-media";
 import type { InboxProduct } from "./inbox-tools";
 import type { DeliveryStatus } from "./inbox-delivery";
@@ -18,6 +18,8 @@ export type InboxItem = {
   sendError?: string;
   authorId?: string;
   authorUsername?: string;
+  /** Comment hidden from the public (still visible to the author and the Page). */
+  hidden?: boolean;
   attachments?: { name: string; url: string; kind?: "image" | "sticker" | "audio" | "video" | "file"; width?: number; height?: number }[];
 };
 export type InboxPage = { items: InboxItem[]; after: string | null };
@@ -41,6 +43,7 @@ type Message = {
 type Comment = {
   id: string; message?: string; text?: string; username?: string;
   from?: Person; created_time?: string; timestamp?: string;
+  is_hidden?: boolean; hidden?: boolean;
 };
 
 const path = (id: string) => encodeURIComponent(id);
@@ -356,21 +359,70 @@ export async function listInboxPosts(ctx: InboxContext, after?: string): Promise
     time: p.timestamp || p.created_time || "", url: safeSocialUrl(p.permalink || p.permalink_url) })), after: next(res) };
 }
 
-function commentFields(ctx: InboxContext) {
-  return ctx.platform === "instagram" ? "id,text,username,from,timestamp" : "id,message,from,created_time";
+function commentFields(ctx: InboxContext, withHidden: boolean) {
+  return ctx.platform === "instagram" ? `id,text,username,from,timestamp${withHidden ? ",hidden" : ""}`
+    : `id,message,from,created_time${withHidden ? ",is_hidden" : ""}`;
 }
 
 export async function readInboxComments(ctx: InboxContext, handle: string, replies: boolean, after?: string): Promise<InboxPage> {
   const id = resourceId(ctx, replies ? "comment" : "post", handle);
   const edge = replies && ctx.platform === "instagram" ? "replies" : "comments";
-  const res = await graphGet<GraphPage<Comment>>(`${path(id)}/${edge}`, ctx.token,
-    { ...params(after), fields: commentFields(ctx),
+  const read = (withHidden: boolean) => graphGet<GraphPage<Comment>>(`${path(id)}/${edge}`, ctx.token,
+    { ...params(after), fields: commentFields(ctx, withHidden),
       order: ctx.platform === "facebook" ? "reverse_chronological" : undefined,
       filter: ctx.platform === "facebook" && !replies ? "toplevel" : undefined });
+  // The hidden flag is a nicety: if Meta rejects the field, still list the comments.
+  const res = await read(true).catch(error => {
+    if (error instanceof GraphError && error.code === 100) return read(false);
+    throw error;
+  });
   return { items: (res.data ?? []).map(c => ({ id: c.id, handle: resourceHandle(ctx, "comment", c.id),
     authorId: c.from?.id, authorUsername: c.username || c.from?.username,
     title: c.from?.name || c.username || c.from?.username || "زبون", text: c.text || c.message || "[تعليق غير نصي]",
-    time: c.timestamp || c.created_time || "", outgoing: own(ctx, c.from?.id) })), after: next(res) };
+    time: c.timestamp || c.created_time || "", outgoing: own(ctx, c.from?.id),
+    ...(c.is_hidden || c.hidden ? { hidden: true } : {}) })), after: next(res) };
+}
+
+export type CommentModeration = "hide" | "unhide" | "delete";
+
+/** Hide, show or delete a comment the Page listed. Facebook uses `is_hidden`, Instagram `hide`. */
+export async function moderateInboxComment(ctx: InboxContext, handle: string, action: CommentModeration) {
+  const id = resourceId(ctx, "comment", handle);
+  const res = action === "delete"
+    ? await graphDelete<{ success?: boolean }>(path(id), ctx.token)
+    : await graphPost<{ success?: boolean }>(path(id), ctx.token,
+      ctx.platform === "instagram" ? { hide: action === "hide" } : { is_hidden: action === "hide" });
+  if (res?.success !== true) throw new Error("لم تؤكد Meta تنفيذ الإجراء؛ حدّث التعليقات للتحقق");
+}
+
+/**
+ * Block a comment's author from the Facebook Page (no commenting or messaging).
+ * The author is read from Meta on the server, never taken from the browser.
+ * Instagram offers no block API.
+ */
+export async function blockInboxCommentAuthor(ctx: InboxContext, handle: string) {
+  if (ctx.platform !== "facebook") throw new Error("إنستغرام لا يتيح الحظر عبر التطبيقات؛ احظر الحساب من تطبيق إنستغرام. يمكنك إخفاء تعليقه أو حذفه من هنا.");
+  const id = resourceId(ctx, "comment", handle);
+  const comment = await graphGet<{ from?: Person }>(path(id), ctx.token, { fields: "from" });
+  const author = comment.from?.id;
+  if (!author) throw new Error("لم تُظهر Meta هوية صاحب التعليق؛ احظره من Meta Business Suite.");
+  if (own(ctx, author)) throw new Error("هذا تعليق الصفحة نفسها");
+  const block = (body: Record<string, unknown>) => graphPost<Record<string, boolean>>(`${path(ctx.pageId)}/blocked`, ctx.token, body);
+  let res: Record<string, boolean>;
+  try {
+    // Meta does not document which ID type a comment author has; try `user`, then `psid`.
+    res = await block({ user: [author] }).catch(error => {
+      if (error instanceof GraphError && error.code === 100) return block({ psid: [author] });
+      throw error;
+    });
+  } catch (error) {
+    if (error instanceof GraphError && (error.code === 210 || error.code === 100))
+      throw new Error("رفضت Meta حظر هذا الحساب عبر التطبيق؛ احظره من Meta Business Suite. يمكنك حذف تعليقه من هنا.");
+    if (error instanceof GraphError && error.code === 3802) throw new Error("أُلغي حظر هذا الشخص مؤخراً؛ تمنع Meta إعادة حظره فوراً. حاول لاحقاً.");
+    if (error instanceof GraphError && error.code === 3801) throw new Error("وصلت الصفحة إلى الحد الأقصى للمحظورين لدى Meta.");
+    throw error;
+  }
+  if (!Object.values(res ?? {}).some(Boolean)) throw new Error("لم تؤكد Meta الحظر؛ راجع قائمة المحظورين في إعدادات الصفحة.");
 }
 
 export async function sendInboxComment(ctx: InboxContext, handle: string, text: string) {

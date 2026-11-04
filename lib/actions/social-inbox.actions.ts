@@ -5,7 +5,8 @@ import { requireAdministrator } from "@/lib/authorization";
 import { getMetaConfig } from "@/lib/meta/config";
 import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
-  sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId, type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
+  sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId,
+  moderateInboxComment, blockInboxCommentAuthor, type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
 import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "@/lib/meta/inbox-receipts";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "@/lib/constants/internal-products";
@@ -268,6 +269,19 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
     }
     if (input.kind !== "comments") throw new Error("قسم غير صالح");
     return { id: await diagnoseSend(ctx, () => sendInboxComment(ctx, input.handle, input.text.trim())) };
+  });
+}
+
+/** Hide, show or delete a comment, or block its author from the Facebook Page. */
+export async function moderateSocialInboxComment(input: { pageId: string; platform: SocialPlatform; handle: string;
+  action: "hide" | "unhide" | "delete" | "block" }) {
+  return attempt(async () => {
+    const ctx = await context(input.pageId, input.platform);
+    if (input.action === "block") await blockInboxCommentAuthor(ctx, input.handle);
+    else if (input.action === "hide" || input.action === "unhide" || input.action === "delete")
+      await moderateInboxComment(ctx, input.handle, input.action);
+    else throw new Error("إجراء غير صالح");
+    return { action: input.action };
   });
 }
 
