@@ -129,11 +129,11 @@ export default function UpdateOrderForm({
             });
 
             if (!res.success) {
-                toast({ variant: "destructive", title: "Error", description: res.message });
+                toast({ variant: "destructive", title: "تعذّر الحفظ", description: res.message });
             } else {
                 setOpen(false);
                 router.refresh();
-                toast({ title: "Success", description: res.message });
+                toast({ title: "تم الحفظ", description: res.message });
             }
         });
     };

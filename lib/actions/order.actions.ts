@@ -3,7 +3,7 @@ import { submitQuickOrder } from "@/lib/orders/quick-order";
 import { reserveOrderStock } from "@/lib/orders/reservations";
 import { syncModonOrders as syncModonOrdersInternal } from "@/lib/orders/internal-operations";
 import { requireStaff, requireAdministrator, requireUser } from "@/lib/authorization";
-import { setOrderStatus, transitionOrder } from "@/lib/orders/status-service";
+import { reallocateDispatchedOrder, setOrderStatus, transitionOrder } from "@/lib/orders/status-service";
 import { after } from "next/server";
 import { processReturnOutbox } from "@/lib/orders/message-outbox";
 import { getExpenseStatsForPeriod } from "./expense.actions";
@@ -908,14 +908,16 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
     let freshItems: { name: string; selectedColor: string | null; qty: number }[] =
       existingOrder?.orderitems?.map((i) => ({ ...i, qty: 0 })) ?? [];
     let freshQuantity = existingOrder?.quantity ?? 0;
+    let changedShippedOrder = false;
 
     await prisma.$transaction(async (tx) => {
       // احذف العناصر التي أزالها المشرف أولاً، حتى لا يُحدَّث عنصر محذوف
       await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${order.id}::uuid FOR UPDATE`;
       const locked = await tx.order.findUniqueOrThrow({ where: { id: order.id }, include: { orderitems: true } });
-      if (locked.inventoryDispatchedAt && (removedIds.length > 0 || order.orderItems?.some(item => locked.orderitems.find(i => i.productId === item.productId)?.qty !== item.qty))) {
-        throw new Error("لا يمكن تغيير أصناف أو كميات طلب خرج من المخزن؛ سجّل الراجع وأنشئ طلباً جديداً");
-      }
+      // Orders already with the courier can still be edited (a customer drops a
+      // product, a quantity or price changes); their stock allocation is redone below.
+      const itemsChanged = removedIds.length > 0 || !!order.orderItems?.some(item =>
+        !removedIds.includes(item.productId) && locked.orderitems.find(i => i.productId === item.productId)?.qty !== item.qty);
       if (removedIds.length > 0) {
         await tx.orderItem.deleteMany({
           where: { orderId: order.id, productId: { in: removedIds } },
@@ -948,6 +950,10 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
       if (removedIds.length > 0 && updatedItems.length === 0) {
         throw new Error("لا يمكن حذف كل المنتجات من الطلب");
       }
+
+      if (itemsChanged) await reallocateDispatchedOrder(tx, order.id);
+      changedShippedOrder = !!locked.deliveryTrackingId && locked.status !== "home" &&
+        (itemsChanged || Number(locked.totalPrice) !== Number(order.totalPrice));
 
       const newQuantity = updatedItems.reduce((sum, i) => sum + i.qty, 0);
       freshItems = updatedItems.map((i) => ({
@@ -1014,11 +1020,15 @@ export async function updateOrder(data: z.infer<typeof updateOrderSchema>) {
     revalidatePath("/admin/orders");
     return {
       success: true,
-      message: "Order Updated Successfully",
+      // Modon has no edit API: the shipment there keeps the old price/items.
+      message: changedShippedOrder
+        ? "تم تحديث الطلب في المتجر. الطلب مرسل لشركة التوصيل مسبقاً، فعدّل السعر والمنتجات لديهم أيضاً."
+        : "تم تحديث الطلب",
     };
   } catch (error) {
+    if (error instanceof Error && /\p{Script=Arabic}/u.test(error.message)) return { success: false, message: error.message };
     const { success, formError } = formatError(error);
-    return { success, message: formError };
+    return { success, message: formError || "تعذّر حفظ التعديل، حاول مرة أخرى" };
   }
 }
 

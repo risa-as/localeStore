@@ -8,6 +8,51 @@ const allowed = ["home", "waiting", "unavailable", "banned", "delete", "returnRe
 
 /** Run inside the transaction that saves the order. Costs are written once per dispatch. */
 type OrderTransaction = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
+type DispatchItem = { productId: string; qty: number; name: string; costPrice: unknown };
+
+/**
+ * Take the items' units from the oldest batches first (FEFO) and record their cost.
+ * A short product never blocks dispatch: the shortfall gets a batch-less allocation
+ * at the item's cost, and the admin orders page flags it.
+ */
+async function allocateItems(tx: OrderTransaction, orderId: string, items: DispatchItem[], now: Date) {
+  for (const item of [...items].sort((a, b) => a.productId.localeCompare(b.productId))) {
+    await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${item.productId}::uuid FOR UPDATE`;
+    if (item.qty <= 0) throw new Error(`كمية غير صالحة: ${item.name}`);
+    const batches = await tx.productBatch.findMany({ where: { productId: item.productId, createdAt: { lte: now } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+    const allocations = await tx.inventoryAllocation.findMany({ where: { productId: item.productId, returnedAt: null } });
+    const consumed = new Map<string, number>();
+    for (const allocation of allocations) if (allocation.batchId) consumed.set(allocation.batchId, (consumed.get(allocation.batchId) ?? 0) + allocation.quantity);
+    let need = item.qty;
+    let cost = 0;
+    for (const batch of batches) {
+      const take = Math.min(need, Math.max(0, batch.quantity - (consumed.get(batch.id) ?? 0)));
+      if (!take) continue;
+      await tx.inventoryAllocation.create({ data: { orderId, productId: item.productId, batchId: batch.id, quantity: take, unitCost: batch.costPrice } });
+      cost += take * Number(batch.costPrice);
+      need -= take;
+      if (!need) break;
+    }
+    if (need) {
+      await tx.inventoryAllocation.create({ data: { orderId, productId: item.productId, quantity: need, unitCost: Number(item.costPrice) } });
+      cost += need * Number(item.costPrice);
+    }
+    await tx.orderItem.update({ where: { orderId_productId: { orderId, productId: item.productId } }, data: { costTotal: cost, costSource: "dispatch" } });
+  }
+}
+
+/**
+ * After an admin changes the products or quantities of an order that already left
+ * the warehouse, redo its stock allocation so remaining stock and costs follow the
+ * edited items. Does nothing for orders that have not been dispatched.
+ */
+export async function reallocateDispatchedOrder(tx: OrderTransaction, orderId: string) {
+  const order = await tx.order.findUniqueOrThrow({ where: { id: orderId }, include: { orderitems: true } });
+  if (!order.inventoryDispatchedAt || order.inventoryReturnedAt) return false;
+  await tx.inventoryAllocation.deleteMany({ where: { orderId, returnedAt: null } });
+  await allocateItems(tx, orderId, order.orderitems, order.inventoryDispatchedAt);
+  return true;
+}
 export async function transitionOrder(tx: OrderTransaction, orderId: string, status: string, source: string) {
   if (!allowed.includes(status)) throw new Error("حالة طلب غير صالحة");
   await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId}::uuid FOR UPDATE`;
@@ -19,31 +64,7 @@ export async function transitionOrder(tx: OrderTransaction, orderId: string, sta
   if (dispatched.includes(status) && (!order.inventoryDispatchedAt || order.inventoryReturnedAt)) {
     if (order.orderitems.length === 0) throw new Error("الطلب بلا منتجات");
     const now = new Date();
-    for (const item of [...order.orderitems].sort((a, b) => a.productId.localeCompare(b.productId))) {
-      await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${item.productId}::uuid FOR UPDATE`;
-      // A short product never blocks dispatch: the shortfall below gets a
-      // batch-less allocation at the item's cost, and the admin orders page flags it.
-      if (item.qty <= 0) throw new Error(`كمية غير صالحة: ${item.name}`);
-      const batches = await tx.productBatch.findMany({ where: { productId: item.productId, createdAt: { lte: now } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
-      const allocations = await tx.inventoryAllocation.findMany({ where: { productId: item.productId, returnedAt: null } });
-      const consumed = new Map<string, number>();
-      for (const allocation of allocations) if (allocation.batchId) consumed.set(allocation.batchId, (consumed.get(allocation.batchId) ?? 0) + allocation.quantity);
-      let need = item.qty;
-      let cost = 0;
-      for (const batch of batches) {
-        const take = Math.min(need, Math.max(0, batch.quantity - (consumed.get(batch.id) ?? 0)));
-        if (!take) continue;
-        await tx.inventoryAllocation.create({ data: { orderId, productId: item.productId, batchId: batch.id, quantity: take, unitCost: batch.costPrice } });
-        cost += take * Number(batch.costPrice);
-        need -= take;
-        if (!need) break;
-      }
-      if (need) {
-        await tx.inventoryAllocation.create({ data: { orderId, productId: item.productId, quantity: need, unitCost: item.costPrice } });
-        cost += need * Number(item.costPrice);
-      }
-      await tx.orderItem.update({ where: { orderId_productId: { orderId, productId: item.productId } }, data: { costTotal: cost, costSource: "dispatch" } });
-    }
+    await allocateItems(tx, orderId, order.orderitems, now);
     await tx.order.update({ where: { id: orderId }, data: { inventoryDispatchedAt: now, inventoryReturnedAt: null } });
   }
   if (status === "returnReceived") {

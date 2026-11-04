@@ -1,5 +1,5 @@
 jest.mock("@/db/prisma", () => ({ prisma: {} }));
-import { transitionOrder } from "./status-service";
+import { reallocateDispatchedOrder, transitionOrder } from "./status-service";
 
 function fixture() {
   const orders = new Map<string, any>();
@@ -19,7 +19,8 @@ function fixture() {
       update: async ({ where, data }: any) => Object.assign(orders.get(where.orderId_productId.orderId).orderitems[0], data),
     },
     inventoryAllocation: {
-      findMany: async () => allocations.filter(a => !a.returnedAt),
+      findMany: async ({ where }: any) => allocations.filter(a => !a.returnedAt && (!where?.productId || a.productId === where.productId)),
+      deleteMany: async ({ where }: any) => { for (let i = allocations.length - 1; i >= 0; i--) if (allocations[i].orderId === where.orderId && !allocations[i].returnedAt) allocations.splice(i, 1); },
       create: async ({ data }: any) => allocations.push({ ...data, returnedAt: null }),
       updateMany: async ({ where, data }: any) => allocations.filter(a => a.orderId === where.orderId && !a.returnedAt).forEach(a => Object.assign(a, data)),
     },
@@ -64,4 +65,22 @@ it("dispatches an order even when stock ran out, costing the shortfall at the it
   expect(allocations.filter(a => a.orderId === "D")).toEqual([expect.objectContaining({ quantity: 1, unitCost: 99 })]);
   expect(allocations.find(a => a.orderId === "D").batchId).toBeUndefined();
   expect(orders.get("D").orderitems[0].costTotal).toBe(99);
+});
+
+it("redoes the stock and cost of a dispatched order after its quantity is edited", async () => {
+  const { tx, orders, allocations } = fixture();
+  await transitionOrder(tx, "A", "pending", "test");
+  expect(orders.get("A").orderitems[0].costTotal).toBe(10);
+  // The admin changes the quantity from 1 to 3 while the order is with the courier.
+  orders.get("A").orderitems[0].qty = 3;
+  await expect(reallocateDispatchedOrder(tx, "A")).resolves.toBe(true);
+  expect(allocations.filter(a => a.orderId === "A").reduce((sum, a) => sum + a.quantity, 0)).toBe(3);
+  expect(orders.get("A").orderitems[0].costTotal).toBe(10 + 2 * 20);
+  // Back to 1: the extra units return to the shelf for the next order.
+  orders.get("A").orderitems[0].qty = 1;
+  await reallocateDispatchedOrder(tx, "A");
+  await transitionOrder(tx, "B", "pending", "test");
+  expect(orders.get("B").orderitems[0].costTotal).toBe(20);
+  // An order still at home has nothing to redo.
+  await expect(reallocateDispatchedOrder(tx, "C")).resolves.toBe(false);
 });
