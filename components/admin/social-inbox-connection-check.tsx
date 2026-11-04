@@ -1,5 +1,6 @@
 "use client";
 
+import { inboxDate } from "@/lib/meta/inbox-date";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, ShieldCheck } from "lucide-react";
@@ -33,7 +34,7 @@ export default function SocialInboxConnectionCheck({ pageId, platform }: { pageI
     {(result || error) && <div role="status" className="rounded-[10px] border p-2 text-xs leading-5 space-y-1">
       <p>{error || result?.message}</p>
       {!!result?.issues.length && <ul className="list-disc ps-4">{result.issues.map(issue => <li key={issue}>{issue}</li>)}</ul>}
-      {result && <p className="text-muted-foreground">وقت الفحص: {new Date(result.checkedAt).toLocaleString("ar-IQ")}</p>}
+      {result && <p className="text-muted-foreground">وقت الفحص: {inboxDate(result.checkedAt)}</p>}
     </div>}
   </div>;
 }

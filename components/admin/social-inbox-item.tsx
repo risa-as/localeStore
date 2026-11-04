@@ -1,12 +1,12 @@
 "use client";
 
+import { inboxDate } from "@/lib/meta/inbox-date";
 import { useState, type SyntheticEvent } from "react";
 import Image from "next/image";
 import { ExternalLink, MessageCircle, Check, CheckCheck, Clock3, Loader2, AlertCircle } from "lucide-react";
 import type { InboxItem } from "@/lib/meta/inbox";
 
-const date = (value: string) => value && Number.isFinite(Date.parse(value))
-  ? new Date(value).toLocaleString("ar-IQ", { dateStyle: "medium", timeStyle: "short" }) : "";
+const date = (value: string) => inboxDate(value);
 
 export default function SocialInboxItem({ item, compact = false, hideCommentLink = false }: { item: InboxItem; compact?: boolean; hideCommentLink?: boolean }) {
   return <>

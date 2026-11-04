@@ -1,5 +1,6 @@
 "use client";
 
+import { inboxDate } from "@/lib/meta/inbox-date";
 import { useEffect, useRef, useState } from "react";
 import { Ban, CheckCheck, ChevronDown, Eye, EyeOff, Loader2, Lock, MessagesSquare, MoreHorizontal, Reply, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,8 +27,7 @@ const INTENT_STYLE: Partial<Record<CommentIntent, string>> = {
   complaint: "bg-red-500/15 text-red-800 dark:text-red-300",
 };
 const intentLabel = (intent: CommentIntent) => COMMENT_INTENTS.find(item => item.value === intent)?.label ?? "";
-const when = (value: string) => value && Number.isFinite(Date.parse(value))
-  ? new Date(value).toLocaleString("ar-IQ", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "";
+const when = (value: string) => inboxDate(value);
 
 /** The replies under the open comment, shown inside its card. */
 export type CommentThread = { id: string; items: InboxItem[]; after: string | null; loading: boolean; error: string };

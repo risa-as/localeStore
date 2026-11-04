@@ -1,5 +1,6 @@
 "use client";
 
+import { inboxDate } from "@/lib/meta/inbox-date";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,8 +40,7 @@ type Kind = "messages" | "comments";
 type MediaDraft = { file: File; preview: string; uploaded?: UploadedInboxMedia };
 type Detail = InboxPage & { window?: InboxReplyWindow | null };
 const EMPTY: InboxPage = { items: [], after: null };
-const date = (value: string) => value && Number.isFinite(Date.parse(value))
-  ? new Date(value).toLocaleString("ar-IQ", { dateStyle: "medium", timeStyle: "short" }) : "";
+const date = (value: string) => inboxDate(value);
 const merge = (old: InboxItem[], incoming: InboxItem[]) => [...new Map([...old, ...incoming].map(x => [x.id, x])).values()];
 
 export default function SocialInboxClient({ setup }: { setup: Setup }) {
