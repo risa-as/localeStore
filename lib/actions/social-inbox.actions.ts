@@ -6,7 +6,8 @@ import { getMetaConfig } from "@/lib/meta/config";
 import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
   sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId,
-  moderateInboxComment, blockInboxCommentAuthor, type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
+  moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText,
+  type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
 import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "@/lib/meta/inbox-receipts";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "@/lib/constants/internal-products";
@@ -269,6 +270,48 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
     }
     if (input.kind !== "comments") throw new Error("قسم غير صالح");
     return { id: await diagnoseSend(ctx, () => sendInboxComment(ctx, input.handle, input.text.trim())) };
+  });
+}
+
+/**
+ * Products a post is about: the product it was published for, then storefront
+ * links in its text. `productId` is the admin's manual choice and comes first.
+ */
+export async function getSocialInboxPostProducts(input: { pageId: string; platform: SocialPlatform; handle: string; productId?: string | null }) {
+  return attempt(async (): Promise<InboxProduct[]> => {
+    const ctx = await context(input.pageId, input.platform);
+    const manual = input.productId ? z.string().uuid().parse(input.productId) : null;
+    const post = await readInboxPostText(ctx, input.handle);
+    const published = await prisma.socialPost.findFirst({
+      where: ctx.platform === "instagram" ? { igPostId: post.id } : { fbPostId: post.id }, select: { productId: true } });
+    const storefront = new URL(process.env.SOCIAL_INBOX_STOREFRONT_URL || SERVER_URL);
+    const slugs = extractInboxOrder([{ id: post.id, handle: "", title: "", text: post.text, time: "" }]).slugs
+      .filter(link => link.host === storefront.host).map(link => link.slug);
+    const ids = [manual, published?.productId].filter((id): id is string => !!id);
+    if (!ids.length && !slugs.length) return [];
+    const products = await prisma.product.findMany({
+      where: { ...EXCLUDE_INTERNAL_PRODUCTS, OR: [...(ids.length ? [{ id: { in: ids } }] : []), ...(slugs.length ? [{ slug: { in: slugs } }] : [])] },
+      select: { id: true, name: true, slug: true, images: true, price: true, shippingPrice: true, stock: true, colors: true, offers: true }, take: 5,
+    });
+    const available = await getAvailableStocks(products);
+    const rank = (id: string) => id === manual ? 0 : id === published?.productId ? 1 : 2;
+    return products.sort((a, b) => rank(a.id) - rank(b.id)).map(product => ({ id: product.id, name: product.name, slug: product.slug,
+      image: product.images[0] || null, price: Number(product.price), shippingPrice: Number(product.shippingPrice),
+      available: available.get(product.id) || 0, colors: product.colors, offers: product.offers,
+      url: new URL(`/ar/landing/${encodeURIComponent(product.slug)}`, storefront.origin).toString() }));
+  });
+}
+
+/** Public and/or private reply to a comment; see replyToComment for the send order. */
+export async function replyToSocialInboxComment(input: { pageId: string; platform: SocialPlatform; handle: string;
+  publicText: string; privateText: string; skipIfReplied: boolean }) {
+  return attempt(async () => {
+    const ctx = await context(input.pageId, input.platform);
+    const publicText = typeof input.publicText === "string" ? input.publicText.trim() : "";
+    const privateText = typeof input.privateText === "string" ? input.privateText.trim() : "";
+    if ((!publicText && !privateText) || publicText.length > 1000 || privateText.length > 1000)
+      throw new Error("نص الرد فارغ أو يتجاوز 1000 حرف");
+    return diagnoseSend(ctx, () => replyToComment(ctx, input.handle, { publicText, privateText, skipIfReplied: input.skipIfReplied === true }));
   });
 }
 

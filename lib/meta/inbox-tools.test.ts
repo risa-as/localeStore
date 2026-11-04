@@ -44,7 +44,7 @@ it("formats the store's thousand-dinar prices and does not invent missing produc
     text: `${money(18)} ${money(4)} ${product.url}`, missing: [],
   });
   expect(expandQuickReply("{التوصيل} {التوفر}", "زبون", { ...product, available: 0, shippingPrice: 0 }).text)
-    .toBe("مجاني غير متوفر حالياً");
+    .toBe("مجاني متوفر حالياً");
 });
 it("opens the oldest waiting customer, excluding the current, answered and system messages", () => {
   const items = [item("current", "2026-10-01", false), item("recent", "2026-10-23", false),

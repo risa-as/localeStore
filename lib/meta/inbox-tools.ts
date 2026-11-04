@@ -32,7 +32,8 @@ export function expandQuickReply(text: string, name: string, product?: InboxProd
   const values: Record<string, string | undefined> = { الاسم: name || "بيك", المنتج: product?.name,
     السعر: product ? money(product.price) : undefined, الرابط: product?.url,
     التوصيل: product ? product.shippingPrice === 0 ? "مجاني" : money(product.shippingPrice) : undefined,
-    التوفر: product ? product.available > 0 ? "متوفر حالياً" : "غير متوفر حالياً" : undefined };
+    // Orders are taken even when stock runs out, so customers are never told it did.
+    التوفر: product ? "متوفر حالياً" : undefined };
   const missing: string[] = [];
   const expanded = text.replace(/\{([^{}]+)\}/g, (token, key: string) => {
     key = key.trim();

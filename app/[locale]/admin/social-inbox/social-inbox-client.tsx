@@ -10,7 +10,10 @@ import { MessageCircle, MessagesSquare, RefreshCw, Send, Loader2, ExternalLink, 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { getSocialInboxList, getSocialInboxDetail, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, markSocialInboxRead,
-  moderateSocialInboxComment, type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
+  moderateSocialInboxComment, getSocialInboxPostProducts, replyToSocialInboxComment, type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
+import { expandCommentReply, matchCommentReply, type CommentReply } from "@/lib/meta/comment-replies";
+import { useSocialCommentReplies, usePostProductChoice } from "@/components/admin/use-social-comment-replies";
+import SocialInboxCommentToolbar, { type BulkState, type BulkGroup } from "@/components/admin/social-inbox-comment-toolbar";
 import type { InboxItem, InboxPage, InboxReplyWindow, SocialPlatform } from "@/lib/meta/inbox";
 import { reconcileConversation, type ConversationReceipt } from "@/lib/meta/inbox-state";
 import ItemBody from "@/components/admin/social-inbox-item";
@@ -118,6 +121,13 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   const [mobileDetail, setMobileDetail] = useState(false);
   const [handledComments, setHandledComments] = useState<Set<string>>(new Set());
   const [moderatingId, setModeratingId] = useState<string | null>(null);
+  const commentReplies = useSocialCommentReplies(userId);
+  const [sendingKey, setSendingKey] = useState<string | null>(null);
+  const [bulk, setBulk] = useState<(BulkState & { postId: string }) | null>(null);
+  const bulkCancel = useRef(false);
+  const variantTurn = useRef(0);
+  const prefilled = useRef(new Set<string>());
+  const [postProducts, setPostProducts] = useState<{ key: string; products: InboxProduct[]; error: string } | null>(null);
   const [mediaDrafts, setMediaDrafts] = useState<Record<string, MediaDraft>>({});
   const mediaDraftsRef = useRef<Record<string, MediaDraft>>({});
   const filePicker = useRef<HTMLInputElement>(null);
@@ -291,6 +301,122 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     finally { if (alive.current && seq === replySeq.current) setLoadingReplies(false); }
   }
 
+  const productChoice = usePostProductChoice(userId, pageId, kind === "comments" ? selected?.id : undefined);
+  const postProductKey = kind === "comments" && selected ? `${selected.id}:${productChoice.choice || ""}` : "";
+  useEffect(() => {
+    if (!postProductKey || !selected) return;
+    let cancelled = false;
+    getSocialInboxPostProducts({ pageId, platform, handle: selected.handle, productId: productChoice.choice })
+      .then(result => { if (!cancelled) setPostProducts({ key: postProductKey, products: result.ok ? result.data : [], error: result.ok ? "" : result.message }); })
+      .catch(() => { if (!cancelled) setPostProducts({ key: postProductKey, products: [], error: "تعذر تحديد منتج المنشور" }); });
+    return () => { cancelled = true; };
+    // `selected.handle` changes with every list refresh; the post id in the key is what matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [postProductKey, pageId, platform]);
+  const productLoading = !!postProductKey && postProducts?.key !== postProductKey;
+  const toolPick = selected ? orderProducts[selected.id] : undefined;
+  const resolvedProduct = postProducts?.key === postProductKey ? postProducts.products[0] ?? null : null;
+  const postProduct: InboxProduct | null = toolPick || resolvedProduct;
+  const postProductSource = toolPick || (resolvedProduct && resolvedProduct.id === productChoice.choice) ? "manual" as const : resolvedProduct ? "auto" as const : null;
+
+  const commentDraftKey = (item: InboxItem) => `${pageId}:${platform}:comments:${item.id}`;
+  /** Open a comment for reply; if its keywords match a public-only reply, prefill it (once, never over a draft). */
+  function selectTarget(item: InboxItem) {
+    setTarget(item); setThread(item); setReplies(EMPTY); void loadReplies(item);
+    const suggestion = matchCommentReply(item.text, commentReplies.replies);
+    const key = commentDraftKey(item);
+    if (!suggestion || suggestion.privateText.trim() || (drafts[key] || "").trim() || prefilled.current.has(item.id)) return;
+    const expanded = expandCommentReply(suggestion, item.title, postProduct, variantTurn.current++);
+    if (expanded.missing.length || !expanded.publicText) return;
+    prefilled.current.add(item.id);
+    onDraft(key, expanded.publicText);
+  }
+  function recordCommentReply(item: InboxItem, publicId: string | undefined, text: string) {
+    if (!publicId) return;
+    const reply: InboxItem = { id: publicId, handle: "", title: "الصفحة", text, time: new Date().toISOString(), outgoing: true };
+    confirmedComments.current[item.id] = merge(confirmedComments.current[item.id] || [], [reply]);
+    if (thread?.id === item.id) setReplies(prev => ({ ...prev, items: merge(prev.items, [reply]) }));
+  }
+  function pauseRefresh() {
+    // An in-flight refresh must not overwrite what we are about to send.
+    ++detailSeq.current; setLoadingDetail(false); ++listSeq.current; setLoadingList(false);
+  }
+
+  /** One click: private message first (if any), then the public reply, then the next waiting comment. */
+  async function quickReply(item: InboxItem, reply: CommentReply) {
+    if (busy || sendingNow.current) return;
+    const expanded = expandCommentReply(reply, item.title, postProduct, variantTurn.current++);
+    if (expanded.missing.length) { setReplyError(`هذا الرد يحتاج ${expanded.missing.join("، ")}؛ اختر منتج المنشور أولاً.`); return; }
+    sendingNow.current = true; pauseRefresh();
+    setBusy(true); onSending(true); setSendingKey(`${item.id}:${reply.id}`); setReplyError(""); setNotice("");
+    try {
+      const result = await replyToSocialInboxComment({ pageId, platform, handle: item.handle,
+        publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: false });
+      if (!alive.current) return;
+      if (!result.ok) { setReplyError(result.message); return; }
+      const data = result.data;
+      if (data.status === "skipped") { setReplyError(`لم يُرسل شيء: ${data.message}`); return; }
+      const handledNow = new Set([...handledComments, item.id]);
+      setHandledComments(handledNow);
+      if (data.status === "partial") {
+        setReplyError(data.message); setTarget(item); onDraft(commentDraftKey(item), expanded.publicText);
+        return;
+      }
+      recordCommentReply(item, data.publicId, expanded.publicText);
+      const next = nextAwaiting(detail.items.filter(entry => !entry.hidden), item.id, handledNow);
+      setNotice(`${data.privateId ? "أُرسلت الرسالة الخاصة و" : ""}نُشر الرد على ${item.title}.${next ? "" : " لا تعليقات أخرى بانتظار الرد ضمن المحمّل."}`);
+      if (next) selectTarget(next); else setTarget(null);
+    } catch { if (alive.current) setReplyError("لم نستلم تأكيد Meta؛ تحقّق من التعليق قبل إعادة المحاولة"); }
+    finally { sendingNow.current = false; if (alive.current) { setBusy(false); setSendingKey(null); } onSending(false); }
+  }
+
+  /** Bulk reply: one comment at a time with a pause, stopping on any unexpected answer from Meta. */
+  async function runBulk(reply: CommentReply, items: InboxItem[]) {
+    if (busy || sendingNow.current || !selected) return;
+    const postId = selected.id;
+    const product = postProduct;
+    bulkCancel.current = false; sendingNow.current = true; pauseRefresh();
+    setBusy(true); onSending(true); setReplyError(""); setNotice("");
+    const handledNow = new Set(handledComments);
+    let sent = 0, skipped = 0, done = 0, stop = "";
+    const show = (running: boolean, result?: string) => setBulk({ postId, label: reply.label, total: items.length, done, sent, skipped, running, result });
+    show(true);
+    try {
+      for (const [index, item] of items.entries()) {
+        if (bulkCancel.current) { stop = "أُوقف الرد الجماعي."; break; }
+        if (selectedId.current !== postId) { stop = "فُتح منشور آخر؛ توقف الرد الجماعي."; break; }
+        const expanded = expandCommentReply(reply, item.title, product, index);
+        if (expanded.missing.length) { stop = `الرد يحتاج ${expanded.missing.join("، ")}.`; break; }
+        setSendingKey(`${item.id}:${reply.id}`);
+        const result = await replyToSocialInboxComment({ pageId, platform, handle: item.handle,
+          publicText: expanded.publicText, privateText: expanded.privateText, skipIfReplied: true });
+        if (!alive.current) return;
+        if (!result.ok) { stop = `توقف بعد اعتراض Meta: ${result.message}`; break; }
+        done++;
+        if (result.data.status === "skipped") skipped++;
+        else {
+          sent++; handledNow.add(item.id);
+          if (result.data.status === "sent") recordCommentReply(item, result.data.publicId, expanded.publicText);
+          else { stop = `${item.title}: ${result.data.message}`; show(false); break; }
+        }
+        show(true);
+        if (index < items.length - 1) await new Promise(resolve => setTimeout(resolve, 3000 + Math.random() * 2000));
+      }
+    } catch { stop = "لم نستلم تأكيد Meta؛ توقف الرد الجماعي. حدّث التعليقات للتحقق."; }
+    finally {
+      sendingNow.current = false;
+      if (alive.current) {
+        setHandledComments(handledNow); setBusy(false); setSendingKey(null);
+        show(false, stop || `انتهى: أُرسل ${sent}${skipped ? `، وتُخطّي ${skipped} (سبق الرد عليها أو لا تسمح Meta بالرسالة الخاصة)` : ""}.`);
+      }
+      onSending(false);
+    }
+  }
+
+  const bulkGroups: BulkGroup[] = kind === "comments" ? commentReplies.replies.filter(reply => reply.keywords.length).map(reply => ({ reply,
+    items: detail.items.filter(item => !item.outgoing && !item.system && !item.hidden && !handledComments.has(item.id) &&
+      matchCommentReply(item.text, commentReplies.replies)?.id === reply.id).slice(0, 30) })).filter(group => group.items.length) : [];
+
   async function moderateComment(item: InboxItem, action: CommentAction, alsoDelete: InboxItem[] = []) {
     // Drop any in-flight refresh so it cannot bring back a comment we just removed.
     ++detailSeq.current; setLoadingDetail(false);
@@ -434,7 +560,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
       setHandledComments(prev => new Set([...prev, destination.id]));
       if (openNext) {
         const next = nextAwaiting(detail.items, destination.id, handledComments);
-        if (next) { setTarget(next); setThread(next); setReplies(EMPTY); void loadReplies(next); }
+        if (next) selectTarget(next);
         else { setTarget(null); setNotice("نُشر الرد. لا تعليقات أخرى من الزبائن ضمن المحمّل لم تتم متابعتها في هذه الجلسة."); }
       }
     } catch { if (alive.current) setReplyError("لم نستلم تأكيد النشر؛ تحقّق في Meta قبل إعادة المحاولة"); }
@@ -521,11 +647,17 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
           <div ref={messageArea} className="flex-1 min-h-0 overflow-auto overscroll-contain bg-muted/15 p-3 sm:p-4 space-y-3" role="region" aria-label={kind === "messages" ? "الرسائل" : "التعليقات"}>
             {detail.after && <div className="text-center"><Button size="sm" variant="ghost" disabled={loadingDetail || busy} onClick={() => void loadDetail(selected, detail.after!)}>تحميل {kind === "messages" ? "رسائل أقدم" : "تعليقات إضافية"}</Button></div>}
             {kind === "comments" && <details className="rounded-lg border bg-background p-2"><summary className="cursor-pointer text-xs font-semibold">المنشور الأصلي</summary><p dir="auto" className="text-sm whitespace-pre-wrap break-words mt-2 max-h-36 overflow-auto">{selected.text || "منشور بدون نص"}</p></details>}
+            {kind === "comments" && <SocialInboxCommentToolbar library={commentReplies} product={postProduct} productSource={postProductSource}
+              productLoading={productLoading} productError={postProducts?.key === postProductKey ? postProducts.error : ""}
+              onChooseProduct={product => { productChoice.choose(product?.id ?? null); if (!product) setOrderProducts(prev => ({ ...prev, [selected.id]: undefined })); }}
+              groups={bulkGroups} bulk={bulk?.postId === selected.id ? bulk : null} disabled={busy}
+              onStartBulk={(reply, items) => void runBulk(reply, items)} onCancelBulk={() => { bulkCancel.current = true; }} />}
             {loadingDetail && !detailItems.length ? <Loading /> : !detailItems.length ? <p className="text-sm text-muted-foreground">{detailError ? "تعذر تحميل المحتوى" : "لا يوجد محتوى متاح"}</p> : kind === "comments" ? <>
               <p className="text-[11px] text-muted-foreground">تُجمع تعليقات الزبون على هذا المنشور بحسب هويته. التجميع يشمل التعليقات المحمّلة{detail.after ? "؛ حمّل المزيد لإضافة الأقدم." : "."}</p>
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}
                 moderatingId={moderatingId} onModerate={(item, action, alsoDelete) => void moderateComment(item, action, alsoDelete)}
-                onReply={item => { setTarget(item); setThread(item); setReplies(EMPTY); void loadReplies(item); }}
+                replies={commentReplies.replies} product={postProduct} sendingId={sendingKey} onQuickReply={(item, reply) => void quickReply(item, reply)}
+                onReply={selectTarget}
                 onThread={item => { setThread(item); setReplies(EMPTY); void loadReplies(item); }} />)}
             </> : detailItems.map(item => <div key={item.id} className={`rounded-2xl border px-3 py-2 [overflow-wrap:anywhere] ${item.system ? "bg-muted/30 border-dashed mx-auto max-w-xl" : item.outgoing ? "w-fit max-w-[90%] sm:max-w-[80%] ms-auto rounded-es-sm bg-emerald-50/80 border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60" : "w-fit max-w-[90%] sm:max-w-[80%] me-auto rounded-ee-sm bg-background"}`}>
               <ItemBody item={item} compact={kind === "messages"} hideCommentLink={!!item.system && kind === "messages" && platform === "facebook"} />

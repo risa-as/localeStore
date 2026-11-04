@@ -105,7 +105,7 @@ export default function SocialInboxTools({ library, name, draft, disabled, onDra
       {product && <div className="rounded-lg border border-primary/40 bg-primary/5 p-2 space-y-2">
         <div className="flex justify-between gap-2"><span className="text-sm font-medium">{product.name}</span><button aria-label="إلغاء اختيار المنتج" onClick={() => { setProduct(null); onProductSelected?.(null); }}><X className="size-4" /></button></div>
         <p className="text-xs">{money(product.price)} · {product.available > 0 ? `المتاح ${product.available}` : "غير متوفر"}</p>
-        <div className="flex flex-wrap gap-1"><Button size="sm" variant="outline" disabled={disabled} onClick={() => insert(`${product.name}\nالسعر: ${money(product.price)}\nالتوصيل: ${product.shippingPrice === 0 ? "مجاني" : money(product.shippingPrice)}\n${product.available > 0 ? "متوفر حالياً" : "غير متوفر حالياً"}\n${product.url}`)}>إدراج التفاصيل</Button>
+        <div className="flex flex-wrap gap-1"><Button size="sm" variant="outline" disabled={disabled} onClick={() => insert(`${product.name}\nالسعر: ${money(product.price)}\nالتوصيل: ${product.shippingPrice === 0 ? "مجاني" : money(product.shippingPrice)}\nمتوفر حالياً\n${product.url}`)}>إدراج التفاصيل</Button>
           <Button size="sm" variant="outline" disabled={disabled} onClick={() => insert(product.url)}>الرابط</Button>
           {product.image && <Button size="sm" variant="outline" disabled={disabled} onClick={() => insert(new URL(product.image!, product.url).toString())}>رابط الصورة</Button>}</div>
       </div>}

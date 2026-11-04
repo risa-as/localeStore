@@ -383,6 +383,81 @@ export async function readInboxComments(ctx: InboxContext, handle: string, repli
     ...(c.is_hidden || c.hidden ? { hidden: true } : {}) })), after: next(res) };
 }
 
+/** A comment the reply tools must not answer; the bulk run skips it and continues. */
+export class CommentReplySkip extends Error {
+  constructor(public reason: "replied" | "private-sent" | "private-unavailable" | "private-rejected", message: string) { super(message); }
+}
+
+/** Whether the Page already replied under this comment (checked on the server before a bulk reply). */
+export async function pageRepliedToComment(ctx: InboxContext, handle: string) {
+  const id = resourceId(ctx, "comment", handle);
+  const res = await graphGet<GraphPage<Comment>>(`${path(id)}/${ctx.platform === "instagram" ? "replies" : "comments"}`, ctx.token,
+    { fields: ctx.platform === "instagram" ? "id,from,username" : "id,from", limit: "50" });
+  return (res.data ?? []).some(reply => own(ctx, reply.from?.id));
+}
+
+const RATE_LIMIT_CODES = [4, 17, 32, 368, 613];
+
+/**
+ * Private reply to a comment (one per comment, within 7 days, text only).
+ * Facebook says up front whether it is allowed; Instagram is just attempted.
+ * A rejection for this comment becomes a skip; rate limits and unknown outcomes throw.
+ */
+export async function sendCommentPrivateReply(ctx: InboxContext, handle: string, text: string) {
+  const id = resourceId(ctx, "comment", handle);
+  if (ctx.platform === "facebook") {
+    const source = await graphGet<{ can_reply_privately?: boolean; private_reply_conversation?: { id?: string } }>(
+      path(id), ctx.token, { fields: "can_reply_privately,private_reply_conversation" });
+    if (source.private_reply_conversation) throw new CommentReplySkip("private-sent", "سبق إرسال رسالة خاصة لصاحب هذا التعليق.");
+    if (source.can_reply_privately !== true) throw new CommentReplySkip("private-unavailable", "فيسبوك لا يسمح برسالة خاصة على هذا التعليق (قد يكون أقدم من 7 أيام).");
+  }
+  let sent: { message_id?: string };
+  try {
+    sent = await graphPost<{ message_id?: string }>(`${path(ctx.pageId)}/messages`, ctx.token,
+      { recipient: { comment_id: id }, message: { text } });
+  } catch (error) {
+    if (error instanceof GraphError && !error.outcomeUnknown && !RATE_LIMIT_CODES.includes(error.code ?? 0) && error.code !== 190)
+      throw new CommentReplySkip("private-rejected", `رفضت Meta الرسالة الخاصة على هذا التعليق (رمز ${error.code ?? error.status}).`);
+    throw error;
+  }
+  if (!sent?.message_id) throw new Error("لم تؤكد Meta إرسال الرسالة الخاصة؛ تحقّق من المحادثات قبل إعادة المحاولة");
+  return sent.message_id;
+}
+
+/**
+ * Reply to a comment publicly and/or privately. The private message goes first:
+ * if it is not possible, nothing public is posted (so "we messaged you" is never
+ * a lie). If the private message went out but the public reply failed, the
+ * result says so and only the public part may be retried.
+ */
+export async function replyToComment(ctx: InboxContext, handle: string,
+  input: { publicText: string; privateText: string; skipIfReplied: boolean }) {
+  const { publicText, privateText } = input;
+  try {
+    if (input.skipIfReplied && await pageRepliedToComment(ctx, handle))
+      throw new CommentReplySkip("replied", "سبق الرد على هذا التعليق من الصفحة.");
+    const privateId = privateText ? await sendCommentPrivateReply(ctx, handle, privateText) : undefined;
+    if (!publicText) return { status: "sent" as const, privateId };
+    try {
+      return { status: "sent" as const, privateId, publicId: await sendInboxComment(ctx, handle, publicText) };
+    } catch (error) {
+      if (!privateId) throw error;
+      return { status: "partial" as const, privateId, message: "أُرسلت الرسالة الخاصة لكن تعذّر نشر الرد العلني؛ أعد نشره من مربع الكتابة." };
+    }
+  } catch (error) {
+    if (error instanceof CommentReplySkip) return { status: "skipped" as const, reason: error.reason, message: error.message };
+    throw error;
+  }
+}
+
+/** The post's own text, read from Meta (used to find storefront links in it). */
+export async function readInboxPostText(ctx: InboxContext, handle: string) {
+  const id = resourceId(ctx, "post", handle);
+  const post = await graphGet<{ id: string; message?: string; caption?: string }>(path(id), ctx.token,
+    { fields: ctx.platform === "instagram" ? "id,caption" : "id,message" });
+  return { id, text: post.caption || post.message || "" };
+}
+
 export type CommentModeration = "hide" | "unhide" | "delete";
 
 /** Hide, show or delete a comment the Page listed. Facebook uses `is_hidden`, Instagram `hide`. */
