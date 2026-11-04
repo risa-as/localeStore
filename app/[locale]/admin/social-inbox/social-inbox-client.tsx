@@ -15,6 +15,7 @@ import { expandCommentReply, matchCommentReply, type CommentReply } from "@/lib/
 import { COMMENT_INTENTS, type CommentIntent } from "@/lib/meta/comment-intent";
 import { useSocialCommentReplies, usePostProductChoice } from "@/components/admin/use-social-comment-replies";
 import SocialInboxCommentToolbar, { type BulkState, type BulkGroup } from "@/components/admin/social-inbox-comment-toolbar";
+import SocialInboxBulkModeration, { type BulkModerationState } from "@/components/admin/social-inbox-bulk-moderation";
 import type { InboxItem, InboxPage, InboxReplyWindow, SocialPlatform } from "@/lib/meta/inbox";
 import { reconcileConversation, type ConversationReceipt } from "@/lib/meta/inbox-state";
 import ItemBody from "@/components/admin/social-inbox-item";
@@ -131,6 +132,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   const [postProducts, setPostProducts] = useState<{ key: string; products: InboxProduct[]; error: string } | null>(null);
   const [commentFilter, setCommentFilter] = useState<"all" | "waiting" | CommentIntent>("all");
   const [loadingAll, setLoadingAll] = useState(false);
+  const [bulkModeration, setBulkModeration] = useState<(BulkModerationState & { postId: string }) | null>(null);
+  const moderationCancel = useRef(false);
   const [mediaDrafts, setMediaDrafts] = useState<Record<string, MediaDraft>>({});
   const mediaDraftsRef = useRef<Record<string, MediaDraft>>({});
   const filePicker = useRef<HTMLInputElement>(null);
@@ -429,6 +432,41 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     if (waitingComment(item)) intentCounts.set("waiting", (intentCounts.get("waiting") || 0) + 1);
   }
 
+  /** Hide or delete many comments, one at a time; stops at the first error from Meta. */
+  async function runBulkModeration(action: "hide" | "delete", items: InboxItem[]) {
+    if (busy || sendingNow.current || !selected) return;
+    const postId = selected.id;
+    moderationCancel.current = false; sendingNow.current = true; pauseRefresh();
+    setBusy(true); onSending(true); setReplyError(""); setNotice("");
+    let done = 0, failed = 0, stop = "";
+    const changed = new Set<string>();
+    const show = (running: boolean, result?: string) => setBulkModeration({ postId, action, total: items.length, done, failed, running, result });
+    show(true);
+    try {
+      for (const [index, item] of items.entries()) {
+        if (moderationCancel.current) { stop = "أُوقف."; break; }
+        if (selectedId.current !== postId) { stop = "فُتح منشور آخر؛ توقف."; break; }
+        const result = await moderateSocialInboxComment({ pageId, platform, handle: item.handle, action });
+        if (!alive.current) return;
+        if (!result.ok) { failed++; stop = `توقف بعد اعتراض Meta: ${result.message}`; break; }
+        done++; changed.add(item.id);
+        show(true);
+        if (index < items.length - 1) await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    } catch { stop = "لم نستلم تأكيد Meta؛ توقف. حدّث التعليقات للتحقق."; }
+    finally {
+      sendingNow.current = false;
+      if (alive.current) {
+        setDetail(prev => ({ ...prev, items: action === "delete" ? prev.items.filter(entry => !changed.has(entry.id))
+          : prev.items.map(entry => changed.has(entry.id) ? { ...entry, hidden: true } : entry) }));
+        if (target && action === "delete" && changed.has(target.id)) setTarget(null);
+        setBusy(false);
+        show(false, stop || `تم ${action === "hide" ? "إخفاء" : "حذف"} ${done} تعليقاً.`);
+      }
+      onSending(false);
+    }
+  }
+
   /** Load every comment of the post (up to 1,000) so filters and bulk replies cover all of them. */
   async function loadAllComments() {
     if (!selected || loadingAll || !detail.after) return;
@@ -690,11 +728,17 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               {([["all", "الكل", detail.items.filter(item => !item.outgoing).length], ["waiting", "بانتظار الرد", intentCounts.get("waiting") || 0],
                 ...COMMENT_INTENTS.map(intent => [intent.value, intent.label, intentCounts.get(intent.value) || 0] as const)] as const)
                 .filter(([value, , count]) => value === "all" || value === "waiting" || count > 0)
-                .map(([value, label, count]) => <Button key={value} size="sm" className="h-7 px-2 text-xs" variant={commentFilter === value ? "default" : "outline"}
+                .map(([value, label, count]) => <Button key={value} size="sm" variant={commentFilter === value ? "default" : "outline"}
+                  className={`h-7 px-2 text-xs ${value === "complaint" && commentFilter !== value ? "border-red-500/50 text-red-700 dark:text-red-400" : ""}`}
                   title={COMMENT_INTENTS.find(intent => intent.value === value)?.hint} onClick={() => setCommentFilter(value as typeof commentFilter)}>{label} ({count})</Button>)}
               {detail.after && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={loadingAll || busy} onClick={() => void loadAllComments()}>
                 {loadingAll ? <Loader2 className="size-3 animate-spin" /> : null}تحميل كل التعليقات</Button>}
             </div>}
+            {kind === "comments" && commentFilter !== "all" && <SocialInboxBulkModeration key={`${selected.id}:${commentFilter}`}
+              items={filteredComments.filter(item => !item.outgoing && !item.system)}
+              label={commentFilter === "waiting" ? "بانتظار الرد" : COMMENT_INTENTS.find(intent => intent.value === commentFilter)?.label || ""}
+              platform={platform} disabled={busy} state={bulkModeration?.postId === selected.id ? bulkModeration : null}
+              onRun={(action, items) => void runBulkModeration(action, items)} onCancel={() => { moderationCancel.current = true; }} />}
             {loadingDetail && !detailItems.length ? <Loading /> : !detailItems.length ? <p className="text-sm text-muted-foreground">{detailError ? "تعذر تحميل المحتوى" : "لا يوجد محتوى متاح"}</p> : kind === "comments" ? <>
               <p className="text-[11px] text-muted-foreground">تُجمع تعليقات الزبون على هذا المنشور بحسب هويته. التجميع يشمل التعليقات المحمّلة{detail.after ? "؛ حمّل المزيد لإضافة الأقدم." : "."}</p>
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}

@@ -16,7 +16,7 @@ export const COMMENT_INTENTS: { value: CommentIntent; label: string; hint: strin
   { value: "question", label: "سؤال يحتاج رداً منك", hint: "ترهم على سيارة؟ القياس؟ كاملة لو بس القاعدة؟" },
   { value: "followup", label: "متابعة طلب سابق", hint: "حجزت وما وصل، وين الطلبية — راجع طلبه" },
   { value: "bargain", label: "يساوم أو يريد عدة قطع", hint: "اذا ب15 مع التوصيل أحجز، رايد 2 قطعة" },
-  { value: "complaint", label: "اعتراض أو شكوى", hint: "غالي، مقلد، فاشل" },
+  { value: "complaint", label: "تسقيط أو تبخيس للمنتج", hint: "غالية، لكيته أرخص، ما تسوه، نصب، فاشل — يمكن إخفاؤها أو حذفها كلها" },
   { value: "praise", label: "شكر وثناء", hint: "روعة، عاشت ايدك" },
   { value: "greeting", label: "سلام فقط", hint: "السلام عليكم" },
   { value: "other", label: "أخرى وإشارات", hint: "إشارة لصديق أو نص غير مفهوم" },
@@ -39,7 +39,33 @@ const BOOKING_PREFIX = ["اريد", "اريدها", "اريده", "رايد", "�
 const BOOKING_EXACT = ["ابي", "ابغي", "ريد"];
 const DELIVERY_TIME = ["كم يوم", "شكد يوم", "بيش يوم", "متي يوصل", "متي يصل", "شكد يوصل", "شكد ياخذ"];
 const DELIVERY_PREFIX = ["توصيل", "يوصل", "توصل", "يصل", "تصل", "واصل", "مكانكم", "مكانك", "عنوانكم", "محلكم", "وين مكان", "كم يوم", "متي يوصل"];
-const COMPLAINT_PREFIX = ["غالي", "غاليه", "فاشل", "فاشله", "نصب", "نصابين", "حرامي", "سيء", "سيئ", "تعبان", "خايس", "كذاب", "كذب", "مضروب"];
+/*
+ * Comments that run the product down in public, from ~8,300 real comments:
+ * "too expensive", "cheaper elsewhere", "not worth it", "fake / scam".
+ * Careful exceptions: «تسوه» alone is praise ("worth it"), «الغالي» is an
+ * endearment, and «اصلي لو تقليد؟» is a question.
+ */
+// Exact words (also with a leading و/ف): never «الغالي» (dear) or names like «الغالبي».
+const EXPENSIVE_WORDS = new Set(["غالي", "غاليه", "غاليين", "غالين", "غاليات", "اغلي", "غاليتين"]);
+const DISCOURAGE_PREFIX = [
+  // too expensive
+  "شدعوه", "اشدعوه", "مبالغ", "ماكو هيج سعر", "رخصو", "تستحون", "استحوا", "تستحي من السعر", "استغلال", "مستغل", "تستغلون",
+  // cheaper elsewhere
+  "ارخص", "تيمو", "temu", "اكسبرس", "اكسبريس", "ناشرته ب", "ناشرينه ب",
+  // not worth it
+  "ماتسوه", "مايسوه", "ميسوه", "متسوه", "ما تسوه", "ما يسوه", "ما تسوي فلس", "ماتسوي فلس", "ما يسوي فلس", "مايسوي فلس",
+  "ما يستاهل", "ما تستاهل", "مايستاهل", "ميستاهل", "ماتستاهل",
+  "ما تفيد", "ما يفيد", "ماتفيد", "مايفيد", "ميفيد", "متفيد", "ولاتفيد", "لا تفيد", "ماكو فايده", "مابي فايده", "مابي اي فايده", "ما بيها فايده", "ما بيها اي فايده", "بلا فايده",
+  "كلاوات", "مهزله", "لعبه اطفال", "مضيعه",
+  // fake, scam, bad quality
+  "نصب", "نصاب", "احتيال", "محتال", "كذاب", "غشاش", "غشو", "تقليد", "مقلد", "فاشل", "زبال", "خايس", "مضروب", "سيء", "سيئ",
+  "تعرضون شكل", "تسلمون تقليد", "اتحداك اذا سلمت",
+  "مو زين", "لاتورط", "لا تورط", "لا تتورط", "لاتشتر", "لا تشتر", "لا تنخدع", "لاتنخدع", "انصح الناس عدم", "انصحكم لا",
+  "حرامي", "حراميه", "سراق", "سرقه"];
+const DISCOURAGE_EXACT = ["كذب", "جذب", "جذابين", "غش", "الغش", "والغش", "تغش", "يغش", "افشل", "موزين", "تخلف", "جشع", "جشعين",
+  // «السنك» market; exact so «سنكل فيز» (single phase) is not caught.
+  "سنك", "السنك", "بالسنك", "بلسنك"];
+const SECOND_HAND_PLACES = ["باله", "الصناعي", "المحلات", "محلات", "السوك", "سوك", "السوق", "سوق"];
 const BARGAIN_HINT = ["اذا", "ممكن", "المفروض", "توصيل", "التوصيل"];
 const PRAISE_PREFIX = ["روعه", "رائع", "عاشت", "تسلم", "شكرا", "حلو", "جميل", "خوش", "ممتاز", "احسن", "بالتوفيق", "ابدعتم", "مبدع", "الله يحفظ", "ربي يحفظ"];
 const GREETING_WORDS = ["سلام", "السلام", "عليكم", "عليكم السلام", "ورحمه", "الله", "وبركاته", "مرحبا", "هلو", "هلا", "صباح", "مساء", "الخير", "النور", "اخي", "اخويه", "حبيبي"];
@@ -63,15 +89,36 @@ function has(words: string[], prefixes: string[], exact: string[] = []) {
  * Most specific first: a phone number is an order; a price question that also
  * asks about a specific car is a question for a person (a template would ignore it).
  */
+/** True when the comment runs the product down: too expensive, cheaper elsewhere, not worth it, fake. */
+export function isDiscouraging(text: string) {
+  const words = commentWords(text);
+  const joined = normalizeArabic(text);
+  const digit = /\d/.test(joined);
+  // Digits may be glued on: «40غاليه».
+  if (words.map(word => word.replace(/^\d+/, "")).some(word => EXPENSIVE_WORDS.has(word) || (/^[وف]/.test(word) && EXPENSIVE_WORDS.has(word.slice(1))))) return true;
+  // «تقليد/مقلد» inside a question («اصلية لو تقليد؟», «اذا مقلد ما استلم») is a fair question, not an attack.
+  const fairQuestion = /اصلي|اذا|هل|لو/.test(joined) && !/تسلمون|تعرضون|ملينا|غش/.test(joined);
+  const prefixes = fairQuestion ? DISCOURAGE_PREFIX.filter(word => word !== "تقليد" && word !== "مقلد") : DISCOURAGE_PREFIX;
+  if (has(words, prefixes, DISCOURAGE_EXACT)) return true;
+  // «سعرك هواي», «هوايه كلش سعر»
+  if (/سعر\S*\s+(?:كلش\s+)?هواي|هوايه?\s+(?:كلش\s+)?سعر/.test(joined)) return true;
+  // Cheaper at a market or bought cheaply before: «بالباله ب10», «اخذته ب7», «لكيتها ب15», «موجود ب15».
+  if (digit && has(words, SECOND_HAND_PLACES)) return true;
+  if (/(?:اخذت|اشتريت|شتريت|مشتري|جنت ابيع|لكيت)\S*[^\n]{0,40}?(?:\s|^)ا?ب\s?\d/.test(joined)) return true;
+  if (/لكيت\S*/.test(joined) && digit) return true;
+  if (/موجود\S*\s*ا?ب\s?\d|ا?ب\s?(?:\d+|عشره|خمسه|الفين)\S*\s+موجود/.test(joined)) return true;
+  return false;
+}
+
 export function classifyComment(text: string): CommentIntent {
   if (hasPhoneNumber(text)) return "order";
+  if (isDiscouraging(text)) return "complaint";
   const words = commentWords(text);
   const joined = normalizeArabic(text);
   // «بيشسعرها» and similar run-together spellings.
   const price = has(words, PRICE_PREFIX, PRICE_EXACT) || /سعر/.test(joined);
   if (has(words, FOLLOWUP_PREFIX)) return "followup";
   if (has(words, QUESTION_PREFIX, QUESTION_EXACT) || has(words, CAR_PREFIX)) return "question";
-  if (has(words, COMPLAINT_PREFIX)) return "complaint";
   // A price the customer proposes: «اذا ب15 مع التوصيل», «ممكن ب 15 الف».
   if (/(?:^|[^\d])\d{1,6}(?!\d)/.test(joined) && has(words, BARGAIN_HINT)) return "bargain";
   if (has(words, DELIVERY_TIME)) return "delivery";

@@ -1,4 +1,4 @@
-import { classifyComment, hasPhoneNumber, type CommentIntent } from "./comment-intent";
+import { classifyComment, hasPhoneNumber, isDiscouraging, type CommentIntent } from "./comment-intent";
 
 // Real comment shapes from the store's posts (names and numbers changed).
 const cases: [string, CommentIntent][] = [
@@ -12,7 +12,7 @@ const cases: [string, CommentIntent][] = [
   ["وين مكانكم", "delivery"], ["كم يوم يصل طلب", "delivery"], ["اكو توصيل واسط", "delivery"],
   ["اذا ب15 مع التوصيل ثبت حجز", "bargain"], ["ممكن ب 15 الف مع التوصيل ؟", "bargain"],
   ["حجزت 2 ولهسا ما وصلن", "followup"], ["صار ٣ ايام وين الطلبيه", "followup"], ["لم يصل المندوب", "followup"],
-  ["غالي جدا", "complaint"], ["السبب اسعاركم غاليه ونشتري من غيركم", "complaint"],
+  ["غالي جدا", "complaint"], ["السبب اسعاركم غاليه ونشتري من غيركم", "complaint"], ["اذا ب15 غاليه", "complaint"],
   ["روعه جدا وجميل", "praise"], ["👍👍", "praise"], ["عاشت الايادي", "praise"],
   ["السلام عليكم", "greeting"], ["مساء الخير", "greeting"],
   ["محمد جعفر", "other"], ["جندب عبد الوهاب", "other"], ["تم", "other"], ["السلام عليكم ورحمه الله", "greeting"],
@@ -28,4 +28,30 @@ it("recognizes Iraqi mobile numbers in any digits and spacing", () => {
   expect(hasPhoneNumber("+964 770 123 4567")).toBe(true);
   expect(hasPhoneNumber("السعر 15000 والتوصيل 5000")).toBe(false);
   expect(hasPhoneNumber("موديل 2012")).toBe(false);
+});
+
+// Real discouraging comments from the store's posts.
+const discouraging = [
+  "غالية", "غالي كلش", "40غاليه", "اكيد غالي وغالي", "هووواي غالي", "جيد جدا ممتاز لاكنه غالي", "شطلعت هاي قاعده اغلى من الكوسرة",
+  "شدعوه ب 17 وتوصيل 5", "اشدعوه هلسعر اب50", "السعر مبالغ بي كلش", "عمي ماكو هيج سعر", "غاليه رخصوه حتى تبيع اكثر", "تره سعرك هواي 75000 دينار",
+  "غالي موجود بالسنك ارخص", "بالسنگ سعرها 10", "لكيتها ب امزون ب15", "عمار الخفاجي بالسنك اخذته ب٧", "ملك زماني اشتريته من سوگ الجمعه ب 7 الاف",
+  "موجود ب١٥ وتوصيل ٥ يعني ب٢٠", "تره بعشره موجود شنو وحد انتم", "هي قاعدة شدعوة بخمسين كتر هو وقاعدته يتحصل من البالة بخمسين", "كاتم الاسرار هواي بيجاة ناشرته ب١٥",
+  "خوان سعرها 45 الف ماتسوه غاليه", "السيارات الحديثه نعال ماتسوه", "چذب ماتسوی فلس صورة مكبرة", "ما يسوه عشر الاف والله",
+  "كلشي مايفيد اني جربته", "اذل مابي بطاريات قلم ميفيد", "اخذت منه مابي اي فايده", "ماكو فايده", "اخذت منه طلع كلاوات", "ومهزلة",
+  "نصب واحتيال", "شركة نصابه.", "كذابين هذولة مرتين طلبت", "والله كذاب", "ملينا من الغش والكذب", "ناس تغش متخاف الله", "اني غشوني",
+  "تعرضون شكل وتسلمون تقليد", "منتج فاشل", "لاتورطون أخذوها مني", "افشل دعاية", "موزين فاشل", "صدك تخلف تاخذ جهاز",
+];
+it.each(discouraging)("flags «%s» as running the product down", text => {
+  expect(isDiscouraging(text)).toBe(true);
+  expect(classifyComment(text)).toBe("complaint");
+});
+
+// Look alike but are fine: praise, endearments, names, fair questions.
+const fine = [
+  "اشتريت وحدة كلش مفيدة وتسوة", "تسوه 50الف", "شكد السعر حبيبي الغالي", "اخي الغالي وين عنوانكم", "علي حيدر الغالبي",
+  "كم السعر وهل هي اصلية لو تقليد", "اخويه ممكن احجز بس بشرط الفحص اذا المنتج مقلد ما استلم", "هل الماطور سنكل فيز لو ثري فيز",
+  "هاي تفيدك بشغلك", "تفيد للدوشمه", "من رخصت صاحب المنشور متوفر 4قطع", "هو سـعره موغالـي بس أحناماعدناهالمبلغ الكبير", "حمزة أمازون",
+];
+it.each(fine)("does not flag «%s»", text => {
+  expect(isDiscouraging(text)).toBe(false);
 });
