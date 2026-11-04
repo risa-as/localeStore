@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { formatNumberWithDecimal, convertArabicToEnglishNumbers } from "./utils";
-import { PAYMENT_METHODS } from "./constants";
+import { MAX_RELATED_PRODUCTS, PAYMENT_METHODS } from "./constants";
 
 const currency = z
   .string()
@@ -11,7 +11,7 @@ const currency = z
 
 // Schema for inserting products
 export const insertProductSchema = z.object({
-  relatedProductIds: z.array(z.string().uuid()).max(3).optional().default([]),
+  relatedProductIds: z.array(z.string().uuid()).max(MAX_RELATED_PRODUCTS).optional().default([]),
   name: z.string().min(3, "Name must be at least 3 characters"),
   slug: z.string().min(3, "Slug must be at least 3 characters"),
   categories: z.array(z.string()).min(1, "يجب اختيار فئة واحدة على الأقل"),

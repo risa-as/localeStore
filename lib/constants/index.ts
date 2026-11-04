@@ -83,3 +83,6 @@ export const iraqGovernorates = [
   "Saladin",
   "Dohuk",
 ];
+
+/** Complementary products per product, suggested to the customer to add to the same order. */
+export const MAX_RELATED_PRODUCTS = 10;

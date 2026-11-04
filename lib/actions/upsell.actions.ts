@@ -5,6 +5,7 @@ import { reserveOrderStock } from "@/lib/orders/reservations";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { recordOrderEvent } from "@/lib/orders/telemetry";
+import { MAX_RELATED_PRODUCTS } from "@/lib/constants";
 
 export async function getOrderReceipt(orderId: string) {
   const order = await prisma.order.findUniqueOrThrow({ where: { id: z.string().uuid().parse(orderId) }, include: { orderitems: true } });
@@ -19,7 +20,9 @@ export async function getOrderSuggestions(orderId: string) {
   if (!order || order.status !== "home") return [];
   const existing = new Set(order.orderitems.map(item => item.productId));
   const ids = [...new Set(order.orderitems.flatMap(item => item.product.relatedProductIds))].filter(id => !existing.has(id));
-  const products = await prisma.product.findMany({ where: { id: { in: ids }, isArchived: false }, take: 3 });
+  // Keep the order the admin picked them in.
+  const found = await prisma.product.findMany({ where: { id: { in: ids }, isArchived: false } });
+  const products = ids.map(id => found.find(product => product.id === id)).filter(product => !!product).slice(0, MAX_RELATED_PRODUCTS);
   const suggestions = [];
   for (const product of products) {
     const additionalShipping = Math.max(0, Number(product.shippingPrice) - Number(order.shippingPrice));

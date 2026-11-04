@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import { Check, Loader2, PackagePlus, Search, X } from "lucide-react";
 import { getRelatedProductOptions } from "@/lib/actions/product.actions";
+import { MAX_RELATED_PRODUCTS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -29,7 +30,7 @@ export default function RelatedProductsPicker({ value = [], onChange, productId,
   const available = options.filter(option => option.id !== productId);
   const terms = searchKey(query).split(/\s+/).filter(Boolean);
   const results = available.filter(option => terms.every(term => searchKey(option.name).includes(term)));
-  const limitReached = value.length >= 3;
+  const limitReached = value.length >= MAX_RELATED_PRODUCTS;
   function toggle(optionId: string) {
     if (value.includes(optionId)) onChange(value.filter(selected => selected !== optionId));
     else if (!limitReached) onChange([...value, optionId]);
@@ -39,14 +40,14 @@ export default function RelatedProductsPicker({ value = [], onChange, productId,
   }
 
   return <fieldset disabled={disabled} aria-describedby={`${id}-description`} className="min-w-0 rounded-[10px] border bg-card p-4 sm:p-5 space-y-4">
-    <legend className="sr-only">منتجات مكملة لهذا المنتج (حتى 3)</legend>
+    <legend className="sr-only">منتجات مكملة لهذا المنتج (حتى {MAX_RELATED_PRODUCTS})</legend>
     <div className="flex items-start gap-3">
       <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/5 text-primary"><PackagePlus className="size-5" /></span>
       <div className="flex-1 min-w-0">
         <h2 className="text-sm font-semibold">منتجات مكملة لهذا المنتج</h2>
-        <p id={`${id}-description`} className="mt-1 text-xs leading-relaxed text-muted-foreground">اختر حتى 3 منتجات مناسبة؛ ستظهر للزبون لإضافتها إلى طلبه نفسه.</p>
+        <p id={`${id}-description`} className="mt-1 text-xs leading-relaxed text-muted-foreground">اختر حتى {MAX_RELATED_PRODUCTS} منتجات مناسبة؛ ستظهر للزبون لإضافتها إلى طلبه نفسه.</p>
       </div>
-      <span aria-label={`المختار ${value.length} من 3`} className="shrink-0 rounded-[10px] border bg-muted/40 px-2.5 py-1 text-xs font-semibold tabular-nums" dir="ltr">{value.length} / 3</span>
+      <span aria-label={`المختار ${value.length} من ${MAX_RELATED_PRODUCTS}`} className="shrink-0 rounded-[10px] border bg-muted/40 px-2.5 py-1 text-xs font-semibold tabular-nums" dir="ltr">{value.length} / {MAX_RELATED_PRODUCTS}</span>
     </div>
 
     <div className="rounded-[10px] bg-muted/35 p-3">
