@@ -700,6 +700,12 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}
                 moderatingId={moderatingId} onModerate={(item, action, alsoDelete) => void moderateComment(item, action, alsoDelete)}
                 replies={commentReplies.replies} product={postProduct} sendingId={sendingKey} onQuickReply={(item, reply) => void quickReply(item, reply)}
+                pageId={pageId} postHandle={selected.handle} onWorking={working => { setBusy(working); onSending(working); }}
+                onOrdered={item => {
+                  // Show it as ordered and open it with the "we received your details" reply ready.
+                  setDetail(prev => ({ ...prev, items: prev.items.map(entry => entry.id === item.id ? { ...entry, ordered: true } : entry) }));
+                  selectTarget({ ...item, ordered: true });
+                }}
                 onReply={selectTarget}
                 onThread={item => { setThread(item); setReplies(EMPTY); void loadReplies(item); }} />)}
             </> : detailItems.map(item => <div key={item.id} className={`rounded-2xl border px-3 py-2 [overflow-wrap:anywhere] ${item.system ? "bg-muted/30 border-dashed mx-auto max-w-xl" : item.outgoing ? "w-fit max-w-[90%] sm:max-w-[80%] ms-auto rounded-es-sm bg-emerald-50/80 border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60" : "w-fit max-w-[90%] sm:max-w-[80%] me-auto rounded-ee-sm bg-background"}`}>

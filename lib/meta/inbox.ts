@@ -29,6 +29,8 @@ export type InboxItem = {
   intent?: CommentIntent;
   /** Comments: the Page already replied under it (publicly or privately). */
   answered?: boolean;
+  /** Comments: an order was already registered from it. */
+  ordered?: boolean;
   attachments?: { name: string; url: string; kind?: "image" | "sticker" | "audio" | "video" | "file"; width?: number; height?: number }[];
 };
 export type InboxPage = { items: InboxItem[]; after: string | null };
@@ -484,6 +486,14 @@ export async function readInboxComments(ctx: InboxContext, handle: string, repli
     ...([...(c.comments?.data ?? []), ...(c.replies?.data ?? [])].some(reply => own(ctx, reply.from?.id)) || c.private_reply_conversation
       ? { answered: true } : {}),
     ...(c.is_hidden || c.hidden ? { hidden: true } : {}) })), after: next(res) };
+}
+
+/** One comment, read from Meta (never from the browser), for registering an order from it. */
+export async function readInboxComment(ctx: InboxContext, handle: string): Promise<InboxItem & { commentId: string }> {
+  const id = resourceId(ctx, "comment", handle);
+  const c = await graphGet<Comment>(path(id), ctx.token, { fields: commentFields(ctx, false) });
+  return { id: c.id, commentId: id, handle, title: c.from?.name || c.username || c.from?.username || UNKNOWN_AUTHOR,
+    text: c.text || c.message || "", time: c.timestamp || c.created_time || "", outgoing: own(ctx, c.from?.id) };
 }
 
 /** A comment the reply tools must not answer; the bulk run skips it and continues. */

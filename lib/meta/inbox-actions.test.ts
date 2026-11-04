@@ -290,3 +290,50 @@ it.each(["وعليكم السلام ورحمة الله وبركاته", "أهل
   expect(prisma.product.findMany).not.toHaveBeenCalled();
   expect(getAvailableStocks).not.toHaveBeenCalled();
 });
+
+describe("orders from comments", () => {
+  const ctx = { pageId: "page1", platform: "facebook" as const, token: "PRIVATE_PAGE", secret: "secret", userId: "admin1" };
+  const comment = () => resourceHandle(ctx, "comment", "c1");
+  const source = () => ({ kind: "comment" as const, postHandle: resourceHandle(ctx, "post", "page1_post") });
+
+  it("reads the comment from Meta and fills phone, governorate and the post's product", async () => {
+    jest.mocked(graphGet).mockImplementation(async (path: string) => path === "c1"
+      ? { id: "c1", message: "اريد قطعة بغداد الدورة قرب الجامع 07701234567", from: { id: "customer", name: "علي" }, created_time: "2026-11-04T10:00:00+0000" }
+      : { id: "page1_post", message: "إعلان", call_to_action: { value: { link: "https://store.example/ar/landing/saw" } } });
+    jest.mocked(prisma.product.findMany).mockResolvedValue([{ id: "22222222-2222-4222-8222-222222222222", name: "منشار", slug: "saw", images: [],
+      price: 20, shippingPrice: 0, stock: 3, colors: [], offers: null }] as never);
+    jest.mocked(getAvailableStocks).mockResolvedValue(new Map());
+    const result = await prepareSocialInboxOrder({ pageId: "page1", platform: "facebook", handle: comment(), source: source() });
+    expect(result).toMatchObject({ ok: true, data: { phoneNumber: "07701234567", hasOlderMessages: false, products: [{ slug: "saw" }] } });
+    expect(prisma.socialInboxOrder.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ conversationId: "comment:c1" }) }));
+    expect(graphPost).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the comment text for the address and accepts a number without its 0", async () => {
+    jest.mocked(graphGet).mockImplementation(async (path: string) => path === "c1"
+      ? { id: "c1", message: "رايد سيت محاويل 770 123 4567", from: { id: "customer" } } : { id: "page1_post", message: "" });
+    jest.mocked(prisma.product.findMany).mockResolvedValue([] as never);
+    jest.mocked(getAvailableStocks).mockResolvedValue(new Map());
+    const result = await prepareSocialInboxOrder({ pageId: "page1", platform: "facebook", handle: comment(), source: source() });
+    expect(result.ok && result.data.phoneNumber).toBe("07701234567");
+    expect(result.ok && result.data.address).toBe("رايد سيت محاويل");
+    expect(result.ok && result.data.warnings.join(" ")).toContain("مأخوذ من نص التعليق");
+  });
+
+  it("ties the approved order to the comment so a retry never creates a second one", async () => {
+    jest.mocked(submitQuickOrder).mockResolvedValue({ orderId: "order1", kind: "created", replay: false });
+    const input = { pageId: "page1", platform: "facebook" as const, handle: comment(), source: source(), requestId: "11111111-1111-4111-8111-111111111111",
+      productId: "22222222-2222-4222-8222-222222222222", phoneNumber: "07701234567", governorate: "Baghdad", address: "الدورة قرب الجامع", quantity: 1 };
+    expect((await approveSocialInboxOrder(input)).ok).toBe(true);
+    expect(jest.mocked(submitQuickOrder).mock.calls[0][2].receipt).toMatchObject({ conversationId: "comment:c1", createdBy: "admin1" });
+    // A conversation handle cannot be passed off as a comment.
+    expect((await approveSocialInboxOrder({ ...input, handle: resourceHandle(ctx, "conversation", "c1") })).ok).toBe(false);
+  });
+
+  it("marks comments that already have an order", async () => {
+    jest.mocked(graphGet).mockResolvedValue({ data: [{ id: "c1", message: "07701234567 بغداد", from: { id: "customer" } }, { id: "c2", message: "السعر", from: { id: "customer" } }] });
+    jest.mocked(prisma.socialInboxOrder.findMany).mockResolvedValue([{ conversationId: "comment:c1" }] as never);
+    const result = await getSocialInboxDetail({ pageId: "page1", platform: "facebook", kind: "comments", handle: resourceHandle(ctx, "post", "page1_post") });
+    expect(result.ok && result.data.items.map(item => [item.id, !!item.ordered, item.intent])).toEqual([["c1", true, "order"], ["c2", false, "price"]]);
+  });
+});

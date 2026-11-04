@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import ItemBody from "./social-inbox-item";
+import SocialInboxOrder from "./social-inbox-order";
 import type { CommentGroup } from "@/lib/meta/inbox-workflow";
 import type { InboxItem, SocialPlatform } from "@/lib/meta/inbox";
 import { expandCommentReply, matchCommentReply, type CommentReply } from "@/lib/meta/comment-replies";
@@ -27,8 +28,10 @@ const INTENT_STYLE: Partial<Record<CommentIntent, string>> = {
 };
 const intentLabel = (intent: CommentIntent) => COMMENT_INTENTS.find(item => item.value === intent)?.label ?? "";
 
-export default function SocialInboxCommentGroup({ group, platform, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate }: {
-  group: CommentGroup; platform: SocialPlatform; targetId?: string; handled: Set<string>; disabled: boolean; moderatingId?: string | null;
+export default function SocialInboxCommentGroup({ group, platform, pageId, postHandle, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate, onOrdered, onWorking }: {
+  group: CommentGroup; platform: SocialPlatform; pageId: string; postHandle: string; targetId?: string; handled: Set<string>; disabled: boolean; moderatingId?: string | null;
+  /** An order was registered from this comment. */
+  onOrdered: (item: InboxItem) => void; onWorking: (working: boolean) => void;
   replies: CommentReply[]; product: InboxProduct | null; /** `${commentId}:${replyId}` being sent */ sendingId?: string | null;
   /** One click: send this reply (private first if it has one) and move to the next comment. */
   onQuickReply: (item: InboxItem, reply: CommentReply) => void;
@@ -74,6 +77,8 @@ export default function SocialInboxCommentGroup({ group, platform, targetId, han
       <div className="flex flex-wrap items-center gap-2 mt-2">
         <Button disabled={disabled} size="sm" variant="outline" onClick={() => onReply(item)}>ردّ على التعليق</Button>
         <Button disabled={disabled} size="sm" variant="ghost" onClick={() => onThread(item)}>عرض الردود</Button>
+        {!item.outgoing && item.intent === "order" && <SocialInboxOrder scope={{ pageId, platform, handle: item.handle }} source={{ kind: "comment", postHandle }}
+          suggestedProduct={product || undefined} disabled={disabled} onWorking={onWorking} onApproved={() => onOrdered(item)} />}
         <DropdownMenu dir="rtl">
           <DropdownMenuTrigger asChild>
             <Button disabled={disabled} size="sm" variant="ghost" className="px-2" aria-label="إدارة التعليق">
@@ -92,6 +97,7 @@ export default function SocialInboxCommentGroup({ group, platform, targetId, han
           </DropdownMenuContent>
         </DropdownMenu>
         {item.intent && item.intent !== "other" && <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${INTENT_STYLE[item.intent] || "bg-muted text-muted-foreground"}`}>{intentLabel(item.intent)}</span>}
+        {item.ordered && <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-medium text-white">سُجّل الطلب</span>}
         {item.answered && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد</span>}
         {item.hidden && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title="لا يراه إلا صاحبه وأصدقاؤه والصفحة"><EyeOff className="size-3" />مخفي</span>}
         {handled.has(item.id) && <span className="text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد في هذه الجلسة</span>}

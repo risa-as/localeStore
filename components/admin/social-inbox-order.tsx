@@ -20,11 +20,15 @@ type Fields = { phoneNumber: string; governorate: string; address: string; quant
 type Approved = { orderId: string; kind: "created" | "merged" | "duplicate"; replay: boolean };
 const control = "w-full rounded-md border bg-background px-3 py-2 text-sm";
 
-export default function SocialInboxOrder({ scope, suggestedProduct, disabled, onWorking, selectedFields, onSelectedFieldChange }: {
+export default function SocialInboxOrder({ scope, suggestedProduct, disabled, onWorking, selectedFields, onSelectedFieldChange, source, onApproved }: {
   scope: Scope; suggestedProduct?: InboxProduct; disabled: boolean; onWorking: (working: boolean) => void;
   selectedFields?: SelectedOrderFields;
   onSelectedFieldChange?: (field: "phoneNumber" | "address", value: string) => void;
+  /** Register the order from a comment (scope.handle is then the comment) instead of a conversation. */
+  source?: { kind: "comment"; postHandle: string };
+  onApproved?: () => void;
 }) {
+  const fromComment = source?.kind === "comment";
   const locale = useLocale(), tGov = useTranslations("Governorates");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,7 +54,7 @@ export default function SocialInboxOrder({ scope, suggestedProduct, disabled, on
   async function prepare() {
     setLoading(true); setError("");
     try {
-      const result = await prepareSocialInboxOrder({ ...scope, productId: suggestedProduct?.id });
+      const result = await prepareSocialInboxOrder({ ...scope, productId: suggestedProduct?.id, source });
       if (!result.ok) { setError(result.message); return; }
       const data = result.data;
       setFields({ phoneNumber: data.phoneNumber, governorate: data.governorate, address: data.address, quantity: data.quantity, selectedColor: "" });
@@ -83,8 +87,8 @@ export default function SocialInboxOrder({ scope, suggestedProduct, disabled, on
     working.current = true; setPending(true); onWorking(true); setError("");
     requestId.current ||= crypto.randomUUID();
     try {
-      const result = await approveSocialInboxOrder({ ...scope, ...fields, productId: product.id, requestId: requestId.current });
-      if (result.ok) { setApproved(result.data); approvedFields.current = { phoneNumber: fields.phoneNumber, address: fields.address }; }
+      const result = await approveSocialInboxOrder({ ...scope, ...fields, productId: product.id, requestId: requestId.current, source });
+      if (result.ok) { setApproved(result.data); approvedFields.current = { phoneNumber: fields.phoneNumber, address: fields.address }; onApproved?.(); }
       else setError(result.message);
     } catch { setError("تعذر التحقق من نتيجة الاعتماد. أعد المحاولة بنفس المسودة؛ لن يُنشأ طلب ثانٍ."); }
     finally { working.current = false; setPending(false); onWorking(false); }
@@ -97,9 +101,11 @@ export default function SocialInboxOrder({ scope, suggestedProduct, disabled, on
     if (value && changedAfterApproval) {
       setApproved(null); setReady(false); requestId.current = null; void prepare();
     } else if (value && !ready && !loading) void prepare();
-  }}><DialogTrigger asChild><Button size="sm" variant="outline" disabled={disabled} title="تجهيز طلب من بيانات المحادثة"><ClipboardCheck className="size-4" /><span className="hidden sm:inline">تجهيز طلب</span><span className="sr-only sm:hidden">تجهيز طلب</span></Button></DialogTrigger>
+  }}><DialogTrigger asChild>{fromComment
+      ? <Button size="sm" variant="outline" className="h-7 gap-1 border-emerald-500/50 px-2 text-xs text-emerald-800 dark:text-emerald-300" disabled={disabled} title="إنشاء الطلب من رقم الهاتف والعنوان في التعليق"><ClipboardCheck className="size-3.5" />تسجيل الطلب</Button>
+      : <Button size="sm" variant="outline" disabled={disabled} title="تجهيز طلب من بيانات المحادثة"><ClipboardCheck className="size-4" /><span className="hidden sm:inline">تجهيز طلب</span><span className="sr-only sm:hidden">تجهيز طلب</span></Button>}</DialogTrigger>
     <DialogContent dir="rtl" className="max-w-xl max-h-[90dvh] overflow-auto" onEscapeKeyDown={event => { if (pending) event.preventDefault(); }} onPointerDownOutside={event => { if (pending) event.preventDefault(); }}>
-      <DialogHeader><DialogTitle>{approved ? "تم اعتماد الطلب" : "تجهيز طلب من المحادثة"}</DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle>{approved ? "تم اعتماد الطلب" : fromComment ? "تسجيل طلب من التعليق" : "تجهيز طلب من المحادثة"}</DialogTitle></DialogHeader>
       {approved ? <div className="space-y-4">
         <p role="status" className="text-sm">{approved.replay ? "هذا الاعتماد محفوظ مسبقاً؛ أعدنا عرض الطلب نفسه." : approved.kind === "duplicate"
           ? "المنتج موجود في طلب سابق خلال 18 ساعة؛ احتفظنا بالكمية ولم نرسل تأكيداً مكرراً."
@@ -110,7 +116,7 @@ export default function SocialInboxOrder({ scope, suggestedProduct, disabled, on
         <Button variant="ghost" className="w-full" onClick={() => { setApproved(null); setReady(false); setProduct(null); requestId.current = null; void prepare(); }}>تجهيز منتج آخر</Button>
       </div> : loading ? <p role="status" className="flex items-center gap-2 text-sm"><Loader2 className="size-4 animate-spin" />جارٍ قراءة بيانات الحجز…</p> : <>
         <p className="text-xs text-muted-foreground">راجع المسودة قبل الاعتماد. الاسم ثابت «زبون»، والسعر والمخزون والتكرار تُراجع عند الحفظ بنفس مسار صفحة الهبوط.</p>
-        {linked.length > 0 && <div className="rounded-md border p-2 text-xs space-y-1"><p className="font-semibold">طلبات اعتمدت من هذه المحادثة</p>{linked.map(item => <Link key={item.id} className="block underline" href={`/${locale}/admin/orders?status=${encodeURIComponent(item.status)}&query=${encodeURIComponent(item.phoneNumber)}`}>#{item.id.slice(0, 8)} · {item.phoneNumber}</Link>)}</div>}
+        {linked.length > 0 && <div className="rounded-md border p-2 text-xs space-y-1"><p className="font-semibold">{fromComment ? "طلبات سُجّلت من هذا التعليق — تأكد أنك لا تكرره" : "طلبات اعتمدت من هذه المحادثة"}</p>{linked.map(item => <Link key={item.id} className="block underline" href={`/${locale}/admin/orders?status=${encodeURIComponent(item.status)}&query=${encodeURIComponent(item.phoneNumber)}`}>#{item.id.slice(0, 8)} · {item.phoneNumber}</Link>)}</div>}
         {warnings.length > 0 && <ul className="text-xs text-amber-700 dark:text-amber-400 space-y-1 list-disc ps-4">{warnings.map(warning => <li key={warning}>{warning}</li>)}</ul>}
         {ready && <form className="space-y-3" onSubmit={event => { event.preventDefault(); void approve(); }}>
           <fieldset disabled={pending} className="space-y-3">

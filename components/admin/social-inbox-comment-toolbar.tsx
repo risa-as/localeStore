@@ -58,7 +58,11 @@ export default function SocialInboxCommentToolbar({ library, product, productSou
       {bulk.result && <p>{bulk.result}</p>}
     </div> : groups.length > 0 && <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <Zap className="size-3.5 text-primary" /><span className="font-semibold">رد جماعي حسب الكلمات:</span>
-      {groups.map(group => <Button key={group.reply.id} size="sm" variant="outline" className="h-7" disabled={disabled} onClick={() => { setExcluded(new Set()); setConfirm(group); }}>
+      {groups.map(group => <Button key={group.reply.id} size="sm" variant="outline" className="h-7" disabled={disabled} onClick={() => {
+        // "We received your order" goes only to comments whose order is registered, unless ticked by hand.
+        setExcluded(new Set(group.reply.intents.includes("order") ? group.items.filter(item => !item.ordered).map(item => item.id) : []));
+        setConfirm(group);
+      }}>
         {group.reply.label} ({group.items.length})
       </Button>)}
     </div>}
@@ -73,13 +77,13 @@ export default function SocialInboxCommentToolbar({ library, product, productSou
           </DialogDescription>
         </DialogHeader>
         {ordersWarning && <p className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-800 dark:text-amber-300">
-          <AlertTriangle className="size-4 shrink-0" />هذه تعليقات فيها أرقام هواتف. تأكد أنك سجّلت طلباتهم في المتجر قبل أن تخبرهم بأن الطلب وصل.
+          <AlertTriangle className="size-4 shrink-0" />تعليقات فيها أرقام هواتف: حُدّدت فقط التي سجّلت طلبها بزر «تسجيل الطلب». سجّل الباقي أولاً حتى لا تخبر زبوناً بأن طلبه وصل وهو غير مسجّل.
         </p>}
         {confirm && <div className="max-h-52 overflow-auto rounded-md border divide-y">{confirm.items.map((item, index) => <label key={item.id}
           className={`flex items-start gap-2 p-2 text-xs ${index >= BULK_LIMIT ? "opacity-50" : ""}`}>
           <Checkbox checked={!excluded.has(item.id)} onCheckedChange={value => setExcluded(prev => {
             const next = new Set(prev); if (value === true) next.delete(item.id); else next.add(item.id); return next; })} />
-          <span className="min-w-0"><span className="font-semibold">{item.title}</span>: <span dir="auto">{item.text}</span></span>
+          <span className="min-w-0"><span className="font-semibold">{item.title}</span>{item.ordered && <span className="ms-1 text-emerald-700 dark:text-emerald-400">(سُجّل الطلب)</span>}: <span dir="auto">{item.text}</span></span>
         </label>)}</div>}
         {confirm && confirm.items.length - excluded.size > BULK_LIMIT && <p className="text-[11px] text-muted-foreground">سيُرد على أول {BULK_LIMIT}؛ شغّله مرة أخرى للباقي.</p>}
         {preview && (preview.missing.length

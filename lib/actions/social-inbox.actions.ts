@@ -6,7 +6,7 @@ import { getMetaConfig } from "@/lib/meta/config";
 import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
   sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId,
-  moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText, listPageAdPostIds,
+  moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText, listPageAdPostIds, readInboxComment,
   type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
 import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "@/lib/meta/inbox-receipts";
@@ -18,7 +18,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { insertOrderSchema } from "@/lib/validators";
 import { iraqGovernorates } from "@/lib/constants";
-import { extractInboxOrder, SOCIAL_ORDER_NAME } from "@/lib/meta/inbox-order";
+import { extractInboxOrder, digits, SOCIAL_ORDER_NAME } from "@/lib/meta/inbox-order";
 import { submitQuickOrder } from "@/lib/orders/quick-order";
 import { revalidatePath } from "next/cache";
 import { applyInboxDelivery } from "@/lib/meta/inbox-delivery-storage";
@@ -99,18 +99,44 @@ export async function searchSocialInboxOrdersByPhone(input: string) {
   });
 }
 
-export async function prepareSocialInboxOrder(input: { pageId: string; platform: SocialPlatform; handle: string; productId?: string }) {
+/** Orders from a comment are tied to `comment:<id>`, so the same comment cannot be ordered twice by accident. */
+type OrderSource = { kind: "comment"; postHandle: string };
+const sourceConversation = (ctx: InboxContext, handle: string, source?: OrderSource) =>
+  source?.kind === "comment" ? `comment:${resourceId(ctx, "comment", handle)}` : resourceId(ctx, "conversation", handle);
+
+/**
+ * Comments are one short line («رايد سيت بابل محاويل 0770…»), which the message
+ * extractor often leaves without an address. Fall back to the comment text minus
+ * the phone (for the admin to tidy), and accept numbers written without the 0.
+ */
+function commentOrderFields(text: string, parsed: ReturnType<typeof extractInboxOrder>) {
+  const plain = digits(text).replace(/[\u200e\u200f\u061c\u202a-\u202e\u2066-\u2069]/g, "");
+  const phoneMatch = plain.replace(/[\s\-–.()]/g, "").match(/(?<!\d)(?:\+?964|00964|0)?(7\d{9})(?!\d)/);
+  const phoneNumber = parsed.phoneNumber || (phoneMatch ? `0${phoneMatch[1]}` : "");
+  if (parsed.address) return { ...parsed, phoneNumber };
+  const rest = plain.replace(/(?:\+?964|00964|0)?\s*7\d(?:[\s\-–.()]*\d){8}/g, " ").replace(/\s+/g, " ").trim();
+  return { ...parsed, phoneNumber, address: rest.length >= 3 ? rest.slice(0, 1000) : "",
+    warnings: rest.length >= 3 ? [...parsed.warnings, "العنوان مأخوذ من نص التعليق كاملاً؛ احذف منه غير العنوان وأكمل أقرب نقطة دالة."] : parsed.warnings };
+}
+
+export async function prepareSocialInboxOrder(input: { pageId: string; platform: SocialPlatform; handle: string; productId?: string; source?: OrderSource }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
-    const conversationId = resourceId(ctx, "conversation", input.handle);
-    const messages = await readInboxMessages(ctx, input.handle);
-    const parsed = extractInboxOrder(messages.items);
+    const conversationId = sourceConversation(ctx, input.handle, input.source);
+    const fromComment = input.source?.kind === "comment";
+    const messages = fromComment ? { items: [await readInboxComment(ctx, input.handle)], after: null } : await readInboxMessages(ctx, input.handle);
+    const parsed = fromComment ? commentOrderFields(messages.items[0].text, extractInboxOrder(messages.items)) : extractInboxOrder(messages.items);
     const storefront = new URL(process.env.SOCIAL_INBOX_STOREFRONT_URL || SERVER_URL);
     const slugs = parsed.slugs.filter(link => link.host === storefront.host).map(link => link.slug);
+    const manual = input.productId ? z.string().uuid().parse(input.productId) : null;
+    // A comment's product is the post's product (published-for, ad button link, links in the post).
+    const postProducts = fromComment ? await resolvePostProducts(ctx, input.source!.postHandle, manual) : [];
     const products = await prisma.product.findMany({
-      where: { ...EXCLUDE_INTERNAL_PRODUCTS, OR: [...(input.productId ? [{ id: z.string().uuid().parse(input.productId) }] : []), { slug: { in: slugs } }] },
+      where: { ...EXCLUDE_INTERNAL_PRODUCTS, OR: [...(manual ? [{ id: manual }] : []), { slug: { in: slugs } }, { id: { in: postProducts.map(product => product.id) } }] },
       select: { id: true, name: true, slug: true, images: true, price: true, shippingPrice: true, stock: true, colors: true, offers: true }, take: 20,
     });
+    const rank = new Map([manual, ...postProducts.map(product => product.id)].filter((id): id is string => !!id).map((id, index) => [id, index]));
+    products.sort((a, b) => (rank.get(a.id) ?? 99) - (rank.get(b.id) ?? 99));
     const available = await getAvailableStocks(products);
     const linked = await prisma.socialInboxOrder.findMany({ where: { pageId: ctx.pageId, platform: ctx.platform, conversationId },
       orderBy: { createdAt: "desc" }, take: 5,
@@ -129,11 +155,11 @@ export async function prepareSocialInboxOrder(input: { pageId: string; platform:
 
 export async function approveSocialInboxOrder(input: {
   pageId: string; platform: SocialPlatform; handle: string; requestId: string; productId: string;
-  phoneNumber: string; governorate: string; address: string; quantity: number; selectedColor?: string | null;
+  phoneNumber: string; governorate: string; address: string; quantity: number; selectedColor?: string | null; source?: OrderSource;
 }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
-    const conversationId = resourceId(ctx, "conversation", input.handle);
+    const conversationId = sourceConversation(ctx, input.handle, input.source);
     const requestId = z.string().uuid().parse(input.requestId);
     const productId = z.string().uuid().parse(input.productId);
     const data = insertOrderSchema.parse({ ...input, fullName: SOCIAL_ORDER_NAME,
@@ -249,7 +275,10 @@ export async function getSocialInboxDetail(input: { pageId: string; platform: So
       return { ...detail, items: await applyInboxDelivery(ctx, detail.recipientId, detail.items) };
     }
     if (input.kind !== "comments" && input.kind !== "replies") throw new Error("قسم غير صالح");
-    return { ...await readInboxComments(ctx, input.handle, input.kind === "replies", input.after), window: null };
+    const page = await readInboxComments(ctx, input.handle, input.kind === "replies", input.after);
+    const ordered = new Set((await prisma.socialInboxOrder.findMany({ where: { pageId: ctx.pageId, platform: ctx.platform,
+      conversationId: { in: page.items.map(item => `comment:${item.id}`) } }, select: { conversationId: true } })).map(row => row.conversationId));
+    return { ...page, items: page.items.map(item => ordered.has(`comment:${item.id}`) ? { ...item, ordered: true } : item), window: null };
   });
 }
 
@@ -292,26 +321,29 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
 export async function getSocialInboxPostProducts(input: { pageId: string; platform: SocialPlatform; handle: string; productId?: string | null }) {
   return attempt(async (): Promise<InboxProduct[]> => {
     const ctx = await context(input.pageId, input.platform);
-    const manual = input.productId ? z.string().uuid().parse(input.productId) : null;
-    const post = await readInboxPostText(ctx, input.handle);
-    const published = await prisma.socialPost.findFirst({
-      where: ctx.platform === "instagram" ? { igPostId: post.id } : { fbPostId: post.id }, select: { productId: true } });
-    const storefront = new URL(process.env.SOCIAL_INBOX_STOREFRONT_URL || SERVER_URL);
-    const slugs = extractInboxOrder([{ id: post.id, handle: "", title: "", text: post.text, time: "" }]).slugs
-      .filter(link => link.host === storefront.host).map(link => link.slug);
-    const ids = [manual, published?.productId].filter((id): id is string => !!id);
-    if (!ids.length && !slugs.length) return [];
-    const products = await prisma.product.findMany({
-      where: { ...EXCLUDE_INTERNAL_PRODUCTS, OR: [...(ids.length ? [{ id: { in: ids } }] : []), ...(slugs.length ? [{ slug: { in: slugs } }] : [])] },
-      select: { id: true, name: true, slug: true, images: true, price: true, shippingPrice: true, stock: true, colors: true, offers: true }, take: 5,
-    });
-    const available = await getAvailableStocks(products);
-    const rank = (id: string) => id === manual ? 0 : id === published?.productId ? 1 : 2;
-    return products.sort((a, b) => rank(a.id) - rank(b.id)).map(product => ({ id: product.id, name: product.name, slug: product.slug,
-      image: product.images[0] || null, price: Number(product.price), shippingPrice: Number(product.shippingPrice),
-      available: available.get(product.id) || 0, colors: product.colors, offers: product.offers,
-      url: new URL(`/ar/landing/${encodeURIComponent(product.slug)}`, storefront.origin).toString() }));
+    return resolvePostProducts(ctx, input.handle, input.productId ? z.string().uuid().parse(input.productId) : null);
   });
+}
+
+async function resolvePostProducts(ctx: InboxContext, postHandle: string, manual: string | null): Promise<InboxProduct[]> {
+  const post = await readInboxPostText(ctx, postHandle);
+  const published = await prisma.socialPost.findFirst({
+    where: ctx.platform === "instagram" ? { igPostId: post.id } : { fbPostId: post.id }, select: { productId: true } });
+  const storefront = new URL(process.env.SOCIAL_INBOX_STOREFRONT_URL || SERVER_URL);
+  const slugs = extractInboxOrder([{ id: post.id, handle: "", title: "", text: post.text, time: "" }]).slugs
+    .filter(link => link.host === storefront.host).map(link => link.slug);
+  const ids = [manual, published?.productId].filter((id): id is string => !!id);
+  if (!ids.length && !slugs.length) return [];
+  const products = await prisma.product.findMany({
+    where: { ...EXCLUDE_INTERNAL_PRODUCTS, OR: [...(ids.length ? [{ id: { in: ids } }] : []), ...(slugs.length ? [{ slug: { in: slugs } }] : [])] },
+    select: { id: true, name: true, slug: true, images: true, price: true, shippingPrice: true, stock: true, colors: true, offers: true }, take: 5,
+  });
+  const available = await getAvailableStocks(products);
+  const rank = (id: string) => id === manual ? 0 : id === published?.productId ? 1 : 2;
+  return products.sort((a, b) => rank(a.id) - rank(b.id)).map(product => ({ id: product.id, name: product.name, slug: product.slug,
+    image: product.images[0] || null, price: Number(product.price), shippingPrice: Number(product.shippingPrice),
+    available: available.get(product.id) || 0, colors: product.colors, offers: product.offers,
+    url: new URL(`/ar/landing/${encodeURIComponent(product.slug)}`, storefront.origin).toString() }));
 }
 
 /** Public and/or private reply to a comment; see replyToComment for the send order. */
