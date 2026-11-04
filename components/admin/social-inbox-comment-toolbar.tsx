@@ -22,11 +22,11 @@ const FIELDS = ["الاسم", "المنتج", "السعر", "التوصيل", "�
 export const BULK_LIMIT = 30;
 
 export default function SocialInboxCommentToolbar({ library, product, productSource, productLoading, productError, onChooseProduct,
-  groups, bulk, disabled, onStartBulk, onCancelBulk }: {
+  groups, bulk, disabled, onStartBulk, onCancelBulk, onDismissBulk }: {
   library: CommentReplyLibrary; product: InboxProduct | null; productSource: "manual" | "auto" | null;
   productLoading: boolean; productError: string; onChooseProduct: (product: InboxProduct | null) => void;
   groups: BulkGroup[]; bulk: BulkState | null; disabled: boolean;
-  onStartBulk: (reply: CommentReply, items: InboxItem[]) => void; onCancelBulk: () => void;
+  onStartBulk: (reply: CommentReply, items: InboxItem[]) => void; onCancelBulk: () => void; onDismissBulk: () => void;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [confirm, setConfirm] = useState<BulkGroup | null>(null);
@@ -53,10 +53,13 @@ export default function SocialInboxCommentToolbar({ library, product, productSou
         {bulk.running && <Loader2 className="size-3.5 animate-spin" />}
         <span className="font-semibold">رد جماعي «{bulk.label}»: {bulk.done}/{bulk.total}</span>
         <span className="text-muted-foreground">أُرسل {bulk.sent} · تُخطّي {bulk.skipped}</span>
-        {bulk.running && <Button size="sm" variant="outline" className="h-6 ms-auto gap-1" onClick={onCancelBulk}><Square className="size-3" />إيقاف</Button>}
+        {bulk.running ? <Button size="sm" variant="outline" className="h-6 ms-auto gap-1" onClick={onCancelBulk}><Square className="size-3" />إيقاف</Button>
+          : <button type="button" className="ms-auto rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="إغلاق النتيجة" onClick={onDismissBulk}><X className="size-3.5" /></button>}
       </div>
       {bulk.result && <p>{bulk.result}</p>}
-    </div> : groups.length > 0 && <div className="flex flex-wrap items-center gap-1.5 text-xs">
+    </div> : null}
+    {/* The options come back as soon as a run ends, with what is still waiting. */}
+    {!bulk?.running && groups.length > 0 && <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <Zap className="size-3.5 text-primary" /><span className="font-semibold">رد جماعي حسب الكلمات:</span>
       {groups.map(group => <Button key={group.reply.id} size="sm" variant="outline" className="h-7" disabled={disabled} onClick={() => {
         // "We received your order" goes only to comments whose order is registered, unless ticked by hand.

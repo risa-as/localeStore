@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EyeOff, Loader2, Square, Trash2 } from "lucide-react";
+import { EyeOff, Loader2, Square, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,9 +14,9 @@ export type BulkModerationState = { action: "hide" | "delete"; total: number; do
  * the product down). Hiding is the safe default: the commenter and their friends
  * still see it, so they do not notice, and it can be undone.
  */
-export default function SocialInboxBulkModeration({ items, label, platform, state, disabled, onRun, onCancel }: {
+export default function SocialInboxBulkModeration({ items, label, platform, state, disabled, onRun, onCancel, onDismiss }: {
   items: InboxItem[]; label: string; platform: SocialPlatform; state: BulkModerationState | null; disabled: boolean;
-  onRun: (action: "hide" | "delete", items: InboxItem[]) => void; onCancel: () => void;
+  onRun: (action: "hide" | "delete", items: InboxItem[]) => void; onCancel: () => void; onDismiss: () => void;
 }) {
   const [action, setAction] = useState<"hide" | "delete" | null>(null);
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
@@ -31,8 +31,10 @@ export default function SocialInboxBulkModeration({ items, label, platform, stat
       <span className="font-semibold">{state.action === "hide" ? "إخفاء" : "حذف"} «{label}»: {state.done}/{state.total}</span>
       {state.failed > 0 && <span className="text-destructive">تعذّر {state.failed}</span>}
       {state.result && <span>{state.result}</span>}
-      {state.running && <Button size="sm" variant="outline" className="h-6 ms-auto gap-1" onClick={onCancel}><Square className="size-3" />إيقاف</Button>}
-    </div> : items.length > 0 && <div className="flex flex-wrap items-center gap-1.5 text-xs">
+      {state.running ? <Button size="sm" variant="outline" className="h-6 ms-auto gap-1" onClick={onCancel}><Square className="size-3" />إيقاف</Button>
+        : <button type="button" className="ms-auto rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="إغلاق النتيجة" onClick={onDismiss}><X className="size-3.5" /></button>}
+    </div> : null}
+    {!state?.running && items.length > 0 && <div className="flex flex-wrap items-center gap-1.5 text-xs">
       <span className="text-muted-foreground">لكل «{label}» المعروضة:</span>
       <Button size="sm" variant="outline" className="h-7 gap-1 px-2" disabled={disabled || visibleCount === 0} onClick={() => { setExcluded(new Set()); setAction("hide"); }}>
         <EyeOff className="size-3.5" />إخفاء الكل ({visibleCount})

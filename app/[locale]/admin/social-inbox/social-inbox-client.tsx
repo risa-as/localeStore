@@ -723,7 +723,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               productLoading={productLoading} productError={postProducts?.key === postProductKey ? postProducts.error : ""}
               onChooseProduct={product => { productChoice.choose(product?.id ?? null); if (!product) setOrderProducts(prev => ({ ...prev, [selected.id]: undefined })); }}
               groups={bulkGroups} bulk={bulk?.postId === selected.id ? bulk : null} disabled={busy}
-              onStartBulk={(reply, items) => void runBulk(reply, items)} onCancelBulk={() => { bulkCancel.current = true; }} />}
+              onStartBulk={(reply, items) => void runBulk(reply, items)} onCancelBulk={() => { bulkCancel.current = true; }} onDismissBulk={() => setBulk(null)} />}
             {kind === "comments" && detail.items.length > 0 && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="فلترة التعليقات">
               {([["all", "الكل", detail.items.filter(item => !item.outgoing).length], ["waiting", "بانتظار الرد", intentCounts.get("waiting") || 0],
                 ...COMMENT_INTENTS.map(intent => [intent.value, intent.label, intentCounts.get(intent.value) || 0] as const)] as const)
@@ -738,7 +738,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               items={filteredComments.filter(item => !item.outgoing && !item.system)}
               label={commentFilter === "waiting" ? "بانتظار الرد" : COMMENT_INTENTS.find(intent => intent.value === commentFilter)?.label || ""}
               platform={platform} disabled={busy} state={bulkModeration?.postId === selected.id ? bulkModeration : null}
-              onRun={(action, items) => void runBulkModeration(action, items)} onCancel={() => { moderationCancel.current = true; }} />}
+              onRun={(action, items) => void runBulkModeration(action, items)} onCancel={() => { moderationCancel.current = true; }} onDismiss={() => setBulkModeration(null)} />}
             {loadingDetail && !detailItems.length ? <Loading /> : !detailItems.length ? <p className="text-sm text-muted-foreground">{detailError ? "تعذر تحميل المحتوى" : "لا يوجد محتوى متاح"}</p> : kind === "comments" ? <>
               <p className="text-[11px] text-muted-foreground">تُجمع تعليقات الزبون على هذا المنشور بحسب هويته. التجميع يشمل التعليقات المحمّلة{detail.after ? "؛ حمّل المزيد لإضافة الأقدم." : "."}</p>
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}
