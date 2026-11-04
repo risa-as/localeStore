@@ -3,6 +3,7 @@ import { graphGet, graphPost, graphDelete, GraphError } from "./graph";
 import type { InboxMedia } from "./inbox-media";
 import type { InboxProduct } from "./inbox-tools";
 import type { DeliveryStatus } from "./inbox-delivery";
+import { UNKNOWN_AUTHOR } from "./comment-replies";
 
 export type SocialPlatform = "facebook" | "instagram";
 export type InboxContext = {
@@ -378,7 +379,7 @@ export async function readInboxComments(ctx: InboxContext, handle: string, repli
   });
   return { items: (res.data ?? []).map(c => ({ id: c.id, handle: resourceHandle(ctx, "comment", c.id),
     authorId: c.from?.id, authorUsername: c.username || c.from?.username,
-    title: c.from?.name || c.username || c.from?.username || "زبون", text: c.text || c.message || "[تعليق غير نصي]",
+    title: c.from?.name || c.username || c.from?.username || UNKNOWN_AUTHOR, text: c.text || c.message || "[تعليق غير نصي]",
     time: c.timestamp || c.created_time || "", outgoing: own(ctx, c.from?.id),
     ...(c.is_hidden || c.hidden ? { hidden: true } : {}) })), after: next(res) };
 }

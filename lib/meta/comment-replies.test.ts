@@ -47,6 +47,14 @@ it("fills product details and never tells the customer it is out of stock", () =
   expect(out.privateText).toContain(product.url);
 });
 
+it("leaves the name out cleanly when Meta does not return it", () => {
+  const greet = reply({ publicText: "راسلناك بالخاص {الاسم} 🌷", privateText: "أهلاً {الاسم}، سعر {المنتج}" });
+  expect(expandCommentReply(greet, "زبون", product)).toMatchObject({ publicText: "راسلناك بالخاص 🌷", privateText: "أهلاً، سعر مسدس تنظيف" });
+  expect(expandCommentReply(greet, "", product).publicText).toBe("راسلناك بالخاص 🌷");
+  expect(expandCommentReply(reply({ publicText: "{الاسم}، شكراً" }), "زبون", null).publicText).toBe("شكراً");
+  expect(expandCommentReply(greet, "علي", product).publicText).toBe("راسلناك بالخاص علي 🌷");
+});
+
 it("reports the fields that still need a product", () => {
   expect(expandCommentReply(reply({ publicText: "مرحبا {الاسم}", privateText: "{السعر}" }), "علي", null).missing).toEqual(["السعر"]);
 });

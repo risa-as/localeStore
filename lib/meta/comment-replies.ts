@@ -89,10 +89,22 @@ export function pickVariant(text: string, index: number) {
   return variants.length ? variants[((index % variants.length) + variants.length) % variants.length] : "";
 }
 
+/** The title the inbox shows when Meta does not return the commenter's name. */
+export const UNKNOWN_AUTHOR = "زبون";
+
+/** Fills {الاسم} with the commenter's name, or leaves it out (with tidy spacing) when unknown. */
+function fillName(text: string, name: string) {
+  const known = name.trim() && name.trim() !== UNKNOWN_AUTHOR ? name.trim() : "";
+  const filled = text.replace(/\{\s*الاسم\s*\}/g, known);
+  if (known) return filled;
+  return filled.split("\n").map(line => line.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+([،,.!؟?:])/g, "$1")
+    .replace(/^[ \t]*[،,][ \t]*/, "").trim()).join("\n");
+}
+
 /** Fills placeholders; `missing` lists fields that need a product (or are unknown). */
 export function expandCommentReply(reply: CommentReply, name: string, product: InboxProduct | null, index = 0) {
-  const publicPart = expandQuickReply(pickVariant(reply.publicText, index), name, product);
-  const privatePart = expandQuickReply(reply.privateText.trim(), name, product);
+  const publicPart = expandQuickReply(fillName(pickVariant(reply.publicText, index), name), name, product);
+  const privatePart = expandQuickReply(fillName(reply.privateText.trim(), name), name, product);
   return { publicText: publicPart.text, privateText: privatePart.text,
     missing: [...new Set([...publicPart.missing, ...privatePart.missing])] };
 }
