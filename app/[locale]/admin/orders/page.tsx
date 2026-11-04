@@ -26,6 +26,7 @@ import {
 
 // n8n
 import { prisma } from "@/db/prisma";
+import { getStockShortProducts } from "@/lib/inventory";
 //
 export const metadata: Metadata = {
   title: "الطلبات",
@@ -122,6 +123,16 @@ const AdminOrdersPage = async (props: {
     // Scoped to the same status tab + search as the table below.
     getOrdersSummaryStats({ query: searchText, status }),
   ]);
+
+  // Orders are accepted even when stock runs out; flag those not yet shipped.
+  const notShipped = orders.data.filter((o: { inventoryDispatchedAt: Date | null; inventoryReturnedAt: Date | null }) =>
+    !o.inventoryDispatchedAt || o.inventoryReturnedAt);
+  const shortProducts = await getStockShortProducts(
+    notShipped.flatMap((o: { orderitems: { productId: string }[] }) => o.orderitems.map((i) => i.productId)));
+  const stockShort = Object.fromEntries(notShipped
+    .map((o: { id: string; orderitems: { productId: string; name: string }[] }) =>
+      [o.id, o.orderitems.filter((i) => shortProducts.has(i.productId)).map((i) => i.name)] as const)
+    .filter(([, names]) => names.length > 0));
 
   const t = await getTranslations("Admin");
 
@@ -274,6 +285,7 @@ const AdminOrdersPage = async (props: {
         sort={sort}
         status={status}
         failedPhone={Array.from(failedPhone)}
+        stockShort={stockShort}
       />
 
       {orders.totalPages > 1 && (

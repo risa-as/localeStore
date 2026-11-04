@@ -21,9 +21,9 @@ export async function transitionOrder(tx: OrderTransaction, orderId: string, sta
     const now = new Date();
     for (const item of [...order.orderitems].sort((a, b) => a.productId.localeCompare(b.productId))) {
       await tx.$queryRaw`SELECT id FROM "Product" WHERE id = ${item.productId}::uuid FOR UPDATE`;
-      const product = await tx.product.findUniqueOrThrow({ where: { id: item.productId }, select: { stock: true } });
-      const occupied = await tx.orderItem.aggregate({ where: { productId: item.productId, orderId: { not: orderId }, order: { OR: [{ status: { in: dispatched } }, { status: "home", reservationExpiresAt: { gt: new Date() } }] } }, _sum: { qty: true } });
-      if (item.qty <= 0 || item.qty > product.stock - (occupied._sum.qty ?? 0)) throw new Error(`المخزون غير كافٍ: ${item.name}`);
+      // A short product never blocks dispatch: the shortfall below gets a
+      // batch-less allocation at the item's cost, and the admin orders page flags it.
+      if (item.qty <= 0) throw new Error(`كمية غير صالحة: ${item.name}`);
       const batches = await tx.productBatch.findMany({ where: { productId: item.productId, createdAt: { lte: now } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
       const allocations = await tx.inventoryAllocation.findMany({ where: { productId: item.productId, returnedAt: null } });
       const consumed = new Map<string, number>();

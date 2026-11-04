@@ -55,6 +55,7 @@ import {
   ChevronUp,
   Package,
   Send,
+  AlertTriangle,
 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -81,6 +82,7 @@ const OrderRow = memo(function OrderRow({
   showCollectedPrice,
   // n8n
   isWhatsappFailed,
+  shortItems,
 }: {
   order: any;
   index: number;
@@ -93,6 +95,7 @@ const OrderRow = memo(function OrderRow({
   showBarcode: boolean;
   showCollectedPrice: boolean;
   isWhatsappFailed: boolean;
+  shortItems?: string[];
 }) {
   return (
     <TableRow key={order.id} data-state={isSelected ? "selected" : undefined}>
@@ -113,6 +116,15 @@ const OrderRow = memo(function OrderRow({
               .map((item: any) => `${item.name} ×${item.qty ?? 1}`)
               .join("، ")
           : t("noItems")}
+        {shortItems && shortItems.length > 0 && (
+          <span
+            className="mt-1 flex w-fit items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-semibold text-red-700"
+            title={`نفدت الكمية في المخزون: ${shortItems.join("، ")} — الطلب مقبول، جهّز الكمية قبل التوصيل`}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            نفد المخزون{shortItems.length < (order.orderitems?.length ?? 0) ? `: ${shortItems.join("، ")}` : ""}
+          </span>
+        )}
       </TableCell>
       {/* <TableCell>
         <a
@@ -291,6 +303,7 @@ export default function OrdersTable({
   sort,
   status,
   failedPhone,
+  stockShort,
 }: {
   orders: any[];
   page: number;
@@ -299,6 +312,8 @@ export default function OrdersTable({
   status?: string;
   // n8n
   failedPhone: string[];
+  /** order id → names of its products that are out of stock (admin-only flag) */
+  stockShort?: Record<string, string[]>;
 }) {
   const t = useTranslations("Admin");
   const showBarcode = true;
@@ -738,6 +753,7 @@ export default function OrdersTable({
                 showBarcode={showBarcode}
                 showCollectedPrice={showCollectedPrice}
                 isWhatsappFailed={failedPhonesSet.has(order.phoneNumber)} // ← أضف هذا
+                shortItems={stockShort?.[order.id]}
               />
             ))}
           </TableBody>

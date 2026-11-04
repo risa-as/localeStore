@@ -187,6 +187,17 @@ async function getOffersByProductId(
   return new Map(products.map((p) => [p.id, p.offers]));
 }
 
+/**
+ * The message a customer sees when an order fails. Our own checks throw Arabic
+ * messages meant for the customer; anything else (database, network) gets a
+ * plain Arabic retry message instead of the generic English one.
+ */
+function customerOrderError(error: unknown) {
+  if (error instanceof z.ZodError) return "يرجى التأكد من بيانات الطلب ثم المحاولة مرة أخرى";
+  if (error instanceof Error && /\p{Script=Arabic}/u.test(error.message)) return error.message;
+  return "تعذّر إرسال الطلب، يرجى المحاولة مرة أخرى";
+}
+
 // Create Quick Order (Direct from Landing Page)
 export async function createQuickOrder(
   data: z.infer<typeof insertOrderSchema>,
@@ -215,8 +226,7 @@ export async function createQuickOrder(
   } catch (error) {
     console.error("Error in createQuickOrder:", error);
     if (isRedirectError(error)) throw error;
-    const { success, formError } = formatError(error);
-    return { success, message: formError };
+    return { success: false, message: customerOrderError(error) };
   }
 }
 
@@ -512,8 +522,7 @@ export async function createOrder(data: z.infer<typeof insertOrderSchema>) {
   } catch (error) {
     console.error("Error in createQuickOrder:", error);
     if (isRedirectError(error)) throw error;
-    const { success, formError } = formatError(error);
-    return { success, message: formError };
+    return { success: false, message: customerOrderError(error) };
   }
 }
 

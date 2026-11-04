@@ -62,3 +62,25 @@ export async function getAvailableStocks(products: { id: string; stock: number }
   return new Map(products.map(product => [product.id,
     Math.max(0, product.stock - (sold.get(product.id) || 0) - (reservations.get(product.id) || 0))]));
 }
+
+/**
+ * Products that are oversold: received stock minus what left the warehouse and
+ * what live `home` orders hold is below zero. Orders are never rejected for
+ * stock, so this is how the admin orders page flags them. Unlike
+ * getAvailableStocks it does not clamp at 0 — an order that takes the last unit
+ * leaves exactly 0 and is not flagged.
+ */
+export async function getStockShortProducts(productIds: string[]): Promise<Set<string>> {
+  const ids = [...new Set(productIds)];
+  if (!ids.length) return new Set();
+  const [products, sold, held] = await Promise.all([
+    prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, stock: true } }),
+    getSoldQuantities(ids),
+    prisma.orderItem.groupBy({ by: ["productId"], where: { productId: { in: ids },
+      order: { status: "home", reservationExpiresAt: { gt: new Date() } } }, _sum: { qty: true } }),
+  ]);
+  const holds = new Map(held.map(item => [item.productId, item._sum.qty || 0]));
+  return new Set(products
+    .filter(product => product.stock - (sold.get(product.id) || 0) - (holds.get(product.id) || 0) < 0)
+    .map(product => product.id));
+}

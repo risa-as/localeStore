@@ -81,7 +81,7 @@ export function QuickOrderForm({ product, availableStock }: QuickOrderFormProps)
             if (!res.success) {
                 toast({
                     variant: "destructive",
-                    title: "Error",
+                    title: "تنبيه",
                     description: res.message,
                 });
                 return;

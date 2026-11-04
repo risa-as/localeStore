@@ -53,3 +53,15 @@ it("repeated transitions do not allocate twice or create another return inquiry"
   expect(outbox.size).toBe(1);
   await expect(transitionOrder(tx, "A", "home", "test")).rejects.toThrow();
 });
+
+it("dispatches an order even when stock ran out, costing the shortfall at the item's cost", async () => {
+  const { tx, orders, allocations } = fixture();
+  orders.set("D", { ...structuredClone(orders.get("A")), id: "D" });
+  for (const id of ["A", "B", "C"]) await transitionOrder(tx, id, "pending", "test");
+  // The two batches (3 units) are used up; D still goes to the courier.
+  await expect(transitionOrder(tx, "D", "pending", "test")).resolves.toBe(true);
+  expect(orders.get("D").status).toBe("pending");
+  expect(allocations.filter(a => a.orderId === "D")).toEqual([expect.objectContaining({ quantity: 1, unitCost: 99 })]);
+  expect(allocations.find(a => a.orderId === "D").batchId).toBeUndefined();
+  expect(orders.get("D").orderitems[0].costTotal).toBe(99);
+});
