@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { getSocialInboxList, getSocialInboxDetail, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, markSocialInboxRead,
   moderateSocialInboxComment, getSocialInboxPostProducts, replyToSocialInboxComment, type getSocialInboxSetup } from "@/lib/actions/social-inbox.actions";
 import { expandCommentReply, matchCommentReply, type CommentReply } from "@/lib/meta/comment-replies";
+import { COMMENT_INTENTS, type CommentIntent } from "@/lib/meta/comment-intent";
 import { useSocialCommentReplies, usePostProductChoice } from "@/components/admin/use-social-comment-replies";
 import SocialInboxCommentToolbar, { type BulkState, type BulkGroup } from "@/components/admin/social-inbox-comment-toolbar";
 import type { InboxItem, InboxPage, InboxReplyWindow, SocialPlatform } from "@/lib/meta/inbox";
@@ -128,6 +129,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   const variantTurn = useRef(0);
   const prefilled = useRef(new Set<string>());
   const [postProducts, setPostProducts] = useState<{ key: string; products: InboxProduct[]; error: string } | null>(null);
+  const [commentFilter, setCommentFilter] = useState<"all" | "waiting" | CommentIntent>("all");
+  const [loadingAll, setLoadingAll] = useState(false);
   const [mediaDrafts, setMediaDrafts] = useState<Record<string, MediaDraft>>({});
   const mediaDraftsRef = useRef<Record<string, MediaDraft>>({});
   const filePicker = useRef<HTMLInputElement>(null);
@@ -154,7 +157,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     selectedId.current = item.id;
     setSelected(item); setMobileDetail(true); setTarget(null); setThread(null); setReplies(EMPTY);
     ++replySeq.current; setLoadingReplies(false); setDetail(EMPTY); loadedThread.current = "";
-    setNotice(""); setReplyError(""); setDeliveryError(""); setHandledComments(new Set());
+    setNotice(""); setReplyError(""); setDeliveryError(""); setHandledComments(new Set()); setCommentFilter("all");
     void loadDetail(item, undefined, true);
   }
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
@@ -323,7 +326,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   /** Open a comment for reply; if its keywords match a public-only reply, prefill it (once, never over a draft). */
   function selectTarget(item: InboxItem) {
     setTarget(item); setThread(item); setReplies(EMPTY); void loadReplies(item);
-    const suggestion = matchCommentReply(item.text, commentReplies.replies);
+    const suggestion = matchCommentReply(item.text, commentReplies.replies, item.intent);
     const key = commentDraftKey(item);
     if (!suggestion || suggestion.privateText.trim() || (drafts[key] || "").trim() || prefilled.current.has(item.id)) return;
     const expanded = expandCommentReply(suggestion, item.title, postProduct, variantTurn.current++);
@@ -363,7 +366,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
         return;
       }
       recordCommentReply(item, data.publicId, expanded.publicText);
-      const next = nextAwaiting(detail.items.filter(entry => !entry.hidden), item.id, handledNow);
+      const next = nextAwaiting(detail.items.filter(entry => !entry.hidden && !entry.answered), item.id, handledNow);
       setNotice(`${data.privateId ? "أُرسلت الرسالة الخاصة و" : ""}نُشر الرد على ${item.title}.${next ? "" : " لا تعليقات أخرى بانتظار الرد ضمن المحمّل."}`);
       if (next) selectTarget(next); else setTarget(null);
     } catch { if (alive.current) setReplyError("لم نستلم تأكيد Meta؛ تحقّق من التعليق قبل إعادة المحاولة"); }
@@ -413,9 +416,38 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     }
   }
 
-  const bulkGroups: BulkGroup[] = kind === "comments" ? commentReplies.replies.filter(reply => reply.keywords.length).map(reply => ({ reply,
-    items: detail.items.filter(item => !item.outgoing && !item.system && !item.hidden && !handledComments.has(item.id) &&
-      matchCommentReply(item.text, commentReplies.replies)?.id === reply.id).slice(0, 30) })).filter(group => group.items.length) : [];
+  // Comments still waiting: from a customer, not hidden, not answered by the Page, not handled now.
+  const waitingComment = (item: InboxItem) => !item.outgoing && !item.system && !item.hidden && !item.answered && !handledComments.has(item.id);
+  // Questions, complaints and follow-ups need a person; never bulk-answer them with a template.
+  const MANUAL_INTENTS: CommentIntent[] = ["question", "complaint", "followup"];
+  const bulkGroups: BulkGroup[] = kind === "comments" ? commentReplies.replies.filter(reply => reply.keywords.length || reply.intents.length).map(reply => ({ reply,
+    items: detail.items.filter(item => waitingComment(item) && !MANUAL_INTENTS.includes(item.intent as CommentIntent) &&
+      matchCommentReply(item.text, commentReplies.replies, item.intent)?.id === reply.id) })).filter(group => group.items.length) : [];
+  const intentCounts = new Map<string, number>();
+  if (kind === "comments") for (const item of detail.items) if (!item.outgoing && item.intent) {
+    intentCounts.set(item.intent, (intentCounts.get(item.intent) || 0) + 1);
+    if (waitingComment(item)) intentCounts.set("waiting", (intentCounts.get("waiting") || 0) + 1);
+  }
+
+  /** Load every comment of the post (up to 1,000) so filters and bulk replies cover all of them. */
+  async function loadAllComments() {
+    if (!selected || loadingAll || !detail.after) return;
+    const postId = selected.id;
+    setLoadingAll(true); pauseRefresh(); setDetailError("");
+    let after: string | null = detail.after;
+    const collected: InboxItem[] = [];
+    try {
+      while (after && detail.items.length + collected.length < 1000) {
+        const result = await getSocialInboxDetail({ pageId, platform, kind: "comments", handle: selected.handle, after });
+        if (!alive.current || selectedId.current !== postId) return;
+        if (!result.ok) { setDetailError(result.message); break; }
+        collected.push(...result.data.items);
+        after = result.data.after;
+      }
+      setDetail(prev => ({ ...prev, items: merge(prev.items, collected), after }));
+    } catch { if (alive.current) setDetailError("تعذر تحميل كل التعليقات"); }
+    finally { if (alive.current) setLoadingAll(false); }
+  }
 
   async function moderateComment(item: InboxItem, action: CommentAction, alsoDelete: InboxItem[] = []) {
     // Drop any in-flight refresh so it cannot bring back a comment we just removed.
@@ -582,7 +614,9 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   ];
   const visible = matching.filter(filters.find(option => option.value === filter)?.matches || filters[0].matches);
   const detailItems = kind === "messages" ? mergeOutbox(detail.items, scopeEntries.filter(entry => entry.conversationId === selected?.id)).filter(item => !item.commentCopy).sort((a, b) => Date.parse(a.time) - Date.parse(b.time)) : detail.items;
-  const commentGroups = kind === "comments" ? groupInboxComments(detail.items) : [];
+  const filteredComments = kind !== "comments" || commentFilter === "all" ? detail.items
+    : detail.items.filter(item => commentFilter === "waiting" ? waitingComment(item) : item.intent === commentFilter);
+  const commentGroups = kind === "comments" ? groupInboxComments(filteredComments) : [];
   const replyWindowText = privateReply
     ? privateReplyConsumed || detail.window?.reason === "private-reply-sent" ? "الرد الخاص على التعليق لا يفتح نافذة المحادثة؛ انتظر رسالة خاصة جديدة من الزبون قبل إرسال المزيد."
       : detail.window?.reason === "private-reply-expired" ? "انتهت مهلة الرد الخاص على هذا التعليق (7 أيام)."
@@ -652,6 +686,15 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
               onChooseProduct={product => { productChoice.choose(product?.id ?? null); if (!product) setOrderProducts(prev => ({ ...prev, [selected.id]: undefined })); }}
               groups={bulkGroups} bulk={bulk?.postId === selected.id ? bulk : null} disabled={busy}
               onStartBulk={(reply, items) => void runBulk(reply, items)} onCancelBulk={() => { bulkCancel.current = true; }} />}
+            {kind === "comments" && detail.items.length > 0 && <div className="flex flex-wrap items-center gap-1" role="group" aria-label="فلترة التعليقات">
+              {([["all", "الكل", detail.items.filter(item => !item.outgoing).length], ["waiting", "بانتظار الرد", intentCounts.get("waiting") || 0],
+                ...COMMENT_INTENTS.map(intent => [intent.value, intent.label, intentCounts.get(intent.value) || 0] as const)] as const)
+                .filter(([value, , count]) => value === "all" || value === "waiting" || count > 0)
+                .map(([value, label, count]) => <Button key={value} size="sm" className="h-7 px-2 text-xs" variant={commentFilter === value ? "default" : "outline"}
+                  title={COMMENT_INTENTS.find(intent => intent.value === value)?.hint} onClick={() => setCommentFilter(value as typeof commentFilter)}>{label} ({count})</Button>)}
+              {detail.after && <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" disabled={loadingAll || busy} onClick={() => void loadAllComments()}>
+                {loadingAll ? <Loader2 className="size-3 animate-spin" /> : null}تحميل كل التعليقات</Button>}
+            </div>}
             {loadingDetail && !detailItems.length ? <Loading /> : !detailItems.length ? <p className="text-sm text-muted-foreground">{detailError ? "تعذر تحميل المحتوى" : "لا يوجد محتوى متاح"}</p> : kind === "comments" ? <>
               <p className="text-[11px] text-muted-foreground">تُجمع تعليقات الزبون على هذا المنشور بحسب هويته. التجميع يشمل التعليقات المحمّلة{detail.after ? "؛ حمّل المزيد لإضافة الأقدم." : "."}</p>
               {commentGroups.map(group => <SocialInboxCommentGroup key={group.key} group={group} platform={platform} targetId={target?.id} handled={handledComments} disabled={busy}

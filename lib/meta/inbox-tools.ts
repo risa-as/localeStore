@@ -9,7 +9,7 @@ export const DEFAULT_QUICK_REPLIES: QuickReply[] = [
   { id: "stock", shortcut: "توفر", title: "توفر المنتج", text: "{المنتج}: {التوفر}.\nتگدر تشوف التفاصيل وتطلب من هنا: {الرابط}" },
   { id: "order", shortcut: "طلب", title: "معلومات الطلب", text: "لتسجيل طلبك، أرسل لنا الاسم ورقم الهاتف والمحافظة والعنوان بالتفصيل بالرسائل الخاصة 🌷" },
 ];
-const PRODUCT_FIELDS = new Set(["المنتج", "السعر", "التوصيل", "التوفر", "الرابط"]);
+const PRODUCT_FIELDS = new Set(["المنتج", "السعر", "التوصيل", "السعر مع التوصيل", "العروض", "التوفر", "الرابط"]);
 export function quickReplyProductFields(text: string) {
   return [...new Set([...text.matchAll(/\{([^{}]+)\}/g)].map(match => match[1].trim()).filter(key => PRODUCT_FIELDS.has(key)))];
 }
@@ -32,6 +32,9 @@ export function expandQuickReply(text: string, name: string, product?: InboxProd
   const values: Record<string, string | undefined> = { الاسم: name || "بيك", المنتج: product?.name,
     السعر: product ? money(product.price) : undefined, الرابط: product?.url,
     التوصيل: product ? product.shippingPrice === 0 ? "مجاني" : money(product.shippingPrice) : undefined,
+    "السعر مع التوصيل": product ? money(product.price + product.shippingPrice) : undefined,
+    // Offers are optional text on the product; without them the line is simply left out.
+    العروض: product ? product.offers?.trim() || "" : undefined,
     // Orders are taken even when stock runs out, so customers are never told it did.
     التوفر: product ? "متوفر حالياً" : undefined };
   const missing: string[] = [];

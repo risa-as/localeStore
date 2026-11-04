@@ -4,6 +4,7 @@ import type { InboxMedia } from "./inbox-media";
 import type { InboxProduct } from "./inbox-tools";
 import type { DeliveryStatus } from "./inbox-delivery";
 import { UNKNOWN_AUTHOR } from "./comment-replies";
+import { classifyComment, type CommentIntent } from "./comment-intent";
 
 export type SocialPlatform = "facebook" | "instagram";
 export type InboxContext = {
@@ -24,6 +25,10 @@ export type InboxItem = {
   /** Posts list: the latest comment, shown under the post title. */
   preview?: string;
   commentCount?: number;
+  /** Comments: what the customer is asking for (see classifyComment). */
+  intent?: CommentIntent;
+  /** Comments: the Page already replied under it (publicly or privately). */
+  answered?: boolean;
   attachments?: { name: string; url: string; kind?: "image" | "sticker" | "audio" | "video" | "file"; width?: number; height?: number }[];
 };
 export type InboxPage = { items: InboxItem[]; after: string | null };
@@ -48,6 +53,9 @@ type Comment = {
   id: string; message?: string; text?: string; username?: string;
   from?: Person; created_time?: string; timestamp?: string;
   is_hidden?: boolean; hidden?: boolean;
+  /** Facebook replies under the comment / Instagram replies. */
+  comments?: { data?: { from?: Person }[] }; replies?: { data?: { from?: Person }[] };
+  private_reply_conversation?: { id?: string };
 };
 
 const path = (id: string) => encodeURIComponent(id);
@@ -450,9 +458,10 @@ export async function listInboxPosts(ctx: InboxContext, after?: string, adPostId
     time: p.timestamp || p.created_time || "", url: safeSocialUrl(p.permalink || p.permalink_url) })), after: next(res) };
 }
 
-function commentFields(ctx: InboxContext, withHidden: boolean) {
-  return ctx.platform === "instagram" ? `id,text,username,from,timestamp${withHidden ? ",hidden" : ""}`
-    : `id,message,from,created_time${withHidden ? ",is_hidden" : ""}`;
+function commentFields(ctx: InboxContext, withExtras: boolean) {
+  // Extras: hidden flag and the replies' authors (to know whether the Page answered).
+  return ctx.platform === "instagram" ? `id,text,username,from,timestamp${withExtras ? ",hidden,replies.limit(25){from}" : ""}`
+    : `id,message,from,created_time${withExtras ? ",is_hidden,private_reply_conversation,comments.limit(25){from}" : ""}`;
 }
 
 export async function readInboxComments(ctx: InboxContext, handle: string, replies: boolean, after?: string): Promise<InboxPage> {
@@ -462,7 +471,7 @@ export async function readInboxComments(ctx: InboxContext, handle: string, repli
     { ...params(after), fields: commentFields(ctx, withHidden),
       order: ctx.platform === "facebook" ? "reverse_chronological" : undefined,
       filter: ctx.platform === "facebook" && !replies ? "toplevel" : undefined });
-  // The hidden flag is a nicety: if Meta rejects the field, still list the comments.
+  // The extras are a nicety: if Meta rejects a field, still list the comments.
   const res = await read(true).catch(error => {
     if (error instanceof GraphError && error.code === 100) return read(false);
     throw error;
@@ -471,6 +480,9 @@ export async function readInboxComments(ctx: InboxContext, handle: string, repli
     authorId: c.from?.id, authorUsername: c.username || c.from?.username,
     title: c.from?.name || c.username || c.from?.username || UNKNOWN_AUTHOR, text: c.text || c.message || "[تعليق غير نصي]",
     time: c.timestamp || c.created_time || "", outgoing: own(ctx, c.from?.id),
+    ...(own(ctx, c.from?.id) ? {} : { intent: classifyComment(c.text || c.message || "") }),
+    ...([...(c.comments?.data ?? []), ...(c.replies?.data ?? [])].some(reply => own(ctx, reply.from?.id)) || c.private_reply_conversation
+      ? { answered: true } : {}),
     ...(c.is_hidden || c.hidden ? { hidden: true } : {}) })), after: next(res) };
 }
 

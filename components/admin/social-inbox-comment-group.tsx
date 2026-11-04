@@ -10,11 +10,22 @@ import ItemBody from "./social-inbox-item";
 import type { CommentGroup } from "@/lib/meta/inbox-workflow";
 import type { InboxItem, SocialPlatform } from "@/lib/meta/inbox";
 import { expandCommentReply, matchCommentReply, type CommentReply } from "@/lib/meta/comment-replies";
+import { COMMENT_INTENTS, type CommentIntent } from "@/lib/meta/comment-intent";
 import type { InboxProduct } from "@/lib/meta/inbox-tools";
 
 export type CommentAction = "hide" | "unhide" | "delete" | "block";
 
 type Pending = { item: InboxItem; action: "delete" | "block" };
+
+const INTENT_STYLE: Partial<Record<CommentIntent, string>> = {
+  order: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300",
+  price: "bg-sky-500/15 text-sky-800 dark:text-sky-300",
+  booking: "bg-teal-500/15 text-teal-800 dark:text-teal-300",
+  question: "bg-amber-500/20 text-amber-900 dark:text-amber-300",
+  followup: "bg-orange-500/20 text-orange-900 dark:text-orange-300",
+  complaint: "bg-red-500/15 text-red-800 dark:text-red-300",
+};
+const intentLabel = (intent: CommentIntent) => COMMENT_INTENTS.find(item => item.value === intent)?.label ?? "";
 
 export default function SocialInboxCommentGroup({ group, platform, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate }: {
   group: CommentGroup; platform: SocialPlatform; targetId?: string; handled: Set<string>; disabled: boolean; moderatingId?: string | null;
@@ -43,7 +54,7 @@ export default function SocialInboxCommentGroup({ group, platform, targetId, han
   return <div className={`rounded-xl border bg-background overflow-hidden ${repeated ? "border-primary/20" : ""}`} role="group" aria-label={repeated ? `تعليقات ${group.items[0].title} على المنشور` : `تعليق ${group.items[0].title}`}>
     {repeated && <div className="px-3 py-2 bg-muted/40 flex flex-wrap items-center gap-2 text-xs"><span className="font-semibold">{group.items[0].title}</span><span className="rounded-full border bg-background px-2 py-0.5">{group.items.length} تعليقات على المنشور نفسه</span><span className="text-muted-foreground">راجعها معاً قبل الرد</span></div>}
     <div className="divide-y">{group.items.map(item => {
-      const suggested = item.outgoing ? null : matchCommentReply(item.text, replies);
+      const suggested = item.outgoing ? null : matchCommentReply(item.text, replies, item.intent);
       return <div key={item.id} ref={targetId === item.id ? targetRef : undefined} className={`p-3 ${targetId === item.id ? "bg-primary/5 ring-1 ring-inset ring-primary" : ""}`}>
       <div className={item.hidden ? "opacity-60" : undefined}><ItemBody item={item} compact /></div>
       {!item.outgoing && replies.length > 0 && <div className="flex flex-wrap items-center gap-1.5 mt-2" role="group" aria-label="ردود بنقرة واحدة">
@@ -80,6 +91,8 @@ export default function SocialInboxCommentGroup({ group, platform, targetId, han
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
+        {item.intent && item.intent !== "other" && <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${INTENT_STYLE[item.intent] || "bg-muted text-muted-foreground"}`}>{intentLabel(item.intent)}</span>}
+        {item.answered && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد</span>}
         {item.hidden && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground" title="لا يراه إلا صاحبه وأصدقاؤه والصفحة"><EyeOff className="size-3" />مخفي</span>}
         {handled.has(item.id) && <span className="text-[11px] text-emerald-700 dark:text-emerald-400">تم الرد في هذه الجلسة</span>}
       </div>

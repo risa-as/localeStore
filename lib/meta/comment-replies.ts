@@ -1,4 +1,5 @@
 import { expandQuickReply, type InboxProduct } from "./inbox-tools";
+import type { CommentIntent } from "./comment-intent";
 
 /**
  * A customizable comment reply. One definition drives all comment tools:
@@ -12,6 +13,8 @@ export type CommentReply = {
   label: string;
   /** Matched against the comment text after Arabic normalization; empty = button only. */
   keywords: string[];
+  /** Comment kinds this reply is suggested for (and bulk-sent to), e.g. every price question. */
+  intents: CommentIntent[];
   /** Public reply. Several variants may be separated by a line containing only --- */
   publicText: string;
   /** Private message to the commenter, sent BEFORE the public reply. Empty = none. */
@@ -20,17 +23,46 @@ export type CommentReply = {
 
 export const MAX_COMMENT_REPLIES = 20;
 
+/**
+ * Written from the store's real comments: most ask the price (السعر، شكد، بيش),
+ * many leave a phone and address, and the Page's own habit is «الاسم 60 الف مع التوصيل».
+ * Several variants per reply so bulk replies are not identical.
+ */
 export const DEFAULT_COMMENT_REPLIES: CommentReply[] = [
-  { id: "price-private", label: "السعر بالخاص", keywords: ["سعر", "اسعار", "بكم", "شكد", "كم السعر", "price"],
-    publicText: "راسلناك بالخاص {الاسم} 🌷\n---\nوصلتك رسالة بالخاص بكل التفاصيل 🌷\n---\nتم الرد بالخاص، نورتنا 🌷",
-    privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\nللطلب من هنا: {الرابط}" },
-  { id: "price-public", label: "السعر علني", keywords: [],
-    publicText: "سعر {المنتج} {السعر} والتوصيل {التوصيل} 🌷\nللطلب: {الرابط}", privateText: "" },
-  { id: "order-how", label: "طريقة الطلب", keywords: ["اطلب", "طلب", "احجز", "حجز", "وين"],
-    publicText: "تكدر تطلب {المنتج} من هنا: {الرابط}\nأو أرسل لنا رقمك وعنوانك بالخاص 🌷", privateText: "" },
-  { id: "thanks", label: "شكراً", keywords: ["شكرا", "تسلم", "حلو", "روعه"],
-    publicText: "شكراً {الاسم} 🌷\n---\nتسلم {الاسم}، نورتنا 🌷", privateText: "" },
+  { id: "price-public", label: "السعر", keywords: [], intents: ["price"], privateText: "",
+    publicText: "{الاسم} سعر القطعة {السعر} والتوصيل {التوصيل} 🌷\nللحجز اكتب رقم الهاتف والعنوان هنا أو اطلب من الرابط: {الرابط}\n---\n"
+      + "{الاسم} السعر {السعر مع التوصيل} مع التوصيل لكل المحافظات 🌷\nللحجز اكتب رقمك وعنوانك بتعليق\n---\n"
+      + "أهلاً {الاسم} 🌷 السعر {السعر} + التوصيل {التوصيل}\nاكتب رقم الهاتف والمحافظة والمنطقة ونثبت طلبك" },
+  { id: "price-private", label: "السعر بالخاص", keywords: [], intents: [],
+    publicText: "{الاسم} راسلناك بالخاص بكل التفاصيل 🌷\n---\n{الاسم} وصلتك رسالة بالخاص 🌷\n---\nتم الرد بالخاص {الاسم}، نورتنا 🌷",
+    privateText: "أهلاً {الاسم} 🌷\n{المنتج}\nالسعر: {السعر}\nالتوصيل: {التوصيل}\n{العروض}\n\nللحجز أرسل رقم هاتفك وعنوانك هنا، أو اطلب مباشرة من الرابط:\n{الرابط}" },
+  { id: "order-received", label: "وصلتنا معلوماتك", keywords: [], intents: ["order"], privateText: "",
+    publicText: "{الاسم} وصلتنا معلوماتك ✅ راح نثبت طلبك ويتصل بيك المندوب قبل التوصيل 🌷\n---\n"
+      + "شكراً {الاسم} 🌷 استلمنا رقمك وعنوانك، راح نتواصل وياك لتأكيد الطلب ✅" },
+  { id: "booking-how", label: "طريقة الحجز", keywords: [], intents: ["booking"], privateText: "",
+    publicText: "{الاسم} حاضرين 🌷 اكتب رقم هاتفك والعنوان (المحافظة والمنطقة) بتعليق ونثبت طلبك\n---\n"
+      + "{الاسم} للحجز أرسل رقمك وعنوانك هنا أو بالخاص، أو اطلب مباشرة من الرابط: {الرابط} 🌷" },
+  { id: "offers", label: "العروض والأسعار الثابتة", keywords: [], intents: ["bargain"], privateText: "",
+    publicText: "{الاسم} الأسعار ثابتة 🌷 سعر القطعة {السعر} والتوصيل {التوصيل}\n{العروض}\nللحجز اكتب رقمك وعنوانك" },
+  { id: "delivery", label: "التوصيل", keywords: [], intents: ["delivery"], privateText: "",
+    publicText: "{الاسم} نوصل لكل محافظات العراق 🚚 التوصيل {التوصيل} ويوصلك خلال 48 ساعة إن شاء الله، والدفع عند الاستلام 🌷\nللحجز اكتب رقمك وعنوانك" },
+  { id: "followup", label: "متابعة الطلب", keywords: [], intents: ["followup"], privateText: "",
+    publicText: "{الاسم} نعتذر عن التأخير 🙏 راسلنا برقم هاتفك بالخاص حتى نتابع طلبك فوراً" },
+  { id: "greeting", label: "رد السلام", keywords: [], intents: ["greeting"], privateText: "",
+    publicText: "وعليكم السلام {الاسم} 🌷 تفضل، شلون نكدر نخدمك؟" },
+  { id: "thanks", label: "شكراً", keywords: [], intents: ["praise"], privateText: "",
+    publicText: "شكراً {الاسم} 🌷 نورتنا\n---\nتسلم {الاسم} 🌷\n---\nالله يحفظك {الاسم} 🌷" },
 ];
+
+const defaults = () => DEFAULT_COMMENT_REPLIES.map(reply => ({ ...reply, keywords: [...reply.keywords], intents: [...reply.intents] }));
+
+/** Replace the suggested replies with the current ones, keep the admin's own replies. */
+export function restoreDefaultReplies(replies: CommentReply[]) {
+  const ids = new Set(DEFAULT_COMMENT_REPLIES.map(reply => reply.id));
+  // Older suggested replies that the new set replaces.
+  for (const old of ["order-how"]) ids.add(old);
+  return [...defaults(), ...replies.filter(reply => !ids.has(reply.id))].slice(0, MAX_COMMENT_REPLIES);
+}
 
 const strings = (value: unknown, max: number) =>
   Array.isArray(value) && value.length <= 30 && value.every(item => typeof item === "string" && item.length <= max);
@@ -41,9 +73,12 @@ export function decodeCommentReplies(raw: string | null): CommentReply[] {
     if (Array.isArray(saved) && saved.length <= MAX_COMMENT_REPLIES && saved.every(item => item &&
       typeof item.id === "string" && typeof item.label === "string" && item.label.length <= 40 &&
       strings(item.keywords, 40) && typeof item.publicText === "string" && item.publicText.length <= 3000 &&
-      typeof item.privateText === "string" && item.privateText.length <= 1000)) return saved;
+      typeof item.privateText === "string" && item.privateText.length <= 1000 &&
+      (item.intents === undefined || strings(item.intents, 20))))
+      // Replies saved before intents existed have none.
+      return saved.map(item => ({ ...item, intents: Array.isArray(item.intents) ? item.intents : [] }));
   } catch { /* Fall back to the defaults when storage is empty or malformed. */ }
-  return DEFAULT_COMMENT_REPLIES.map(reply => ({ ...reply, keywords: [...reply.keywords] }));
+  return defaults();
 }
 
 /**
@@ -55,25 +90,30 @@ export function normalizeArabic(text: string) {
     .replace(/[ً-ٰٟـ]/g, "")
     .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
     .replace(/[یې]/g, "ي").replace(/ک/g, "ك")
+    // Iraqi/Kurdish letters: «شگد» is «شكد».
+    .replace(/گ/g, "ك").replace(/چ/g, "ج").replace(/پ/g, "ب").replace(/ڤ/g, "ف").replace(/ڕ/g, "ر")
     .replace(/[٠-٩]/g, digit => String(digit.charCodeAt(0) - 0x0660))
     .replace(/\s+/g, " ").trim();
 }
 
-const words = (text: string) => normalizeArabic(text).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+export const commentWords = (text: string) => normalizeArabic(text).split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 // Attached Arabic prefixes: «السعر», «بالسعر», «وبكم» still match «سعر» / «بكم».
 const PREFIXES = ["وال", "بال", "فال", "كال", "ال", "لل", "و", "ب", "ف", "ل"];
-const wordStartsWith = (word: string, keyword: string) => word.startsWith(keyword) ||
+export const wordStartsWith = (word: string, keyword: string) => word.startsWith(keyword) ||
   PREFIXES.some(prefix => word.length > prefix.length && word.startsWith(prefix) && word.slice(prefix.length).startsWith(keyword));
 
 /**
- * The first reply with a keyword at the START of a word in the comment, or null.
+ * The reply to suggest for a comment: first one made for its intent (price,
+ * order…), otherwise the first with a keyword at the START of a word in it.
  * Matching inside words is avoided on purpose: «كم» must not match «عليكم».
  */
-export function matchCommentReply(text: string, replies: CommentReply[]) {
-  const comment = words(text);
+export function matchCommentReply(text: string, replies: CommentReply[], intent?: CommentIntent) {
+  const byIntent = intent ? replies.find(reply => reply.intents.includes(intent)) : undefined;
+  if (byIntent) return byIntent;
+  const comment = commentWords(text);
   if (!comment.length) return null;
   return replies.find(reply => reply.keywords.some(keyword => {
-    const parts = words(keyword);
+    const parts = commentWords(keyword);
     return parts.length > 0 && comment.some((_, start) =>
       parts.every((part, offset) => start + offset < comment.length && wordStartsWith(comment[start + offset], part)));
   })) || null;
@@ -105,6 +145,8 @@ function fillName(text: string, name: string) {
 export function expandCommentReply(reply: CommentReply, name: string, product: InboxProduct | null, index = 0) {
   const publicPart = expandQuickReply(fillName(pickVariant(reply.publicText, index), name), name, product);
   const privatePart = expandQuickReply(fillName(reply.privateText.trim(), name), name, product);
-  return { publicText: publicPart.text, privateText: privatePart.text,
+  // An empty {العروض} must not leave a gap of blank lines.
+  const tidy = (text: string) => text.replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n").replace(/(^|\n)[ \t]*\n(?=[^\n]*$)/, "$1").trim();
+  return { publicText: tidy(publicPart.text), privateText: tidy(privatePart.text),
     missing: [...new Set([...publicPart.missing, ...privatePart.missing])] };
 }
