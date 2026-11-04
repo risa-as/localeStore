@@ -21,6 +21,9 @@ export type InboxItem = {
   authorUsername?: string;
   /** Comment hidden from the public (still visible to the author and the Page). */
   hidden?: boolean;
+  /** Posts list: the latest comment, shown under the post title. */
+  preview?: string;
+  commentCount?: number;
   attachments?: { name: string; url: string; kind?: "image" | "sticker" | "audio" | "video" | "file"; width?: number; height?: number }[];
 };
 export type InboxPage = { items: InboxItem[]; after: string | null };
@@ -349,7 +352,94 @@ async function sendInboxContent(ctx: InboxContext, handle: string, message: Reco
     ...(window.mode === "private-reply" ? { replyMode: "private-reply" as const, originMessageId: window.originMessageId } : {}) };
 }
 
-export async function listInboxPosts(ctx: InboxContext, after?: string): Promise<InboxPage> {
+const POSTS_PAGE = 30;
+const MAX_SCANNED_POSTS = 500;
+const scanCache = new Map<string, { at: number; posts: { id: string; updated: number }[] }>();
+
+/**
+ * Facebook lists posts by creation date, so an old post (a January reel) with a
+ * comment today would be buried. Scan the Page's posts cheaply, sort them by
+ * `updated_time` (which moves on every new comment), then fetch details and the
+ * latest comment for one page of them in a single request — like Business Suite.
+ */
+const adStoryCache = new Map<string, { at: number; ids: string[] }>();
+
+/**
+ * Ad-only ("dark") posts never appear in /{page}/posts, yet most comments land
+ * on them. Collect the posts this Page's ads run on, across the connected ad
+ * accounts (user token). Cached for 10 minutes; failures just mean no ad posts.
+ */
+export async function listPageAdPostIds(pageId: string, userToken: string, adAccountIds: string[]) {
+  const cached = adStoryCache.get(pageId);
+  if (cached && Date.now() - cached.at < 600000) return cached.ids;
+  const results = await Promise.allSettled(adAccountIds.slice(0, 30).map(account =>
+    graphGet<GraphPage<{ creative?: { effective_object_story_id?: string } }>>(`${path(account)}/ads`, userToken, {
+      fields: "creative{effective_object_story_id}", limit: "500",
+      effective_status: JSON.stringify(["ACTIVE", "PAUSED", "ADSET_PAUSED", "CAMPAIGN_PAUSED", "IN_PROCESS", "WITH_ISSUES", "PENDING_REVIEW", "DISAPPROVED"]) })));
+  const ids = [...new Set(results.flatMap(result => result.status === "fulfilled" ? result.value.data ?? [] : [])
+    .map(ad => ad.creative?.effective_object_story_id)
+    .filter((id): id is string => !!id && id.startsWith(`${pageId}_`) && id.length < 200))];
+  if (results.some(result => result.status === "rejected"))
+    console.warn("[social-inbox] Some ad accounts could not be read for ad posts", { pageId,
+      failed: results.filter(result => result.status === "rejected").length });
+  adStoryCache.set(pageId, { at: Date.now(), ids });
+  return ids;
+}
+
+async function listFacebookPostsByActivity(ctx: InboxContext, after?: string, adPostIds: string[] = []): Promise<InboxPage> {
+  const offset = after ? Number(after.match(/^offset:(\d{1,4})$/)?.[1] ?? NaN) : 0;
+  if (!Number.isInteger(offset) || offset < 0) throw new Error("مؤشر غير صالح");
+  const cached = scanCache.get(ctx.pageId);
+  let posts = cached && Date.now() - cached.at < 45000 && offset > 0 ? cached.posts : null;
+  if (!posts) {
+    const stamp = (post: { updated_time?: string; created_time?: string }) => Date.parse(post.updated_time || post.created_time || "") || 0;
+    const scanPublished = async () => {
+      const found: { id: string; updated: number }[] = [];
+      let cursor: string | undefined;
+      do {
+        const res = await graphGet<GraphPage<{ id: string; updated_time?: string; created_time?: string }>>(`${path(ctx.pageId)}/posts`, ctx.token,
+          { fields: "id,updated_time,created_time", limit: "100", after: cursor });
+        found.push(...(res.data ?? []).map(post => ({ id: post.id, updated: stamp(post) })));
+        cursor = next(res) ?? undefined;
+      } while (cursor && found.length < MAX_SCANNED_POSTS);
+      return found;
+    };
+    // Ad posts: fetch their activity time 50 at a time (the `ids` limit).
+    const scanAds = async () => {
+      const ids = adPostIds.filter(id => id.startsWith(`${ctx.pageId}_`)).slice(0, MAX_SCANNED_POSTS);
+      const chunks = Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => ids.slice(i * 50, i * 50 + 50));
+      const pages = await Promise.allSettled(chunks.map(chunk => graphGet<Record<string, { id: string; updated_time?: string; created_time?: string }>>(
+        "", ctx.token, { ids: chunk.join(","), fields: "id,updated_time,created_time" })));
+      return pages.flatMap(page => page.status === "fulfilled" ? Object.values(page.value) : [])
+        .map(post => ({ id: post.id, updated: stamp(post) }));
+    };
+    const [published, ads] = await Promise.all([scanPublished(), scanAds()]);
+    posts = [...new Map([...ads, ...published].map(post => [post.id, post])).values()].sort((a, b) => b.updated - a.updated);
+    scanCache.set(ctx.pageId, { at: Date.now(), posts });
+  }
+  const slice = posts.slice(offset, offset + POSTS_PAGE);
+  if (!slice.length) return { items: [], after: null };
+  type Detail = { id: string; message?: string; created_time?: string; permalink_url?: string;
+    comments?: { data?: (Comment & { from?: Person })[]; summary?: { total_count?: number } } };
+  const details = await graphGet<Record<string, Detail>>("", ctx.token, { ids: slice.map(post => post.id).join(","),
+    // `stream` includes replies, so a Page reply under a comment counts as answered.
+    fields: "id,message,created_time,permalink_url,comments.filter(stream).order(reverse_chronological).limit(1).summary(true){id,message,from,created_time}" });
+  const items = slice.flatMap(({ id, updated }) => {
+    const post = details[id];
+    const latest = post?.comments?.data?.[0];
+    const total = post?.comments?.summary?.total_count ?? 0;
+    if (!post || !latest || total === 0) return [];
+    const text = post.message || "";
+    return [{ id, handle: resourceHandle(ctx, "post", id), title: (text || "منشور بدون نص").slice(0, 120), text,
+      time: latest.created_time || new Date(updated).toISOString(), url: safeSocialUrl(post.permalink_url),
+      outgoing: own(ctx, latest.from?.id), commentCount: total,
+      preview: `${own(ctx, latest.from?.id) ? "أنت" : latest.from?.name || UNKNOWN_AUTHOR}: ${latest.message || "[تعليق غير نصي]"}` }];
+  });
+  return { items, after: offset + POSTS_PAGE < posts.length ? `offset:${offset + POSTS_PAGE}` : null };
+}
+
+export async function listInboxPosts(ctx: InboxContext, after?: string, adPostIds?: string[]): Promise<InboxPage> {
+  if (ctx.platform === "facebook") return listFacebookPostsByActivity(ctx, after, adPostIds);
   const instagram = ctx.platform === "instagram";
   const res = await graphGet<GraphPage<{ id: string; message?: string; caption?: string;
     created_time?: string; timestamp?: string; permalink?: string; permalink_url?: string }>>(
@@ -455,9 +545,16 @@ export async function replyToComment(ctx: InboxContext, handle: string,
 /** The post's own text, read from Meta (used to find storefront links in it). */
 export async function readInboxPostText(ctx: InboxContext, handle: string) {
   const id = resourceId(ctx, "post", handle);
-  const post = await graphGet<{ id: string; message?: string; caption?: string }>(path(id), ctx.token,
-    { fields: ctx.platform === "instagram" ? "id,caption" : "id,message" });
-  return { id, text: post.caption || post.message || "" };
+  type Post = { id: string; message?: string; caption?: string; call_to_action?: { value?: { link?: string } } };
+  const read = (fields: string) => graphGet<Post>(path(id), ctx.token, { fields });
+  // Ads keep the landing-page link in their button (call_to_action), not in the text.
+  const post = ctx.platform === "instagram" ? await read("id,caption")
+    : await read("id,message,call_to_action").catch(error => {
+      if (error instanceof GraphError && error.code === 100) return read("id,message");
+      throw error;
+    });
+  const link = safeSocialUrl(post.call_to_action?.value?.link);
+  return { id, text: [post.caption || post.message || "", link].filter(Boolean).join("\n") };
 }
 
 export type CommentModeration = "hide" | "unhide" | "delete";

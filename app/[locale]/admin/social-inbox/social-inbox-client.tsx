@@ -619,8 +619,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
             onClick={() => choose(item)}
             className={`w-full text-start px-3 py-3 border-s-2 hover:bg-muted/60 transition-colors ${selected?.id === item.id ? "bg-muted/70 border-primary" : "border-transparent"}`}>
             <span className="font-semibold text-sm flex justify-between gap-2"><span className="truncate">{item.title}</span>{!!item.unread && <span className="rounded-full bg-primary text-primary-foreground px-2 h-5 text-xs">{item.unread}</span>}</span>
-            <span className="block text-xs text-muted-foreground truncate mt-1">{kind === "messages" && item.outgoing ? "أنت: " : ""}{item.text}</span>
-            <span className="flex items-center justify-between gap-1 mt-1"><span className={`text-[10px] ${item.outgoing ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>{kind === "messages" ? item.system ? "بدأت من تعليق" : item.outgoing === true ? "تم الرد" : item.outgoing === false ? "بانتظار الرد" : "" : "منشور"}</span>
+            <span className="block text-xs text-muted-foreground truncate mt-1">{kind === "messages" && item.outgoing ? "أنت: " : ""}{kind === "comments" && item.preview ? item.preview : item.text}</span>
+            <span className="flex items-center justify-between gap-1 mt-1"><span className={`text-[10px] ${item.outgoing ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}`}>{kind === "messages" ? item.system ? "بدأت من تعليق" : item.outgoing === true ? "تم الرد" : item.outgoing === false ? "بانتظار الرد" : "" : item.commentCount ? `${item.outgoing ? "آخر تعليق منك" : "آخر تعليق من زبون"} · ${item.commentCount} تعليق` : "منشور"}</span>
             <time className="text-[10px] text-muted-foreground">{date(item.time)}</time></span>
           </button>)}
         </div>

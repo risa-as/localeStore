@@ -6,7 +6,7 @@ import { getMetaConfig } from "@/lib/meta/config";
 import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
   sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId,
-  moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText,
+  moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText, listPageAdPostIds,
   type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
 import { applyInboxReceipts, saveInboxRead, saveInboxReply, hasInboxReplyForOrigin } from "@/lib/meta/inbox-receipts";
@@ -148,6 +148,17 @@ export async function approveSocialInboxOrder(input: {
   });
 }
 
+/** Posts this Page's ads run on, so comments on ad-only posts show up too. Never fails the list. */
+async function adPostIds(pageId: string) {
+  try {
+    const conn = await prisma.metaConnection.findUnique({ where: { id: "default" }, select: { userAccessToken: true, adAccounts: true } });
+    const accounts = Array.isArray(conn?.adAccounts) ? (conn.adAccounts as { id?: unknown }[])
+      .map(account => account?.id).filter((id): id is string => typeof id === "string" && /^act_\d{1,30}$/.test(id)) : [];
+    if (!conn?.userAccessToken || !accounts.length) return [];
+    return await listPageAdPostIds(pageId, conn.userAccessToken, accounts);
+  } catch { return []; }
+}
+
 async function context(pageId: string, platform: SocialPlatform): Promise<InboxContext> {
   const session = await requireAdministrator();
   if (platform !== "facebook" && platform !== "instagram") throw new Error("منصة غير صالحة");
@@ -222,7 +233,8 @@ export async function getSocialInboxList(input: { pageId: string; platform: Soci
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
     if (input.kind !== "messages" && input.kind !== "comments") throw new Error("قسم غير صالح");
-    return input.kind === "messages" ? applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after)) : listInboxPosts(ctx, input.after);
+    if (input.kind === "messages") return applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after));
+    return listInboxPosts(ctx, input.after, ctx.platform === "facebook" ? await adPostIds(ctx.pageId) : undefined);
   });
 }
 
