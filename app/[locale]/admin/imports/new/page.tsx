@@ -26,9 +26,14 @@ export default async function NewImportPage(props: { searchParams: Promise<{ pro
   return (
     <div className="w-full min-w-0 space-y-5">
       <div className="space-y-3">
-        <Link href="/admin/imports" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
-          <ArrowRight className="h-3.5 w-3.5" />
-          الاستيراد
+        <Link
+          href="/admin/imports"
+          className="group inline-flex items-center gap-2 rounded-full border bg-card py-1.5 pe-3.5 ps-1.5 text-xs font-medium text-muted-foreground shadow-sm transition-colors hover:border-foreground/20 hover:bg-muted hover:text-foreground"
+        >
+          <span className="flex size-6 items-center justify-center rounded-full bg-muted transition-colors group-hover:bg-foreground group-hover:text-background">
+            <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </span>
+          العودة إلى الاستيراد
         </Link>
         <div className="flex items-center gap-3">
           <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-foreground text-background shadow-sm">
