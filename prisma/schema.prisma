@@ -563,7 +563,7 @@ model ImportCandidate {
   id                      String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name                    String
   kind                    String        @default("new") // new | reimport
-  status                  String        @default("idea") // idea | studying | approved | ordered | shipping | arrived | converted | rejected
+  status                  String        @default("idea") // studying | ordered | arrived | converted | rejected (القديمة idea/approved/shipping تُقرأ عبر normalizeImportStatus)
   productId               String?       @db.Uuid
   product                 Product?      @relation(fields: [productId], references: [id], onDelete: SetNull)
   supplierName            String?

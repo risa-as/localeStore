@@ -96,7 +96,7 @@ export default function ImportsDashboard({
   const committed = candidates.filter((c) => COMMITTED_STATUSES.includes(c.status));
   const capital = committed.reduce((s, c) => s + shown(c).result.capitalKiqd, 0);
   const expectedProfit = committed.reduce((s, c) => s + shown(c).result.totalProfitKiqd, 0);
-  const studying = candidates.filter((c) => c.status === "idea" || c.status === "studying").length;
+  const studying = candidates.filter((c) => c.status === "studying").length;
   const urgent = alerts.filter((a) => a.orderNow).length;
 
   const counts = useMemo(() => {
@@ -136,9 +136,9 @@ export default function ImportsDashboard({
       )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="رأس المال الملتزم" value={fmtK(capital)} sub={`${committed.length} منتج موافَق عليه أو في الطريق`} icon={Wallet} />
+        <Stat label="رأس المال الملتزم" value={fmtK(capital)} sub={`${committed.length} منتج مطلوب أو وصل`} icon={Wallet} />
         <Stat label="الربح المتوقع للملتزم" value={fmtK(expectedProfit)} sub="لو بيعت الكمية كاملة" icon={TrendingUp} tone={profitTone(expectedProfit)} />
-        <Stat label="قيد الدراسة" value={String(studying)} sub="أفكار ومنتجات تُدرس" icon={PackageSearch} />
+        <Stat label="قيد الدراسة" value={String(studying)} sub="منتجات تُدرس قبل طلبها" icon={PackageSearch} />
         <Stat
           label="يجب طلبها الآن"
           value={reorder ? String(urgent) : "…"}
@@ -291,7 +291,7 @@ export default function ImportsDashboard({
           </table>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          الأرقام مقرّبة لأقرب 250 د.ع للعرض فقط — الحساب نفسه بدقة كاملة. المنتجات الموافَق عليها تُعرض بلقطتها الثابتة لحظة الموافقة.
+          الأرقام مقرّبة لأقرب 250 د.ع للعرض فقط — الحساب نفسه بدقة كاملة. المنتجات المطلوبة أو الواصلة تُعرض بلقطتها الثابتة لحظة الطلب.
         </p>
       </section>
     </div>

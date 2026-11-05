@@ -21,6 +21,7 @@ import {
   MANUAL_STATUSES,
   isImportStatus,
   type ImportStatus,
+  normalizeImportStatus,
 } from "../import-status";
 import { REVENUE_STATUSES } from "../constants/order-statuses";
 import { EXCLUDE_INTERNAL_PRODUCTS } from "../constants/internal-products";
@@ -215,7 +216,7 @@ function toDTO(r: CandidateRow, targetMarginPct: number): CandidateDTO {
     id: r.id,
     name: r.name,
     kind: r.kind === "reimport" ? "reimport" : "new",
-    status: isImportStatus(r.status) ? r.status : "idea",
+    status: normalizeImportStatus(r.status),
     productId: r.productId,
     productName: r.product?.name ?? null,
     productSlug: r.product?.slug ?? null,
@@ -305,7 +306,8 @@ export async function createImportCandidate(data: CandidateInput) {
   await requireAdministrator();
   try {
     const parsed = candidateSchema.parse(data);
-    const created = await prisma.importCandidate.create({ data: candidateData(parsed) });
+    // أول مرحلة دائماً «قيد الدراسة» (الافتراضي في قاعدة البيانات ما زال «فكرة» القديمة).
+    const created = await prisma.importCandidate.create({ data: { ...candidateData(parsed), status: "studying" } });
     revalidateImportPages();
     return { success: true, message: "تمت إضافة المنتج المرشح", id: created.id };
   } catch (error) {
@@ -328,7 +330,7 @@ export async function updateImportCandidate(id: string, data: CandidateInput) {
 }
 
 /**
- * تغيير المرحلة. عند الدخول في مرحلة ملتزمة (موافَق فما بعد) تُؤخذ لقطة ثابتة
+ * تغيير المرحلة. عند الدخول في مرحلة ملتزمة («تم الطلب» فما بعد) تُؤخذ لقطة ثابتة
  * إن لم توجد، وعند الرجوع إلى «فكرة/قيد الدراسة/مرفوض» تُمسح لتُؤخذ من جديد.
  */
 export async function setImportCandidateStatus(id: string, status: string) {
@@ -368,8 +370,8 @@ export async function refreshImportSnapshot(id: string) {
       loadSettings(),
       prisma.importCandidate.findUniqueOrThrow({ where: { id }, include: withProduct }),
     ]);
-    if (!isImportStatus(row.status) || !COMMITTED_STATUSES.includes(row.status)) {
-      throw new Error("اللقطة تؤخذ فقط للمنتجات الموافَق عليها");
+    if (!COMMITTED_STATUSES.includes(normalizeImportStatus(row.status))) {
+      throw new Error("اللقطة تؤخذ فقط للمنتجات المطلوبة أو الواصلة");
     }
     const snapshot = buildSnapshot(rowInputs(row), settings.targetMarginPct);
     await prisma.importCandidate.update({
@@ -843,7 +845,7 @@ export type ImportComparison = {
   warnings: HistoryWarning[];
 };
 
-/** يقارن لقطة الموافقة بما حدث فعلاً منذ وصول الشحنة. */
+/** يقارن لقطة الطلب بما حدث فعلاً منذ وصول الشحنة. */
 export async function getImportComparison(id: string): Promise<ImportComparison | null> {
   await requireAdministrator();
   const [settings, row] = await Promise.all([

@@ -48,11 +48,8 @@ export const SIGNAL_STYLES: Record<ImportSignal, { dot: string; chip: string; la
 };
 
 export const STATUS_STYLES: Record<ImportStatus, string> = {
-  idea: "bg-muted text-muted-foreground",
   studying: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
-  approved: "bg-violet-500/15 text-violet-700 dark:text-violet-400",
   ordered: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
-  shipping: "bg-orange-500/15 text-orange-700 dark:text-orange-400",
   arrived: "bg-teal-500/15 text-teal-700 dark:text-teal-400",
   converted: "bg-green-500/15 text-green-700 dark:text-green-400",
   rejected: "bg-red-500/10 text-red-600 dark:text-red-400",

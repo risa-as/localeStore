@@ -932,7 +932,7 @@ export default function ImportCandidateForm({
           <section className="space-y-2 rounded-2xl border bg-card p-4 text-sm shadow-sm">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
               <History className="h-3.5 w-3.5" />
-              لقطة الموافقة ({new Date(snap.at).toLocaleDateString("en-GB")})
+              لقطة الطلب ({new Date(snap.at).toLocaleDateString("en-GB")})
             </p>
             <Line label="ربح القطعة المجمَّد" value={fmtK(snap.result.profitPerUnitKiqd)} tone={profitTone(snap.result.profitPerUnitKiqd)} />
             <Line label="سعر الصرف المجمَّد" value={fmtNum(snap.inputs.fxRate)} muted />
