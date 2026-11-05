@@ -2,9 +2,17 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronDown, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -31,7 +39,7 @@ import {
   type ImportStatus,
 } from "@/lib/import-status";
 import { cn } from "@/lib/utils";
-import { SIGNAL_STYLES, STATUS_STYLES, fmtK, fmtNum, fmtPct, profitTone } from "./format";
+import { SIGNAL_STYLES, STATUS_DOTS, STATUS_STYLES, fmtK, fmtNum, fmtPct, profitTone } from "./format";
 
 type Filter = "active" | "all" | ImportStatus;
 type Sort = "newest" | "margin" | "roi" | "profit";
@@ -298,6 +306,14 @@ export default function ImportsDashboard({
   );
 }
 
+/** سطر يشرح أثر كل مرحلة داخل قائمة المراحل. */
+const STAGE_HINTS: Partial<Record<ImportStatus, string>> = {
+  studying: "الأرقام تتغير مع أي تعديل",
+  ordered: "تُجمَّد الأرقام ويُحسب في رأس المال",
+  arrived: "جاهز للإضافة إلى المخزون",
+  rejected: "يُخفى من النشطة ولا يُحسب",
+};
+
 /** المرحلة تُغيَّر من الجدول مباشرة؛ «أُضيف للمخزون» فقط عبر نافذة الوصول. */
 function StageCell({ candidate: c }: { candidate: CandidateDTO }) {
   const router = useRouter();
@@ -305,11 +321,27 @@ function StageCell({ candidate: c }: { candidate: CandidateDTO }) {
   const [pending, start] = useTransition();
   if (c.status === "converted") {
     return (
-      <span className={cn("whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[c.status])}>
+      <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold", STATUS_STYLES[c.status])}>
+        <Check className="h-3 w-3" />
         {IMPORT_STATUS_LABELS[c.status]}
       </span>
     );
   }
+  const item = (st: ImportStatus) => (
+    <DropdownMenuItem
+      key={st}
+      disabled={pending}
+      onSelect={() => st !== c.status && change(st)}
+      className={cn("cursor-pointer items-start gap-2.5 rounded-lg px-2 py-2", st === c.status && "bg-muted/70")}
+    >
+      <span className={cn("mt-1.5 size-2 shrink-0 rounded-full", STATUS_DOTS[st])} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">{IMPORT_STATUS_LABELS[st]}</span>
+        {STAGE_HINTS[st] && <span className="block text-[11px] leading-4 text-muted-foreground">{STAGE_HINTS[st]}</span>}
+      </span>
+      {st === c.status && <Check className="mt-1 h-4 w-4 shrink-0" />}
+    </DropdownMenuItem>
+  );
   const change = (status: string) =>
     start(async () => {
       const res = await setImportCandidateStatus(c.id, status);
@@ -318,33 +350,32 @@ function StageCell({ candidate: c }: { candidate: CandidateDTO }) {
     });
   return (
     <div className="flex items-center gap-2">
-      <div className="relative">
-        <select
-          value={c.status}
-          disabled={pending}
-          onChange={(e) => change(e.target.value)}
-          aria-label={`مرحلة ${c.name}`}
-          className={cn(
-            "cursor-pointer appearance-none rounded-md border-0 py-1 pe-6 ps-2 text-xs font-semibold outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
-            STATUS_STYLES[c.status],
-          )}
-        >
-          {MANUAL_STATUSES.map((st) => (
-            <option key={st} value={st} className="bg-background text-foreground">
-              {IMPORT_STATUS_LABELS[st as ImportStatus]}
-            </option>
-          ))}
-        </select>
-        {pending ? (
-          <Loader2 className="pointer-events-none absolute end-1.5 top-1/2 h-3 w-3 -translate-y-1/2 animate-spin" />
-        ) : (
-          <ChevronDown className="pointer-events-none absolute end-1.5 top-1/2 h-3 w-3 -translate-y-1/2 opacity-70" />
-        )}
-      </div>
+      <DropdownMenu dir="rtl">
+        <DropdownMenuTrigger asChild disabled={pending}>
+          <button
+            type="button"
+            aria-label={`مرحلة ${c.name}: ${IMPORT_STATUS_LABELS[c.status]}`}
+            className={cn(
+              "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full py-1 pe-2 ps-2.5 text-xs font-semibold outline-none ring-offset-background transition hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 data-[state=open]:ring-2 data-[state=open]:ring-ring/20 dark:hover:brightness-125",
+              STATUS_STYLES[c.status],
+            )}
+          >
+            <span className={cn("size-1.5 rounded-full", STATUS_DOTS[c.status])} />
+            {IMPORT_STATUS_LABELS[c.status]}
+            {pending ? <Loader2 className="h-3 w-3 animate-spin" /> : <ChevronDown className="h-3 w-3 opacity-60" />}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-60 rounded-xl p-1.5">
+          <DropdownMenuLabel className="px-2 pb-1 pt-1 text-[11px] font-medium text-muted-foreground">تغيير المرحلة</DropdownMenuLabel>
+          {MANUAL_STATUSES.filter((st) => st !== "rejected").map(item)}
+          <DropdownMenuSeparator />
+          {item("rejected")}
+        </DropdownMenuContent>
+      </DropdownMenu>
       {c.status === "arrived" && (
         <Link
           href={`/admin/imports/${c.id}?arrive=1`}
-          className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-primary underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors hover:bg-muted"
         >
           <PackagePlus className="h-3.5 w-3.5" />
           أضف للمخزون

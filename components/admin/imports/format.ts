@@ -47,6 +47,15 @@ export const SIGNAL_STYLES: Record<ImportSignal, { dot: string; chip: string; la
   },
 };
 
+/** نقطة لون المرحلة في القوائم. */
+export const STATUS_DOTS: Record<ImportStatus, string> = {
+  studying: "bg-sky-500",
+  ordered: "bg-indigo-500",
+  arrived: "bg-teal-500",
+  converted: "bg-green-500",
+  rejected: "bg-red-500",
+};
+
 export const STATUS_STYLES: Record<ImportStatus, string> = {
   studying: "bg-sky-500/15 text-sky-700 dark:text-sky-400",
   ordered: "bg-indigo-500/15 text-indigo-700 dark:text-indigo-400",
