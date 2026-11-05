@@ -32,8 +32,8 @@ const when = (value: string) => inboxDate(value);
 /** The replies under the open comment, shown inside its card. */
 export type CommentThread = { id: string; items: InboxItem[]; after: string | null; loading: boolean; error: string };
 
-export default function SocialInboxCommentGroup({ group, platform, pageId, postHandle, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate, onOrdered, onWorking, thread, onCloseThread, onMoreReplies }: {
-  thread: CommentThread | null; onCloseThread: () => void; onMoreReplies: () => void;
+export default function SocialInboxCommentGroup({ group, platform, pageId, postHandle, targetId, handled, disabled, moderatingId, replies, product, sendingId, onQuickReply, onReply, onThread, onModerate, onOrdered, onWorking, thread, onCloseThread, onMoreReplies, onDeleteReply }: {
+  thread: CommentThread | null; onCloseThread: () => void; onMoreReplies: () => void; onDeleteReply: (reply: InboxItem) => void;
   group: CommentGroup; platform: SocialPlatform; pageId: string; postHandle: string; targetId?: string; handled: Set<string>; disabled: boolean; moderatingId?: string | null;
   /** An order was registered from this comment. */
   onOrdered: (item: InboxItem) => void; onWorking: (working: boolean) => void;
@@ -47,6 +47,7 @@ export default function SocialInboxCommentGroup({ group, platform, pageId, postH
   const repeated = group.items.length > 1;
   const [pending, setPending] = useState<Pending | null>(null);
   const [deleteAll, setDeleteAll] = useState(true);
+  const [confirmReply, setConfirmReply] = useState<string | null>(null);
   const authorComments = group.items.filter(item => !item.outgoing);
   const targetRef = useRef<HTMLDivElement>(null);
   const hasTarget = group.items.some(item => item.id === targetId);
@@ -151,8 +152,19 @@ export default function SocialInboxCommentGroup({ group, platform, pageId, postH
               <div className="mb-0.5 flex items-center gap-2 text-[11px]">
                 <span className={`font-semibold ${reply.outgoing ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{reply.outgoing ? "الصفحة" : reply.title}</span>
                 <time className="text-muted-foreground" dateTime={reply.time || undefined}>{when(reply.time)}</time>
+                {reply.outgoing && reply.handle && confirmReply !== reply.id && <button type="button" disabled={disabled}
+                  className="ms-auto rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                  aria-label="حذف ردك" title="حذف ردك" onClick={() => setConfirmReply(reply.id)}>
+                  {moderatingId === reply.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}
+                </button>}
               </div>
               <p dir="auto" className="whitespace-pre-wrap break-words text-sm leading-6">{reply.text}</p>
+              {confirmReply === reply.id && <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-emerald-200/60 pt-2 text-xs dark:border-emerald-900/60">
+                <span>حذف هذا الرد نهائياً من {platform === "instagram" ? "إنستغرام" : "فيسبوك"}؟</span>
+                <Button size="sm" variant="destructive" className="h-6 px-2 text-xs" disabled={disabled}
+                  onClick={() => { setConfirmReply(null); onDeleteReply(reply); }}>حذف</Button>
+                <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={() => setConfirmReply(null)}>إلغاء</Button>
+              </div>}
             </div>)
             : <p className="text-xs text-muted-foreground">لا توجد ردود بعد على هذا التعليق.</p>}
           {thread.error && <p role="alert" className="text-xs text-destructive">{thread.error}</p>}

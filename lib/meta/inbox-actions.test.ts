@@ -5,7 +5,7 @@ import { getAvailableStocks } from "../inventory";
 import { requireAdministrator } from "../authorization";
 import { prisma } from "@/db/prisma";
 import { graphGet, graphPost, GraphError } from "./graph";
-import { resourceHandle } from "./inbox";
+import { resourceHandle, resourceId } from "./inbox";
 
 jest.mock("../orders/quick-order", () => ({ submitQuickOrder: jest.fn() }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
@@ -359,4 +359,15 @@ describe("order confirmations on comments", () => {
     expect(jest.mocked(graphPost).mock.calls[0][2]).toEqual({ recipient: { comment_id: "c1" },
       message: { text: "المنتج: منشار\nالعنوان: بغداد - الدورة\nالهاتف: 07701234567" } });
   });
+});
+
+it("returns a handle for each public comment reply so the admin can delete it later", async () => {
+  const ctx = { pageId: "page1", platform: "facebook" as const, token: "PRIVATE_PAGE", secret: "secret", userId: "admin1" };
+  jest.mocked(graphPost).mockResolvedValueOnce({ id: "reply1" });
+  const result = await replyToSocialInbox({ pageId: "page1", platform: "facebook", kind: "comments", handle: resourceHandle(ctx, "comment", "c1"), text: "شكراً" });
+  expect(result.ok && "handle" in result.data && resourceId(ctx, "comment", result.data.handle as string)).toBe("reply1");
+  jest.mocked(graphPost).mockResolvedValueOnce({ id: "reply2" });
+  const quick = await replyToSocialInboxComment({ pageId: "page1", platform: "facebook", handle: resourceHandle(ctx, "comment", "c2"),
+    publicText: "شكراً", privateText: "", skipIfReplied: false });
+  expect(quick.ok && "publicHandle" in quick.data && resourceId(ctx, "comment", quick.data.publicHandle as string)).toBe("reply2");
 });

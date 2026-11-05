@@ -5,7 +5,7 @@ import { requireAdministrator } from "@/lib/authorization";
 import { getMetaConfig } from "@/lib/meta/config";
 import { GraphError } from "@/lib/meta/graph";
 import { listInboxConversations, listInboxPosts, readInboxMessages, readInboxComments,
-  sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId,
+  sendInboxMessage, sendInboxMediaMessage, sendInboxComment, markInboxConversationRead, readInboxOrigin, resourceId, resourceHandle,
   moderateInboxComment, blockInboxCommentAuthor, replyToComment, readInboxPostText, listPageAdPostIds, readInboxComment,
   type SocialPlatform, type InboxContext } from "@/lib/meta/inbox";
 import { verifyInboxMedia } from "@/lib/meta/inbox-media-ticket";
@@ -311,7 +311,9 @@ export async function replyToSocialInbox(input: { pageId: string; platform: Soci
       }
     }
     if (input.kind !== "comments") throw new Error("قسم غير صالح");
-    return { id: await diagnoseSend(ctx, () => sendInboxComment(ctx, input.handle, input.text.trim())) };
+    const id = await diagnoseSend(ctx, () => sendInboxComment(ctx, input.handle, input.text.trim()));
+    // The handle lets the admin delete this reply later.
+    return { id, handle: resourceHandle(ctx, "comment", id) };
   });
 }
 
@@ -367,8 +369,10 @@ export async function replyToSocialInboxComment(input: { pageId: string; platfor
     }
     if ((!publicText && !privateText) || publicText.length > 1000 || privateText.length > 1000)
       throw new Error("نص الرد فارغ أو يتجاوز 1000 حرف");
-    return diagnoseSend(ctx, () => replyToComment(ctx, input.handle, { publicText, privateText,
+    const result = await diagnoseSend(ctx, () => replyToComment(ctx, input.handle, { publicText, privateText,
       skipIfReplied: input.skipIfReplied === true, privateRequired: input.privateRequired !== false }));
+    // The handle lets the admin delete the public reply later.
+    return "publicId" in result && result.publicId ? { ...result, publicHandle: resourceHandle(ctx, "comment", result.publicId) } : result;
   });
 }
 

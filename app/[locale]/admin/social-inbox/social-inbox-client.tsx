@@ -337,9 +337,9 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
     prefilled.current.add(item.id);
     onDraft(key, expanded.publicText);
   }
-  function recordCommentReply(item: InboxItem, publicId: string | undefined, text: string) {
+  function recordCommentReply(item: InboxItem, publicId: string | undefined, text: string, handle = "") {
     if (!publicId) return;
-    const reply: InboxItem = { id: publicId, handle: "", title: "الصفحة", text, time: new Date().toISOString(), outgoing: true };
+    const reply: InboxItem = { id: publicId, handle, title: "الصفحة", text, time: new Date().toISOString(), outgoing: true };
     confirmedComments.current[item.id] = merge(confirmedComments.current[item.id] || [], [reply]);
     if (thread?.id === item.id) setReplies(prev => ({ ...prev, items: merge(prev.items, [reply]) }));
   }
@@ -370,7 +370,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
         setReplyError(data.message); setTarget(item); onDraft(commentDraftKey(item), expanded.publicText);
         return;
       }
-      recordCommentReply(item, data.publicId, expanded.publicText);
+      recordCommentReply(item, data.publicId, expanded.publicText, "publicHandle" in data ? data.publicHandle : "");
       const next = nextAwaiting(detail.items.filter(entry => !entry.hidden && !entry.answered), item.id, handledNow);
       setNotice(`${data.privateId ? "أُرسلت الرسالة الخاصة و" : ""}نُشر الرد على ${item.title}.${next ? "" : " لا تعليقات أخرى بانتظار الرد ضمن المحمّل."}`);
       if ("privateSkipped" in data && data.privateSkipped) setReplyError(`نُشر الرد العلني فقط؛ لم تُرسل الرسالة الخاصة: ${data.privateSkipped}`);
@@ -406,7 +406,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
         if (result.data.status === "skipped") skipped++;
         else {
           sent++; handledNow.add(item.id);
-          if (result.data.status === "sent") recordCommentReply(item, result.data.publicId, expanded.publicText);
+          if (result.data.status === "sent") recordCommentReply(item, result.data.publicId, expanded.publicText, "publicHandle" in result.data ? result.data.publicHandle : "");
           else { stop = `${item.title}: ${result.data.message}`; show(false); break; }
         }
         show(true);
@@ -434,6 +434,22 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
   if (kind === "comments") for (const item of detail.items) if (!item.outgoing && item.intent) {
     intentCounts.set(item.intent, (intentCounts.get(item.intent) || 0) + 1);
     if (waitingComment(item)) intentCounts.set("waiting", (intentCounts.get("waiting") || 0) + 1);
+  }
+
+  /** Delete one of the Page's replies under a comment. */
+  async function deleteReply(reply: InboxItem) {
+    if (busy || sendingNow.current || !reply.handle || !thread) return;
+    const parentId = thread.id;
+    pauseRefresh(); setBusy(true); setModeratingId(reply.id); setReplyError(""); setNotice("");
+    try {
+      const result = await moderateSocialInboxComment({ pageId, platform, handle: reply.handle, action: "delete" });
+      if (!alive.current) return;
+      if (!result.ok) { setReplyError(result.message); return; }
+      confirmedComments.current[parentId] = (confirmedComments.current[parentId] || []).filter(entry => entry.id !== reply.id);
+      setReplies(prev => ({ ...prev, items: prev.items.filter(entry => entry.id !== reply.id) }));
+      setNotice("حُذف ردك.");
+    } catch { if (alive.current) setReplyError("لم نستلم تأكيد Meta؛ حدّث الردود للتحقق قبل إعادة المحاولة"); }
+    finally { if (alive.current) { setBusy(false); setModeratingId(null); } }
   }
 
   /** Hide or delete many comments, one at a time; stops at the first error from Meta. */
@@ -628,7 +644,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
       if (!alive.current) return;
       if (!result.ok) { setReplyError(result.message); return; }
       onDraft(draftKey, ""); setNotice("نُشر الرد على التعليق");
-      const reply: InboxItem = { id: result.data.id, handle: "", title: "الصفحة", text: draft.trim(), time: new Date().toISOString(), outgoing: true };
+      const reply: InboxItem = { id: result.data.id, handle: ("handle" in result.data ? result.data.handle : "") || "", title: "الصفحة", text: draft.trim(), time: new Date().toISOString(), outgoing: true };
       confirmedComments.current[destination.id] = merge(confirmedComments.current[destination.id] || [], [reply]);
       if (thread?.id === destination.id) setReplies(prev => ({ ...prev, items: merge(prev.items, [reply]) }));
       setHandledComments(prev => new Set([...prev, destination.id]));
@@ -751,6 +767,7 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
                 thread={thread && group.items.some(item => item.id === thread.id) ? { id: thread.id, items: replies.items, after: replies.after, loading: loadingReplies, error: "" } : null}
                 onCloseThread={() => { ++replySeq.current; setLoadingReplies(false); setThread(null); }}
                 onMoreReplies={() => { if (thread && replies.after) void loadReplies(thread, replies.after); }}
+                onDeleteReply={reply => void deleteReply(reply)}
                 pageId={pageId} postHandle={selected.handle} onWorking={working => { setBusy(working); onSending(working); }}
                 onOrdered={item => {
                   const ordered = { ...item, ordered: true };
