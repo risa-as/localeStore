@@ -256,11 +256,28 @@ async function attempt<T>(fn: () => Promise<T>) {
   }
 }
 
+/**
+ * With Standard Access, Meta lists Instagram conversations only for people who
+ * have a role on the app. A busy inbox makes the call fail: code 1 ("reduce the
+ * amount of data") or code -2 / subcode 2534084 (timeout). Comments still work.
+ */
+function isInstagramInboxTooLarge(error: unknown) {
+  return error instanceof GraphError && (error.code === 1 || error.subcode === 2534084 || error.code === -2);
+}
+
+const INSTAGRAM_INBOX_LIMITED = "رسائل إنستغرام غير متاحة بعد: Meta لا تسمح بجلب صندوق رسائل كبير إلا بعد منح التطبيق «الوصول المتقدم» لإذن instagram_manage_messages (عبر مراجعة التطبيق في Meta). التعليقات تعمل من تبويب «التعليقات»، والرسائل متاحة حالياً من تطبيق إنستغرام أو Business Suite.";
+
 export async function getSocialInboxList(input: { pageId: string; platform: SocialPlatform; kind: "messages" | "comments"; after?: string }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
     if (input.kind !== "messages" && input.kind !== "comments") throw new Error("قسم غير صالح");
-    if (input.kind === "messages") return applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after));
+    if (input.kind === "messages") {
+      try { return applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after)); }
+      catch (error) {
+        if (ctx.platform === "instagram" && isInstagramInboxTooLarge(error)) throw new Error(INSTAGRAM_INBOX_LIMITED);
+        throw error;
+      }
+    }
     return listInboxPosts(ctx, input.after, ctx.platform === "facebook" ? await adPostIds(ctx.pageId) : undefined);
   });
 }

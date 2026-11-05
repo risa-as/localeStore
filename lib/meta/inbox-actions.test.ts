@@ -371,3 +371,13 @@ it("returns a handle for each public comment reply so the admin can delete it la
     publicText: "شكراً", privateText: "", skipIfReplied: false });
   expect(quick.ok && "publicHandle" in quick.data && resourceId(ctx, "comment", quick.data.publicHandle as string)).toBe("reply2");
 });
+
+it("explains that Meta limits the Instagram inbox instead of showing a bare error code", async () => {
+  find.mockResolvedValue({ userAccessToken: "PRIVATE_USER", pages: [{ id: "page1", name: "Page", access_token: "PRIVATE_PAGE",
+    instagram_business_account: { id: "ig1" } }] } as never);
+  jest.mocked(graphGet).mockRejectedValueOnce(Object.assign(new GraphError(500, "reduce data"), { code: 1, status: 500 }));
+  const result = await getSocialInboxList({ pageId: "page1", platform: "instagram", kind: "messages" });
+  expect(result).toMatchObject({ ok: false, message: expect.stringContaining("الوصول المتقدم") });
+  jest.mocked(graphGet).mockRejectedValueOnce(Object.assign(new GraphError(400, "timeout"), { code: -2, subcode: 2534084, status: 400 }));
+  expect(await getSocialInboxList({ pageId: "page1", platform: "instagram", kind: "messages" })).toMatchObject({ ok: false, message: expect.stringContaining("instagram_manage_messages") });
+});
