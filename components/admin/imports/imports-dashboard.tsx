@@ -4,6 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ChevronDown, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   deleteImportCandidate,
   getReorderAlerts,
@@ -346,25 +357,54 @@ function StageCell({ candidate: c }: { candidate: CandidateDTO }) {
 function DeleteCandidate({ candidate: c }: { candidate: CandidateDTO }) {
   const router = useRouter();
   const { toast } = useToast();
+  const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const remove = () =>
     start(async () => {
-      if (!window.confirm(`حذف «${c.name}» نهائياً؟`)) return;
       const res = await deleteImportCandidate(c.id);
       toast({ variant: res.success ? "default" : "destructive", description: res.message });
-      if (res.success) router.refresh();
+      if (res.success) {
+        setOpen(false);
+        router.refresh();
+      }
     });
   return (
-    <button
-      type="button"
-      onClick={remove}
-      disabled={pending}
-      aria-label={`حذف ${c.name}`}
-      title="حذف"
-      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
-    >
-      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-    </button>
+    <AlertDialog open={open} onOpenChange={(v) => !pending && setOpen(v)}>
+      <AlertDialogTrigger asChild>
+        <button
+          type="button"
+          aria-label={`حذف ${c.name}`}
+          title="حذف"
+          className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </AlertDialogTrigger>
+      <AlertDialogContent dir="rtl" className="w-[calc(100%-2rem)] max-w-sm gap-5 rounded-2xl p-6 sm:rounded-2xl">
+        <AlertDialogHeader className="items-center space-y-3 text-center sm:text-center">
+          <span className="flex size-12 items-center justify-center rounded-full bg-red-500/10 text-red-600 ring-8 ring-red-500/5 dark:text-red-400">
+            <Trash2 className="size-5" />
+          </span>
+          <AlertDialogTitle className="text-base">حذف «{c.name}»؟</AlertDialogTitle>
+          <AlertDialogDescription className="text-sm leading-6">
+            تُحذف دراسة هذا المنتج وحساباته نهائياً ولا يمكن استرجاعها. المخزون والمنتج في المتجر لا يتأثران.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex items-center justify-between rounded-xl bg-muted/60 px-3 py-2 text-xs">
+          <span className="text-muted-foreground">المرحلة الحالية</span>
+          <span className={cn("rounded-md px-2 py-0.5 font-semibold", STATUS_STYLES[c.status])}>{IMPORT_STATUS_LABELS[c.status]}</span>
+        </div>
+        <AlertDialogFooter className="grid grid-cols-2 gap-2 sm:grid sm:gap-2">
+          <AlertDialogCancel disabled={pending} className="mt-0 rounded-lg">
+            إلغاء
+          </AlertDialogCancel>
+          <Button variant="destructive" disabled={pending} onClick={remove} className="gap-1.5 rounded-lg">
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            {pending ? "جارٍ الحذف…" : "حذف نهائياً"}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 
