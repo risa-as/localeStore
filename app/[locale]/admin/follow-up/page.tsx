@@ -1,3 +1,4 @@
+import { AppSelect } from "@/components/ui/app-select";
 import { requireStaff } from "@/lib/authorization";
 import { getLocale } from "next-intl/server";
 import { FOLLOW_UP_PAGE_SIZES, getFollowUpData, type FollowUpParams } from "@/lib/follow-up";
@@ -186,7 +187,7 @@ export default async function FollowUpPage({ searchParams }: { searchParams: Pro
               <blockquote className="whitespace-pre-wrap break-words rounded-[10px] border-s-2 border-primary/30 bg-muted/40 p-3 text-sm leading-7">{order.returnReasonText}</blockquote>
               <form action={saveReturnReason} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="id" value={order.id} />
-                <label className="min-w-0 flex-1 basis-48 space-y-1.5 text-xs font-semibold"><span className="block">سبب الرفض — راجع التصنيف المقترح</span><select name="reason" className="h-10 w-full rounded-[10px] border bg-background px-3 text-sm font-normal" defaultValue={suggestReturnReason(order.returnReasonText ?? "")}>{Object.entries(RETURN_REASONS).map(([key, label]) => <option value={key} key={key}>{label}</option>)}</select></label>
+                <label className="min-w-0 flex-1 basis-48 space-y-1.5 text-xs font-semibold"><span className="block">سبب الرفض — راجع التصنيف المقترح</span><AppSelect name="reason" required className="font-normal" aria-label="سبب الرفض" defaultValue={suggestReturnReason(order.returnReasonText ?? "")} options={Object.entries(RETURN_REASONS).map(([key, label]) => ({ value: key, label }))} /></label>
                 <button className="h-10 rounded-[10px] bg-primary px-4 text-xs font-bold text-primary-foreground hover:opacity-90">حفظ التصنيف</button>
               </form>
             </article>)}

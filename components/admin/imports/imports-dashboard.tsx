@@ -1,8 +1,9 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, ChevronDown, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, Clock, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -217,19 +218,22 @@ export default function ImportsDashboard({
               </button>
             ))}
           </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             ترتيب حسب
-            <select
+            <AppSelect
+              size="sm"
+              className="w-48"
+              aria-label="ترتيب حسب"
               value={sort}
-              onChange={(e) => setSort(e.target.value as Sort)}
-              className="rounded-lg border bg-background px-2 py-1 text-xs text-foreground"
-            >
-              <option value="newest">الأحدث</option>
-              <option value="margin">هامش الربح</option>
-              <option value="roi">العائد على رأس المال</option>
-              <option value="profit">إجمالي الربح المتوقع</option>
-            </select>
-          </label>
+              onValueChange={(v) => setSort(v as Sort)}
+              options={[
+                { value: "newest", label: "الأحدث" },
+                { value: "margin", label: "هامش الربح" },
+                { value: "roi", label: "العائد على رأس المال" },
+                { value: "profit", label: "إجمالي الربح المتوقع" },
+              ]}
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto rounded-xl border">
@@ -496,12 +500,21 @@ function AlertsTable({ rows, excluded }: { rows: ReorderAlert[]; excluded?: bool
               )}
               <td className="py-2 text-end">
                 {a.hasOpenCandidate ? (
-                  <span className="text-xs text-muted-foreground">لديه طلب مفتوح</span>
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5" />
+                    لديه طلب مفتوح
+                  </span>
                 ) : (
                   <Link
                     href={`/admin/imports/new?productId=${a.productId}`}
-                    className="text-xs font-semibold text-primary underline-offset-4 hover:underline"
+                    className={cn(
+                      "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition",
+                      excluded
+                        ? "border bg-card text-foreground hover:bg-muted"
+                        : "bg-foreground text-background hover:opacity-90",
+                    )}
                   >
+                    <RotateCcw className="h-3.5 w-3.5" />
                     ابدأ إعادة استيراد
                   </Link>
                 )}

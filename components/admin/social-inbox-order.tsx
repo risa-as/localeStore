@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 
 import { useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
@@ -127,11 +128,11 @@ export default function SocialInboxOrder({ scope, suggestedProduct, disabled, on
             <div className="grid grid-cols-2 gap-3">
               <label className="text-xs space-y-1"><span>الاسم</span><input value={SOCIAL_ORDER_NAME} readOnly className={`${control} text-muted-foreground`} /></label>
               <label className="text-xs space-y-1"><span>رقم الهاتف</span><input required dir="ltr" inputMode="tel" maxLength={25} value={fields.phoneNumber} onChange={event => { setFields({ ...fields, phoneNumber: event.target.value }); onSelectedFieldChange?.("phoneNumber", event.target.value); }} className={control} /></label>
-              <label className="text-xs space-y-1"><span>المحافظة</span><select required value={fields.governorate} onChange={event => setFields({ ...fields, governorate: event.target.value })} className={control}><option value="">اختر المحافظة</option>{iraqGovernorates.map(gov => <option key={gov} value={gov}>{tGov(gov)}</option>)}</select></label>
+              <label className="text-xs space-y-1"><span>المحافظة</span><AppSelect name="governorate" required aria-label="المحافظة" value={fields.governorate} onValueChange={governorate => setFields({ ...fields, governorate })} placeholder="اختر المحافظة" options={iraqGovernorates.map(gov => ({ value: gov, label: tGov(gov), keywords: [gov] }))} /></label>
               <label className="text-xs space-y-1"><span>الكمية</span><input required type="number" min={1} step={1} value={fields.quantity || ""} onChange={event => setFields({ ...fields, quantity: Number(event.target.value) })} className={control} /></label>
             </div>
             <label className="block text-xs space-y-1"><span>العنوان وأقرب نقطة دالة</span><textarea aria-label="العنوان وأقرب نقطة دالة" required minLength={3} maxLength={1000} rows={2} value={fields.address} onChange={event => { setFields({ ...fields, address: event.target.value }); onSelectedFieldChange?.("address", event.target.value); }} className={control} /></label>
-            {!!product?.colors?.length && <label className="block text-xs space-y-1"><span>اللون</span><select value={fields.selectedColor} onChange={event => setFields({ ...fields, selectedColor: event.target.value })} className={control}>{product.colors.map(color => <option key={color}>{color}</option>)}</select></label>}
+            {!!product?.colors?.length && <label className="block text-xs space-y-1"><span>اللون</span><AppSelect aria-label="اللون" value={fields.selectedColor} onValueChange={selectedColor => setFields({ ...fields, selectedColor })} placeholder="اختر اللون" options={product.colors.map(color => ({ value: color, label: color }))} /></label>}
           </fieldset>
           {pricing && <div className="rounded-lg border p-3 text-sm space-y-1"><div className="flex justify-between"><span>المنتج × {fields.quantity || 1}</span><span>{money(pricing.itemsPrice)}</span></div><div className="flex justify-between"><span>التوصيل</span><span>{money(pricing.shippingPrice)}</span></div><div className="flex justify-between font-bold"><span>الإجمالي التقديري</span><span>{money(pricing.totalPrice)}</span></div><p className="text-[11px] text-muted-foreground">عند الدمج يُحسب إجمالي الطلب القائم وتوصيله من جديد. المنتج الموجود لا تُزاد كميته.</p></div>}
           {!validation.success && <p className="text-xs text-muted-foreground">أكمل رقم هاتف عراقي صحيح، والمحافظة، والعنوان، وكمية صحيحة.</p>}

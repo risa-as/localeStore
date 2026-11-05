@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 
 import { useState, useTransition } from "react";
 import Image from "next/image";
@@ -225,18 +226,13 @@ export default function PublishPanel({
             <label className="text-xs text-muted-foreground">
               من منتج (اختياري — يملأ الصور والوصف)
             </label>
-            <select
+            <AppSelect
+              className="mt-1"
+              aria-label="المنتج"
               value={productId}
-              onChange={(e) => onPickProduct(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="">— بدون منتج —</option>
-              {feed.products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={onPickProduct}
+              options={[{ value: "", label: "— بدون منتج —" }, ...feed.products.map((p) => ({ value: p.id, label: p.name }))]}
+            />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">المنصّات</label>
@@ -935,17 +931,13 @@ function BoostDialog({
 
         <div>
           <label className="text-xs text-muted-foreground">الهدف</label>
-          <select
+          <AppSelect
+            className="mt-1"
+            aria-label="هدف الإعلان"
             value={objective}
-            onChange={(e) => setObjective(e.target.value)}
-            className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-          >
-            {adMeta.objectives.map((o) => (
-              <option key={o.key} value={o.key}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+            onValueChange={setObjective}
+            options={adMeta.objectives.map((o) => ({ value: o.key, label: o.label }))}
+          />
         </div>
 
         <div>

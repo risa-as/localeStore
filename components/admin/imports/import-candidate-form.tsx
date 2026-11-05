@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -538,20 +539,14 @@ export default function ImportCandidateForm({
               <Label htmlFor="ic-product" className="text-xs">
                 المنتج في المتجر
               </Label>
-              <select
+              <AppSelect
                 id="ic-product"
                 value={f.productId}
                 disabled={locked}
-                onChange={(e) => onPickProduct(e.target.value)}
-                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm"
-              >
-                <option value="">— اختر المنتج —</option>
-                {products.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} (المخزون {p.stock})
-                  </option>
-                ))}
-              </select>
+                onValueChange={onPickProduct}
+                placeholder="— اختر المنتج —"
+                options={products.map((p) => ({ value: p.id, label: p.name, hint: `المخزون ${p.stock}` }))}
+              />
             </div>
           )}
           <div className="space-y-1">
@@ -1026,20 +1021,14 @@ function ArrivalDialog({
             <Label htmlFor="ar-product" className="text-xs">
               المنتج في المتجر
             </Label>
-            <select
+            <AppSelect
               id="ar-product"
               value={productId}
               disabled={reimport && !!candidate.productId}
-              onChange={(e) => setProductId(e.target.value)}
-              className="w-full rounded-md border bg-background px-3 py-2 text-sm"
-            >
-              <option value="">— اختر المنتج —</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setProductId}
+              placeholder="— اختر المنتج —"
+              options={products.map((p) => ({ value: p.id, label: p.name }))}
+            />
             {!reimport && (
               <div className="flex flex-wrap gap-3 text-xs">
                 <Link href="/admin/products/create" target="_blank" className="font-medium text-primary underline-offset-2 hover:underline">

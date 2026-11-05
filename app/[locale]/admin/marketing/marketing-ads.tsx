@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -262,17 +263,13 @@ export default function AdsPanel({ data }: { data: AdsData }) {
                 هدف «تفاعل».
               </p>
             ) : (
-              <select
+              <AppSelect
+                className="mt-1"
+                aria-label="البكسل"
                 value={pixelId}
-                onChange={(e) => setPixelId(e.target.value)}
-                className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-              >
-                {data.pixels.map((px) => (
-                  <option key={px.id} value={px.id}>
-                    {px.name} ({px.id})
-                  </option>
-                ))}
-              </select>
+                onValueChange={setPixelId}
+                options={data.pixels.map((px) => ({ value: px.id, label: px.name, hint: px.id }))}
+              />
             )}
           </div>
         )}
@@ -299,18 +296,15 @@ export default function AdsPanel({ data }: { data: AdsData }) {
             </a>
           ) : null}
           <div className="flex-1 min-w-0 space-y-2">
-            <select
+            <AppSelect
+              aria-label="المنشور"
               value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
-              className="w-full h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              {data.pagePosts.map((p) => (
-                <option key={p.key} value={p.key}>
-                  {(p.hasCta ? "🔗 " : "") +
-                    (p.message || "فيديو").slice(0, 50).replace(/\n/g, " ")}
-                </option>
-              ))}
-            </select>
+              onValueChange={setSelectedKey}
+              options={data.pagePosts.map((p) => ({
+                value: p.key,
+                label: (p.hasCta ? "🔗 " : "") + (p.message || "فيديو").slice(0, 50).replace(/\n/g, " "),
+              }))}
+            />
             <div className="flex items-center gap-2 flex-wrap text-xs">
               {selectedPost?.hasCta ? (
                 <span className="inline-flex items-center gap-1 rounded-full border border-green-300 dark:border-green-900 bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 px-2 py-0.5">
@@ -424,32 +418,24 @@ export default function AdsPanel({ data }: { data: AdsData }) {
             <label className="text-xs text-muted-foreground">
               اختر المنتج (يملأ الرابط)
             </label>
-            <select
+            <AppSelect
+              className="mt-1"
+              aria-label="المنتج"
               value={productId}
-              onChange={(e) => onPickProduct(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              <option value="">— اختر منتجاً —</option>
-              {data.products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={onPickProduct}
+              placeholder="— اختر منتجاً —"
+              options={[{ value: "", label: "— اختر منتجاً —" }, ...data.products.map((p) => ({ value: p.id, label: p.name }))]}
+            />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">زر الحث</label>
-            <select
+            <AppSelect
+              className="mt-1"
+              aria-label="زر الحث"
               value={cta}
-              onChange={(e) => setCta(e.target.value)}
-              className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-            >
-              {data.ctas.map((c) => (
-                <option key={c.key} value={c.key}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+              onValueChange={setCta}
+              options={data.ctas.map((c) => ({ value: c.key, label: c.label }))}
+            />
           </div>
         </div>
         <div className="mt-2">

@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 
 import { Fragment, useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -1152,20 +1153,15 @@ function PeriodCampaignsFetcher({
                       {c.linked ? (
                         <span className="text-sm">{c.productName ?? "—"}</span>
                       ) : (
-                        <select
+                        <AppSelect
+                          size="sm"
+                          className="max-w-[220px]"
+                          aria-label="المنتج"
                           value={picks[c.campaignId] ?? ""}
-                          onChange={(e) =>
-                            setPicks((prev) => ({ ...prev, [c.campaignId]: e.target.value }))
-                          }
-                          className="h-8 rounded-md border bg-background px-2 text-xs w-full max-w-[220px]"
-                        >
-                          <option value="">— اختر المنتج —</option>
-                          {products.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
-                        </select>
+                          onValueChange={(v) => setPicks((prev) => ({ ...prev, [c.campaignId]: v }))}
+                          placeholder="— اختر المنتج —"
+                          options={[{ value: "", label: "— اختر المنتج —" }, ...products.map((p) => ({ value: p.id, label: p.name }))]}
+                        />
                       )}
                     </TableCell>
                       </TableRow>
@@ -1543,17 +1539,14 @@ function EditManualCampaignForm({
       </div>
       <div>
         <label className="text-xs text-muted-foreground">المنتج</label>
-        <select
+        <AppSelect
+          className="mt-1"
+          aria-label="المنتج"
           value={form.productId}
-          onChange={(e) => setForm({ ...form, productId: e.target.value })}
-          className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-        >
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={(v) => setForm({ ...form, productId: v })}
+          placeholder="اختر المنتج"
+          options={products.map((p) => ({ value: p.id, label: p.name }))}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -1589,14 +1582,16 @@ function EditManualCampaignForm({
         </div>
         <div>
           <label className="text-xs text-muted-foreground">العملة</label>
-          <select
+          <AppSelect
+            className="mt-1"
+            aria-label="العملة"
             value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value })}
-            className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-          >
-            <option value="IQD">دينار عراقي</option>
-            <option value="USD">دولار أمريكي</option>
-          </select>
+            onValueChange={(v) => setForm({ ...form, currency: v })}
+            options={[
+              { value: "IQD", label: "دينار عراقي" },
+              { value: "USD", label: "دولار أمريكي" },
+            ]}
+          />
         </div>
       </div>
       <div className="flex justify-end pt-2">
@@ -1652,17 +1647,14 @@ function ManualCampaignForm({
       </div>
       <div>
         <label className="text-xs text-muted-foreground">المنتج</label>
-        <select
+        <AppSelect
+          className="mt-1"
+          aria-label="المنتج"
           value={form.productId}
-          onChange={(e) => setForm({ ...form, productId: e.target.value })}
-          className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-        >
-          {products.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={(v) => setForm({ ...form, productId: v })}
+          placeholder="اختر المنتج"
+          options={products.map((p) => ({ value: p.id, label: p.name }))}
+        />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -1698,14 +1690,16 @@ function ManualCampaignForm({
         </div>
         <div>
           <label className="text-xs text-muted-foreground">العملة</label>
-          <select
+          <AppSelect
+            className="mt-1"
+            aria-label="العملة"
             value={form.currency}
-            onChange={(e) => setForm({ ...form, currency: e.target.value })}
-            className="mt-1 w-full h-9 rounded-md border bg-background px-2 text-sm"
-          >
-            <option value="IQD">دينار عراقي</option>
-            <option value="USD">دولار أمريكي</option>
-          </select>
+            onValueChange={(v) => setForm({ ...form, currency: v })}
+            options={[
+              { value: "IQD", label: "دينار عراقي" },
+              { value: "USD", label: "دولار أمريكي" },
+            ]}
+          />
         </div>
       </div>
       <div className="flex justify-end pt-2">

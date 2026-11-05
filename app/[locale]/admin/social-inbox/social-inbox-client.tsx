@@ -1,4 +1,5 @@
 "use client";
+import { AppSelect } from "@/components/ui/app-select";
 
 import { inboxDate } from "@/lib/meta/inbox-date";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -67,9 +68,8 @@ export default function SocialInboxClient({ setup }: { setup: Setup }) {
       <Popover><PopoverTrigger asChild><Button size="sm" variant="ghost" aria-label="إعدادات الصفحة والمنصة" title="الصفحة والمنصة والاتصال"><Settings2 className="size-4" /><span className="hidden sm:inline">الصفحة والمنصة</span></Button></PopoverTrigger>
         <PopoverContent dir="rtl" align="end" className="w-80 max-w-[calc(100vw-2rem)] space-y-4">
           <p className="text-sm font-semibold">إعدادات الصندوق</p>
-          {!!setup.pages.length && <><label className="block space-y-1 text-xs"><span>الصفحة</span><select aria-label="الصفحة" value={pageId} disabled={sending} onChange={e => { setPageId(e.target.value); setPlatform("facebook"); }} className="w-full rounded-md border bg-background p-2 text-sm">
-            {setup.pages.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </select></label><div className="flex gap-2" role="group" aria-label="المنصة">
+          {!!setup.pages.length && <><label className="block space-y-1 text-xs"><span>الصفحة</span><AppSelect aria-label="الصفحة" value={pageId} disabled={sending} onValueChange={v => { setPageId(v); setPlatform("facebook"); }}
+            options={setup.pages.map(p => ({ value: p.id, label: p.name }))} /></label><div className="flex gap-2" role="group" aria-label="المنصة">
             <Button size="sm" disabled={sending} aria-pressed={platform === "facebook"} variant={platform === "facebook" ? "default" : "outline"} onClick={() => setPlatform("facebook")}>فيسبوك</Button>
             <Button size="sm" disabled={sending || !page?.igId} aria-pressed={platform === "instagram"} variant={platform === "instagram" ? "default" : "outline"} onClick={() => setPlatform("instagram")}>إنستغرام</Button>
           </div>{!page?.igId && <p className="text-xs text-muted-foreground">إنستغرام يحتاج حساباً احترافياً مرتبطاً بالصفحة ومصرّحاً للتطبيق.</p>}</>}
@@ -702,9 +702,8 @@ function Workspace({ userId, pageId, platform, kind, drafts, onDraft, onSending,
             </Popover>
           </div>
           <div className="relative"><Search className="absolute start-2.5 top-2.5 size-4 text-muted-foreground" /><input aria-label="البحث في النتائج المحملة" placeholder={kind === "messages" ? "ابحث عن محادثة…" : "ابحث عن منشور…"} value={query} onChange={e => setQuery(e.target.value)} className="rounded-lg border bg-muted/30 py-2 ps-9 pe-2 w-full text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" /></div>
-          {kind === "messages" && <div className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-muted-foreground shrink-0" /><select aria-label="فلتر المحادثات" value={filter} onChange={e => setFilter(e.target.value)} className="min-w-0 flex-1 rounded-md border bg-background px-2 py-1.5 text-xs">
-            {filters.map(option => <option key={option.value} value={option.value}>{option.label} ({matching.filter(option.matches).length})</option>)}
-          </select></div>}
+          {kind === "messages" && <div className="flex items-center gap-2"><SlidersHorizontal className="size-4 text-muted-foreground shrink-0" /><AppSelect size="sm" className="flex-1" aria-label="فلتر المحادثات" value={filter} onValueChange={setFilter}
+            options={filters.map(option => ({ value: option.value, label: `${option.label} (${matching.filter(option.matches).length})` }))} /></div>}
         </div>
         <div className="flex-1 min-h-0 overflow-auto divide-y">
           {loadingList && !list.items.length ? <Loading /> : !visible.length ? <p className="p-6 text-sm text-muted-foreground">{query || filter !== "all" ? "لا نتائج مطابقة ضمن المحمّل" : listError ? "تعذر جلب القائمة" : "لا توجد نتائج متاحة"}</p> : visible.map(item => <button key={item.id} disabled={busy} aria-pressed={selected?.id === item.id}
