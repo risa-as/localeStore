@@ -15,11 +15,15 @@ import ImportComparisonCard from "@/components/admin/imports/import-comparison";
 
 export const metadata: Metadata = { title: "منتج مرشح" };
 
-export default async function ImportCandidatePage(props: { params: Promise<{ id: string }> }) {
+export default async function ImportCandidatePage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ arrive?: string }>;
+}) {
   const session = await auth();
   if (session?.user?.role !== "admin") redirect("/unauthorized");
 
   const { id } = await props.params;
+  const { arrive } = await props.searchParams;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
 
   const candidate = await getImportCandidate(id);
@@ -48,6 +52,7 @@ export default async function ImportCandidatePage(props: { params: Promise<{ id:
         products={products}
         fxDefault={fx}
         comparison={comparison ? <ImportComparisonCard data={comparison} /> : null}
+        openArrival={arrive === "1"}
       />
     </div>
   );

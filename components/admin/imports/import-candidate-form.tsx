@@ -20,7 +20,6 @@ import {
   Sparkles,
   StickyNote,
   Target,
-  Trash2,
   TrendingUp,
   Wallet,
   type LucideIcon,
@@ -45,20 +44,13 @@ import {
   usdToKiqd,
   type ImportInputs,
 } from "@/lib/import-calc";
-import {
-  COMMITTED_STATUSES,
-  IMPORT_STATUS_LABELS,
-  MANUAL_STATUSES,
-  type ImportStatus,
-} from "@/lib/import-status";
+import { COMMITTED_STATUSES, IMPORT_STATUS_LABELS } from "@/lib/import-status";
 import {
   convertImportCandidate,
   createImportCandidate,
-  deleteImportCandidate,
   getProductsForImport,
   getReimportHistory,
   refreshImportSnapshot,
-  setImportCandidateStatus,
   updateImportCandidate,
   type CandidateDTO,
   type ImportSettingsDTO,
@@ -335,6 +327,7 @@ export default function ImportCandidateForm({
   fxDefault,
   presetProductId,
   comparison,
+  openArrival,
 }: {
   candidate?: CandidateDTO;
   settings: ImportSettingsDTO;
@@ -342,6 +335,8 @@ export default function ImportCandidateForm({
   fxDefault: number | null;
   presetProductId?: string;
   comparison?: React.ReactNode;
+  /** يفتح نافذة «إضافة الشحنة للمخزون» مباشرة (من زر في جدول الاستيراد). */
+  openArrival?: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -458,23 +453,10 @@ export default function ImportCandidateForm({
 
   const save = () =>
     startSaving(async () => {
-      if (candidate) {
-        const res = await updateImportCandidate(candidate.id, payload());
-        toast({ variant: res.success ? "default" : "destructive", description: res.message });
-        if (res.success) router.refresh();
-      } else {
-        const res = await createImportCandidate(payload());
-        toast({ variant: res.success ? "default" : "destructive", description: res.message });
-        if (res.success && res.id) router.push(`/admin/imports/${res.id}`);
-      }
-    });
-
-  const changeStatus = (status: string) =>
-    startStatus(async () => {
-      if (!candidate) return;
-      const res = await setImportCandidateStatus(candidate.id, status);
+      // بعد الحفظ يعود إلى قائمة الاستيراد، ومنها تُغيَّر المرحلة.
+      const res = candidate ? await updateImportCandidate(candidate.id, payload()) : await createImportCandidate(payload());
       toast({ variant: res.success ? "default" : "destructive", description: res.message });
-      if (res.success) router.refresh();
+      if (res.success) router.push("/admin/imports");
     });
 
   const refreshSnap = () =>
@@ -485,15 +467,7 @@ export default function ImportCandidateForm({
       if (res.success) router.refresh();
     });
 
-  const remove = () =>
-    startStatus(async () => {
-      if (!candidate || !window.confirm(`حذف «${candidate.name}» نهائياً؟`)) return;
-      const res = await deleteImportCandidate(candidate.id);
-      toast({ variant: res.success ? "default" : "destructive", description: res.message });
-      if (res.success) router.push("/admin/imports");
-    });
-
-  const [arrivalOpen, setArrivalOpen] = useState(false);
+  const [arrivalOpen, setArrivalOpen] = useState(!!openArrival && candidate?.status === "arrived");
 
   const snap = candidate?.snapshot ?? null;
   const snapDiffers = !!snap && Math.abs(snap.result.profitPerUnitKiqd - r.profitPerUnitKiqd) > 0.001;
@@ -510,37 +484,16 @@ export default function ImportCandidateForm({
               {IMPORT_STATUS_LABELS[candidate.status]}
             </span>
             {!locked && (
-              <label className="flex items-center gap-2 text-sm">
-                تغيير المرحلة
-                <select
-                  value={candidate.status}
-                  disabled={statusPending || dirty}
-                  onChange={(e) => changeStatus(e.target.value)}
-                  className="rounded-lg border bg-background px-2 py-1.5 text-sm"
-                >
-                  {MANUAL_STATUSES.map((st) => (
-                    <option key={st} value={st}>
-                      {IMPORT_STATUS_LABELS[st as ImportStatus]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Link href="/admin/imports" className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline">
+                تُغيَّر المرحلة ويُحذف المنتج من صفحة الاستيراد
+              </Link>
             )}
-            {dirty && !locked && <span className="text-xs text-amber-600">احفظ التعديلات قبل تغيير المرحلة</span>}
             {candidate.status === "arrived" && (
-              <Button size="sm" className="gap-1.5" disabled={dirty} onClick={() => setArrivalOpen(true)}>
+              <Button size="sm" className="ms-auto gap-1.5" disabled={dirty} onClick={() => setArrivalOpen(true)}>
                 <PackagePlus className="h-4 w-4" />
                 إضافة الشحنة للمخزون
               </Button>
             )}
-            <div className="ms-auto flex items-center gap-2">
-              {!locked && (
-                <Button size="sm" variant="ghost" className="gap-1.5 text-red-600" onClick={remove} disabled={statusPending}>
-                  <Trash2 className="h-4 w-4" />
-                  حذف
-                </Button>
-              )}
-            </div>
             {locked && candidate.batchId && (
               <p className="w-full text-xs text-muted-foreground">
                 أُضيفت كدفعة جديدة ({fmtNum(candidate.receivedQty)} قطعة بتكلفة واصلة {fmtK(candidate.actualLandedKiqd)}) —{" "}

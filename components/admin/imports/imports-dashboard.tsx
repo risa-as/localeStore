@@ -1,10 +1,13 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ChevronDown, Loader2, PackageSearch, RotateCcw, Wallet, TrendingUp, Timer } from "lucide-react";
+import { AlertTriangle, ChevronDown, Loader2, PackagePlus, PackageSearch, RotateCcw, Trash2, Wallet, TrendingUp, Timer } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
+  deleteImportCandidate,
   getReorderAlerts,
+  setImportCandidateStatus,
   type CandidateDTO,
   type ReorderAlert,
   type ReorderAlertsReport,
@@ -13,6 +16,7 @@ import {
   COMMITTED_STATUSES,
   IMPORT_STATUSES,
   IMPORT_STATUS_LABELS,
+  MANUAL_STATUSES,
   type ImportStatus,
 } from "@/lib/import-status";
 import { cn } from "@/lib/utils";
@@ -222,12 +226,13 @@ export default function ImportsDashboard({
                 <th className="px-3 py-2.5 text-center font-semibold">الهامش</th>
                 <th className="px-3 py-2.5 text-center font-semibold">العائد</th>
                 <th className="px-3 py-2.5 text-end font-semibold">رأس المال</th>
+                <th className="w-10 px-2 py-2.5" />
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                  <td colSpan={10} className="py-12 text-center text-muted-foreground">
                     لا توجد منتجات هنا. اضغط «منتج مرشح جديد» للبدء.
                   </td>
                 </tr>
@@ -254,10 +259,8 @@ export default function ImportsDashboard({
                           </div>
                         </div>
                       </td>
-                      <td className="px-3 py-2.5">
-                        <span className={cn("whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[c.status])}>
-                          {IMPORT_STATUS_LABELS[c.status]}
-                        </span>
+                      <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
+                        <StageCell candidate={c} />
                       </td>
                       <td className="px-3 py-2.5 text-center">{fmtNum(c.inputs.quantity)}</td>
                       <td className="px-3 py-2.5 text-end">{fmtK(r.landedPerUnitKiqd)}</td>
@@ -266,6 +269,9 @@ export default function ImportsDashboard({
                       <td className="px-3 py-2.5 text-center">{fmtPct(r.marginPct, 0)}</td>
                       <td className="px-3 py-2.5 text-center">{fmtPct(r.roiPct, 0)}</td>
                       <td className="px-3 py-2.5 text-end">{fmtK(r.capitalKiqd)}</td>
+                      <td className="px-2 py-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                        {c.status !== "converted" && <DeleteCandidate candidate={c} />}
+                      </td>
                     </tr>
                   );
                 })
@@ -278,6 +284,87 @@ export default function ImportsDashboard({
         </p>
       </section>
     </div>
+  );
+}
+
+/** المرحلة تُغيَّر من الجدول مباشرة؛ «أُضيف للمخزون» فقط عبر نافذة الوصول. */
+function StageCell({ candidate: c }: { candidate: CandidateDTO }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [pending, start] = useTransition();
+  if (c.status === "converted") {
+    return (
+      <span className={cn("whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-semibold", STATUS_STYLES[c.status])}>
+        {IMPORT_STATUS_LABELS[c.status]}
+      </span>
+    );
+  }
+  const change = (status: string) =>
+    start(async () => {
+      const res = await setImportCandidateStatus(c.id, status);
+      toast({ variant: res.success ? "default" : "destructive", description: res.message });
+      if (res.success) router.refresh();
+    });
+  return (
+    <div className="flex items-center gap-2">
+      <div className="relative">
+        <select
+          value={c.status}
+          disabled={pending}
+          onChange={(e) => change(e.target.value)}
+          aria-label={`مرحلة ${c.name}`}
+          className={cn(
+            "cursor-pointer appearance-none rounded-md border-0 py-1 pe-6 ps-2 text-xs font-semibold outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
+            STATUS_STYLES[c.status],
+          )}
+        >
+          {MANUAL_STATUSES.map((st) => (
+            <option key={st} value={st} className="bg-background text-foreground">
+              {IMPORT_STATUS_LABELS[st as ImportStatus]}
+            </option>
+          ))}
+        </select>
+        {pending ? (
+          <Loader2 className="pointer-events-none absolute end-1.5 top-1/2 h-3 w-3 -translate-y-1/2 animate-spin" />
+        ) : (
+          <ChevronDown className="pointer-events-none absolute end-1.5 top-1/2 h-3 w-3 -translate-y-1/2 opacity-70" />
+        )}
+      </div>
+      {c.status === "arrived" && (
+        <Link
+          href={`/admin/imports/${c.id}?arrive=1`}
+          className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold text-primary underline-offset-4 hover:underline"
+        >
+          <PackagePlus className="h-3.5 w-3.5" />
+          أضف للمخزون
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function DeleteCandidate({ candidate: c }: { candidate: CandidateDTO }) {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [pending, start] = useTransition();
+  const remove = () =>
+    start(async () => {
+      if (!window.confirm(`حذف «${c.name}» نهائياً؟`)) return;
+      const res = await deleteImportCandidate(c.id);
+      toast({ variant: res.success ? "default" : "destructive", description: res.message });
+      if (res.success) router.refresh();
+    });
+  return (
+    <button
+      type="button"
+      onClick={remove}
+      disabled={pending}
+      aria-label={`حذف ${c.name}`}
+      title="حذف"
+      className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-600 disabled:opacity-50"
+    >
+      {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+    </button>
   );
 }
 
