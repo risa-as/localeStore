@@ -34,7 +34,7 @@
   color: var(--ink);
 }
 .clp .latin {
-  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  font-family: var(--font-sans), "Segoe UI", sans-serif;
   letter-spacing: 0.34em;
   text-transform: uppercase;
 }

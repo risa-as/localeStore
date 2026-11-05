@@ -2,7 +2,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
 import { getLogoUrl } from "@/lib/get-logo";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Rubik } from "next/font/google";
 import "@/assets/styles/globals.css";
 import { APP_DESCRIPTION, APP_NAME, SERVER_URL } from "@/lib/constants";
 import { ThemeProvider } from "next-themes";
@@ -13,9 +13,11 @@ import { Suspense } from "react";
 // import FacebookPixelWrapper from "./facebook-pixel-wrapper";
 import { FacebookPixelProvider } from './facebook-pixel-provider';
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+// The site font (Arabic + Latin digits); Tailwind's `font-sans` points to it.
+const rubik = Rubik({
+  variable: "--font-sans",
+  subsets: ["arabic", "latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -65,7 +67,7 @@ export default async function RootLayout({
         <link rel="preconnect" href="https://connect.facebook.net" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${rubik.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <Analytics />
         <NextIntlClientProvider messages={messages} locale={locale} timeZone="Asia/Baghdad">

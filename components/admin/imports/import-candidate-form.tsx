@@ -4,14 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  ChartLine,
   ChevronDown,
   History,
   Info,
   Loader2,
+  Megaphone,
+  Package,
   PackagePlus,
+  Percent,
+  Receipt,
   RefreshCw,
   Save,
+  Ship,
+  Sparkles,
+  StickyNote,
+  Target,
   Trash2,
+  TrendingUp,
+  Wallet,
+  type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -184,15 +196,68 @@ function toInputs(f: FormState): ImportInputs {
 
 // ─── عناصر صغيرة ─────────────────────────────────────────────────────────────
 
-function Section({ title, children, aside }: { title: string; children: React.ReactNode; aside?: React.ReactNode }) {
+/** خلفية بطاقة الربح حسب الإشارة. */
+const HERO_STYLES = {
+  green: "border-green-500/30 bg-green-500/[0.06]",
+  yellow: "border-amber-500/30 bg-amber-500/[0.06]",
+  red: "border-red-500/30 bg-red-500/[0.06]",
+} as const;
+
+function Section({
+  title,
+  children,
+  aside,
+  step,
+  icon: Icon,
+  description,
+}: {
+  title: string;
+  children: React.ReactNode;
+  aside?: React.ReactNode;
+  step?: number;
+  icon?: LucideIcon;
+  description?: string;
+}) {
   return (
-    <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-semibold">{title}</h2>
+    <section className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-3">
+          {Icon && (
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl border bg-card text-foreground/80 shadow-sm">
+              <Icon className="size-[18px]" />
+            </span>
+          )}
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold leading-6">
+              {step !== undefined && (
+                <span className="flex size-5 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background tabular-nums">
+                  {step}
+                </span>
+              )}
+              {title}
+            </h2>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          </div>
+        </div>
         {aside}
-      </div>
-      {children}
+      </header>
+      <div className="space-y-4 p-4 sm:p-5">{children}</div>
     </section>
+  );
+}
+
+/** رقم بارز في بطاقة صغيرة ضمن لوحة النتائج. */
+function Stat({ label, value, tone, icon: Icon }: { label: string; value: string; tone?: string; icon: LucideIcon }) {
+  return (
+    <div className="rounded-xl border bg-card p-3 shadow-sm">
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" />
+        {label}
+      </p>
+      <p dir="ltr" className={cn("mt-1 truncate text-right text-lg font-semibold tabular-nums", tone)}>
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -216,15 +281,15 @@ function Field({
   step?: string;
 }) {
   return (
-    <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs">
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-xs font-medium text-foreground/80">
         {label}
       </Label>
       {/* الحقل والوحدة إطار واحد: الحدود والزوايا على الغلاف، فلا تتأثر باتجاه
           الحقل (ltr للأرقام) ولا تغطي الوحدة الرقم. */}
       <div
         className={cn(
-          "flex h-9 items-stretch overflow-hidden rounded-md border border-input shadow-sm focus-within:ring-1 focus-within:ring-ring",
+          "flex h-10 items-stretch overflow-hidden rounded-lg border border-input bg-background shadow-sm transition-colors hover:border-foreground/25 focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-ring/15",
           disabled && "opacity-50",
         )}
       >
@@ -237,10 +302,10 @@ function Field({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="h-full min-w-0 rounded-none border-0 text-right tabular-nums shadow-none focus-visible:ring-0 disabled:opacity-100"
+          className="h-full min-w-0 rounded-none border-0 bg-transparent text-right font-medium tabular-nums shadow-none focus-visible:ring-0 disabled:opacity-100"
         />
         {unit && (
-          <span className="flex shrink-0 items-center whitespace-nowrap border-s border-input bg-muted px-2.5 text-[11px] text-muted-foreground">
+          <span className="flex min-w-12 shrink-0 items-center justify-center whitespace-nowrap border-s border-input bg-muted/60 px-2.5 text-[11px] font-medium text-muted-foreground">
             {unit}
           </span>
         )}
@@ -440,7 +505,7 @@ export default function ImportCandidateForm({
     <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0 space-y-5">
         {candidate && (
-          <section className="flex flex-wrap items-center gap-3 rounded-xl border bg-card p-4">
+          <section className="flex flex-wrap items-center gap-3 rounded-2xl border bg-card p-4 shadow-sm">
             <span className={cn("rounded-md px-2.5 py-1 text-xs font-semibold", STATUS_STYLES[candidate.status])}>
               {IMPORT_STATUS_LABELS[candidate.status]}
             </span>
@@ -489,22 +554,31 @@ export default function ImportCandidateForm({
 
         {comparison}
 
-        <Section title="المنتج">
-          <div className="flex gap-2">
-            {(["new", "reimport"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                disabled={locked}
-                onClick={() => setF((p) => ({ ...p, kind: k }))}
-                className={cn(
-                  "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-                  f.kind === k ? "border-primary bg-primary/10 text-primary" : "hover:bg-muted",
-                )}
-              >
-                {k === "new" ? "منتج جديد" : "إعادة استيراد منتج موجود"}
-              </button>
-            ))}
+        <Section step={1} icon={Package} title="المنتج" description="منتج جديد تجرّبه، أو إعادة طلب منتج يُباع في متجرك">
+          <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+            {(["new", "reimport"] as const).map((k) => {
+              const KindIcon = k === "new" ? Sparkles : RefreshCw;
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  disabled={locked}
+                  onClick={() => setF((p) => ({ ...p, kind: k }))}
+                  className={cn(
+                    "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                    f.kind === k ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <KindIcon className="size-4 shrink-0" />
+                  {k === "new" ? "منتج جديد" : (
+                    <>
+                      <span className="sm:hidden">إعادة استيراد</span>
+                      <span className="hidden sm:inline">إعادة استيراد منتج موجود</span>
+                    </>
+                  )}
+                </button>
+              );
+            })}
           </div>
           {f.kind === "reimport" && (
             <div className="space-y-1">
@@ -516,7 +590,7 @@ export default function ImportCandidateForm({
                 value={f.productId}
                 disabled={locked}
                 onChange={(e) => onPickProduct(e.target.value)}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                className="h-10 w-full rounded-lg border bg-background px-3 text-sm shadow-sm"
               >
                 <option value="">— اختر المنتج —</option>
                 {products.map((p) => (
@@ -528,16 +602,18 @@ export default function ImportCandidateForm({
             </div>
           )}
           <div className="space-y-1">
-            <Label htmlFor="ic-name" className="text-xs">
+            <Label htmlFor="ic-name" className="text-xs font-medium text-foreground/80">
               اسم المنتج
             </Label>
-            <Input id="ic-name" value={f.name} disabled={locked} onChange={(e) => set("name")(e.target.value)} />
+            <Input id="ic-name" value={f.name} disabled={locked} onChange={(e) => set("name")(e.target.value)} className="h-10 rounded-lg" />
           </div>
         </Section>
 
         {f.kind === "reimport" && f.productId && (
           <Section
+            icon={ChartLine}
             title="الأرقام الفعلية من متجرك"
+            description="من الطلبات المسلَّمة والراجعة وصرف الإعلانات"
             aside={
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">آخر</span>
@@ -693,7 +769,7 @@ export default function ImportCandidateForm({
           </Section>
         )}
 
-        <Section title="الشراء من الصين">
+        <Section step={2} icon={Ship} title="الشراء من الصين" description="سعر المورد والشحن والعمولات بالدولار">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field id="ic-qty" label="الكمية" unit="قطعة" step="1" value={f.quantity} onChange={set("quantity")} disabled={locked} />
             <Field id="ic-unit" label="سعر القطعة" unit="$" value={f.unitPriceUsd} onChange={set("unitPriceUsd")} hint={usdHint(f.unitPriceUsd)} disabled={locked} />
@@ -721,7 +797,7 @@ export default function ImportCandidateForm({
           </div>
         </Section>
 
-        <Section title="تكاليف محلية">
+        <Section step={3} icon={Receipt} title="تكاليف محلية" description="ما يُدفع داخل العراق حتى تصبح القطعة جاهزة للبيع">
           <div className="grid gap-3 sm:grid-cols-2">
             <Field id="ic-customs" label="الجمارك والتخليص للشحنة" unit="ألف د.ع" value={f.customsKiqd} onChange={set("customsKiqd")} hint={kHint(f.customsKiqd)} disabled={locked} />
             <Field
@@ -745,7 +821,7 @@ export default function ImportCandidateForm({
           )}
         </Section>
 
-        <Section title="البيع والإعلان">
+        <Section step={4} icon={Megaphone} title="البيع والإعلان" description="سعر البيع وتكلفة الإعلان ونسبة التسليم المتوقعة">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Field id="ic-price" label="صافي سعر البيع للقطعة" unit="ألف د.ع" value={f.sellingPriceKiqd} onChange={set("sellingPriceKiqd")} hint={`${kHint(f.sellingPriceKiqd) ?? ""} بعد العروض`} disabled={locked} />
             <Field
@@ -763,36 +839,71 @@ export default function ImportCandidateForm({
           </div>
         </Section>
 
-        <Section title="ملاحظات">
-          <Textarea value={f.notes} disabled={locked} onChange={(e) => set("notes")(e.target.value)} rows={3} />
+        <Section icon={StickyNote} title="ملاحظات">
+          <Textarea value={f.notes} disabled={locked} onChange={(e) => set("notes")(e.target.value)} rows={3} className="rounded-lg" placeholder="المورد، المواصفات، أي شيء تريد تذكّره…" />
         </Section>
 
         {!locked && (
-          <div className="flex flex-wrap items-center gap-3">
-            <Button onClick={save} disabled={saving || (!!candidate && !dirty)} className="gap-1.5">
+          <div className="sticky bottom-3 z-20 flex items-center gap-3 rounded-2xl border bg-background/90 p-3 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-background/75">
+            <Button onClick={save} disabled={saving || (!!candidate && !dirty)} className="h-10 shrink-0 gap-1.5 rounded-lg px-4 sm:px-5">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {candidate ? "حفظ التعديلات" : "حفظ المنتج المرشح"}
+              <span className="sm:hidden">{candidate ? "حفظ التعديلات" : "حفظ"}</span>
+              <span className="hidden sm:inline">{candidate ? "حفظ التعديلات" : "حفظ المنتج المرشح"}</span>
             </Button>
-            {candidate && dirty && <span className="text-xs text-amber-600">توجد تعديلات غير محفوظة</span>}
+            {candidate && dirty && <span className="min-w-0 text-xs text-amber-600">توجد تعديلات غير محفوظة</span>}
+            {/* ملخص الربح يبقى ظاهراً على الهاتف حيث لوحة النتائج في الأسفل. */}
+            <div className="ms-auto flex shrink-0 items-center gap-2 lg:hidden">
+              <span className={cn("rounded-md px-2 py-0.5 text-[11px] font-semibold", SIGNAL_STYLES[signal].chip)}>{SIGNAL_STYLES[signal].label}</span>
+              <span dir="ltr" className={cn("text-sm font-semibold tabular-nums", profitTone(r.profitPerUnitKiqd))}>
+                {fmtK(r.profitPerUnitKiqd)}
+              </span>
+            </div>
           </div>
         )}
       </div>
 
       {/* ── النتائج ── */}
       <aside className="space-y-4 lg:sticky lg:top-4">
-        <section className="space-y-4 rounded-xl border bg-card p-4 sm:p-5">
+        <section className={cn("space-y-4 rounded-2xl border p-4 shadow-sm sm:p-5", HERO_STYLES[signal])}>
           <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-xs text-muted-foreground">صافي ربح القطعة المسلَّمة</p>
-              <p className={cn("text-3xl font-bold tracking-tight", profitTone(r.profitPerUnitKiqd))} dir="ltr">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-muted-foreground">صافي ربح القطعة المسلَّمة</p>
+              <p className={cn("mt-1 text-right text-4xl font-bold tracking-tight tabular-nums", profitTone(r.profitPerUnitKiqd))} dir="ltr">
                 {fmtK(r.profitPerUnitKiqd)}
               </p>
-              <p className="text-xs text-muted-foreground">هامش {fmtPct(r.marginPct)}</p>
             </div>
-            <span className={cn("rounded-md px-2 py-1 text-xs font-semibold", SIGNAL_STYLES[signal].chip)}>{SIGNAL_STYLES[signal].label}</span>
+            <span className={cn("flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", SIGNAL_STYLES[signal].chip)}>
+              <span className={cn("size-1.5 rounded-full", SIGNAL_STYLES[signal].dot)} />
+              {SIGNAL_STYLES[signal].label}
+            </span>
           </div>
+          {settings.targetMarginPct > 0 && (
+            <div className="space-y-1.5">
+              <div className="relative h-2 rounded-full bg-foreground/10">
+                <div
+                  className={cn("absolute inset-y-0 start-0 rounded-full transition-all", SIGNAL_STYLES[signal].dot)}
+                  style={{ width: `${Math.max(0, Math.min(100, (r.marginPct / (settings.targetMarginPct * 2)) * 100))}%` }}
+                />
+                {/* علامة الهامش المستهدف في منتصف الشريط. */}
+                <span className="absolute -top-1 start-1/2 h-4 w-0.5 rounded-full bg-foreground/50" />
+              </div>
+              <div className="flex justify-between text-[11px] text-muted-foreground">
+                <span>هامش {fmtPct(r.marginPct)}</span>
+                <span>الهدف {fmtPct(settings.targetMarginPct, 0)}</span>
+              </div>
+            </div>
+          )}
+        </section>
 
-          <div className="space-y-1.5 border-t pt-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Stat icon={Wallet} label="رأس المال المطلوب" value={fmtK(r.capitalKiqd)} />
+          <Stat icon={TrendingUp} label="إجمالي الربح المتوقع" value={fmtK(r.totalProfitKiqd)} tone={profitTone(r.totalProfitKiqd)} />
+          <Stat icon={Percent} label="العائد على رأس المال" value={fmtPct(r.roiPct)} tone={profitTone(r.roiPct)} />
+          <Stat icon={Target} label="أعلى إعلان لكل طلب" value={fmtUsd(r.breakEvenCpaUsd)} />
+        </div>
+
+        <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+          <div className="space-y-1.5">
             <p className="text-xs font-semibold text-muted-foreground">تكلفة الشحنة</p>
             <Line label="البضاعة" value={fmtUsd(r.goodsUsd)} muted />
             <Line label="الشحن الدولي" value={fmtUsd(inputs.intlShippingUsd)} muted />
@@ -812,31 +923,25 @@ export default function ImportCandidateForm({
           </div>
 
           <div className="space-y-1.5 border-t pt-3">
-            <p className="text-xs font-semibold text-muted-foreground">الشحنة كاملة</p>
-            <Line label="رأس المال المطلوب" value={fmtK(r.capitalKiqd)} />
-            <Line label="إجمالي الربح المتوقع" value={fmtK(r.totalProfitKiqd)} tone={profitTone(r.totalProfitKiqd)} />
-            <Line label="العائد على رأس المال" value={fmtPct(r.roiPct)} />
-          </div>
-
-          <div className="space-y-1.5 border-t pt-3">
             <p className="text-xs font-semibold text-muted-foreground">نقاط التعادل</p>
             <Line label="أعلى تكلفة إعلان لكل طلب" value={fmtUsd(r.breakEvenCpaUsd)} strong />
             <Line label="أقل سعر بيع بلا خسارة" value={fmtK(r.breakEvenPriceKiqd)} />
           </div>
         </section>
 
-        <section className="space-y-2 rounded-xl border bg-card p-4">
+        <section className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
           <p className="text-xs font-semibold text-muted-foreground">السيناريوهات</p>
-          <table className="w-full text-xs">
+          {/* عمود «متوقع» مظلَّل لأنه الحساب المعتمد. */}
+          <table className="w-full text-xs [&_td:nth-child(3)]:bg-muted/70 [&_th:nth-child(3)]:bg-muted/70">
             <thead>
               <tr className="text-muted-foreground">
-                <th className="py-1 text-start font-medium" />
-                <th className="py-1 text-center font-medium">متشائم</th>
-                <th className="py-1 text-center font-medium">متوقع</th>
-                <th className="py-1 text-center font-medium">متفائل</th>
+                <th className="py-1.5 text-start font-medium" />
+                <th className="py-1.5 text-center font-medium">متشائم</th>
+                <th className="rounded-t-lg py-1.5 text-center font-semibold text-foreground">متوقع</th>
+                <th className="py-1.5 text-center font-medium">متفائل</th>
               </tr>
             </thead>
-            <tbody className="[&_td]:py-1">
+            <tbody className="[&_td]:py-1.5 [&_tr:last-child_td:nth-child(3)]:rounded-b-lg">
               <tr>
                 <td className="text-muted-foreground">الإعلان/طلب</td>
                 {(["pessimistic", "expected", "optimistic"] as const).map((k) => (
@@ -871,7 +976,7 @@ export default function ImportCandidateForm({
         </section>
 
         {snap && candidate && COMMITTED_STATUSES.includes(candidate.status) && (
-          <section className="space-y-2 rounded-xl border bg-card p-4 text-sm">
+          <section className="space-y-2 rounded-2xl border bg-card p-4 text-sm shadow-sm">
             <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
               <History className="h-3.5 w-3.5" />
               لقطة الموافقة ({new Date(snap.at).toLocaleDateString("en-GB")})
