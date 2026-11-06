@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2, ShoppingBag, Loader2 } from "lucide-react";
 import Link from "next/link";
 import OrderSuggestions from "@/components/shared/order-suggestions";
+import { RedirectCountdownBanner, useRedirectCountdown } from "@/components/shared/redirect-countdown";
 
 // UI Components
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,17 @@ function ThankYouContent() {
   const [loading, setLoading] = useState(Boolean(orderId));
   const [loadError, setLoadError] = useState(false);
   const [redirectCategory, setRedirectCategory] = useState("");
+  const continueHref = redirectCategory
+    ? `/ar/search?category=${encodeURIComponent(redirectCategory)}`
+    : "/ar";
+
+  // عدّاد التحويل: يبدأ فقط حين توجد منتجات مقترحة، ويعود إلى 5 عند إضافة منتج
+  // أو اختيار لون، ويتوقف أثناء الإضافة. الطلب المكرّر لا يُحوَّل (يقرأ التوضيح).
+  const [addingSuggestion, setAddingSuggestion] = useState(false);
+  const { secondsLeft, restart: restartCountdown } = useRedirectCountdown(continueHref, {
+    paused: addingSuggestion,
+    disabled: isDuplicate,
+  });
 
   // جلب البيانات (يحدث مرة واحدة)
   useEffect(() => {
@@ -257,10 +269,17 @@ function ThankYouContent() {
             </p>
           </CardContent>
           {orderId && purchase && (
-            <div className="px-6 pb-6">
+            <div className="px-6 pb-6 space-y-3">
+              {secondsLeft !== null && (
+                <RedirectCountdownBanner secondsLeft={secondsLeft} busy={addingSuggestion} />
+              )}
               <OrderSuggestions
                 orderId={orderId}
+                onLoaded={(count) => { if (count > 0) restartCountdown(); }}
+                onActivity={restartCountdown}
+                onBusyChange={setAddingSuggestion}
                 onAdded={() => {
+                  restartCountdown();
                   import("@/lib/actions/upsell.actions")
                     .then(({ getOrderReceipt }) => getOrderReceipt(orderId))
                     .then((summary) =>
@@ -278,11 +297,7 @@ function ThankYouContent() {
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"
             >
               <Link
-                href={
-                  redirectCategory
-                    ? `/ar/search?category=${encodeURIComponent(redirectCategory)}`
-                    : "/ar"
-                }
+                href={continueHref}
                 className="flex items-center gap-2"
               >
                 <ShoppingBag className="w-4 h-4" />
