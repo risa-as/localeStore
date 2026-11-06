@@ -11,7 +11,7 @@ import {
   type WaTemplateKind,
 } from "@/lib/whatsapp";
 import type { Prisma } from "@prisma/client";
-import { waConversationFilter, waConversationStatusWhere } from "@/lib/whatsapp-inbox-filters";
+import { WA_INBOX_PAGE_SIZE, waConversationFilter, waConversationStatusWhere } from "@/lib/whatsapp-inbox-filters";
 
 async function requireStaff() {
   return requireCurrentStaff();
@@ -66,11 +66,11 @@ export async function getWaConversations(query?: string, template?: string, filt
   });
 }
 
-async function findWaConversations(where: Prisma.WaConversationWhereInput) {
+async function findWaConversations(where: Prisma.WaConversationWhereInput, take = WA_INBOX_PAGE_SIZE) {
   const conversations = await prisma.waConversation.findMany({
     where,
     orderBy: [{ lastMessageAt: "desc" }, { id: "desc" }],
-    take: 100,
+    take,
   });
 
   return conversations.map((c) => ({
@@ -84,16 +84,19 @@ async function findWaConversations(where: Prisma.WaConversationWhereInput) {
   }));
 }
 
-/** Counts cover every matching conversation; the list contains the latest 100 matches. */
-export async function getWaInbox(query?: string, template?: string, filter?: string) {
+/** Counts cover every match; take the latest matches up to the requested list size. */
+export async function getWaInbox(query?: string, template?: string, filter?: string, limit = WA_INBOX_PAGE_SIZE) {
   await requireStaff();
   const selectedQuery = typeof query === "string" ? query.trim() : "";
   const selectedTemplate = isTemplateKind(template) ? template : undefined;
   const selectedFilter = waConversationFilter(filter);
+  const take = Number.isSafeInteger(limit) && limit >= WA_INBOX_PAGE_SIZE
+    ? Math.min(limit, 2_147_483_647)
+    : WA_INBOX_PAGE_SIZE;
   const now = new Date();
   const base = conversationWhere(selectedQuery, selectedTemplate);
   const [conversations, all, unread, open, confirmation, returned] = await Promise.all([
-    findWaConversations({ ...base, ...waConversationStatusWhere(selectedFilter, now) }),
+    findWaConversations({ ...base, ...waConversationStatusWhere(selectedFilter, now) }, take),
     prisma.waConversation.count({ where: base }),
     prisma.waConversation.count({ where: { ...base, ...waConversationStatusWhere("unread", now) } }),
     prisma.waConversation.count({ where: { ...base, ...waConversationStatusWhere("open", now) } }),

@@ -1,5 +1,5 @@
 import { replyToSocialInboxComment, checkSocialInboxConnection, getSocialInboxSetup, getSocialInboxList, getSocialInboxDetail, getSocialInboxOrigin, getSocialInboxDelivery, replyToSocialInbox, sendSocialInboxMedia, getSocialInboxUploadScope, markSocialInboxRead, searchSocialInboxProducts, searchSocialInboxOrdersByPhone, prepareSocialInboxOrder, approveSocialInboxOrder } from "../actions/social-inbox.actions";
-import { submitQuickOrder } from "../orders/quick-order";
+import { submitQuickOrder, submitQuickOrderItems } from "../orders/quick-order";
 import { signInboxMedia } from "./inbox-media-ticket";
 import { getAvailableStocks } from "../inventory";
 import { requireAdministrator } from "../authorization";
@@ -7,7 +7,7 @@ import { prisma } from "@/db/prisma";
 import { graphGet, graphPost, GraphError } from "./graph";
 import { resourceHandle, resourceId } from "./inbox";
 
-jest.mock("../orders/quick-order", () => ({ submitQuickOrder: jest.fn() }));
+jest.mock("../orders/quick-order", () => ({ submitQuickOrder: jest.fn(), submitQuickOrderItems: jest.fn() }));
 jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("../utils", () => ({ formatNumberWithDecimal: (value: number) => value.toFixed(2), convertArabicToEnglishNumbers: (value: string) => value.replace(/[٠-٩]/g, c => String(c.charCodeAt(0) - 1632)) }));
 
@@ -195,6 +195,22 @@ it("uses the shared checkout with a fixed name and scoped durable approval recei
   await approveSocialInboxOrder(input);
   expect(jest.mocked(submitQuickOrder).mock.calls[1][2].receipt?.requestKey).toBe(firstKey);
   expect(graphPost).not.toHaveBeenCalled();
+});
+
+it("passes all products to one checkout with one receipt and rejects duplicate lines", async () => {
+  jest.mocked(submitQuickOrderItems).mockResolvedValue({ orderId: "order1", kind: "created", replay: false });
+  const ctx = { pageId: "page1", platform: "facebook" as const, token: "PRIVATE_PAGE", secret: "secret", userId: "admin1" };
+  const input = { pageId: ctx.pageId, platform: ctx.platform, handle: resourceHandle(ctx, "conversation", "thread1"),
+    requestId: "11111111-1111-4111-8111-111111111111", phoneNumber: "+9647701234567", governorate: "Baghdad", address: "عنوان كامل",
+    items: [{ productId: "22222222-2222-4222-8222-222222222222", quantity: 2, selectedColor: "أسود" },
+      { productId: "33333333-3333-4333-8333-333333333333", quantity: 1 }] };
+  expect((await approveSocialInboxOrder(input)).ok).toBe(true);
+  expect(submitQuickOrderItems).toHaveBeenCalledWith(
+    { fullName: "زبون", phoneNumber: "07701234567", governorate: "Baghdad", address: "عنوان كامل" }, input.items,
+    expect.objectContaining({ receipt: expect.objectContaining({ conversationId: "thread1", createdBy: "admin1" }) }));
+  expect((await approveSocialInboxOrder({ ...input, items: [input.items[0], input.items[0]] })).ok).toBe(false);
+  expect(submitQuickOrderItems).toHaveBeenCalledTimes(1);
+  expect(submitQuickOrder).not.toHaveBeenCalled();
 });
 
 it("rejects incomplete orders and cross-Page handles before checkout", async () => {

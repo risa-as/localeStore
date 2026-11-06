@@ -5,9 +5,9 @@ import { cn } from "@/lib/utils";
 import React from "react";
 import { useTranslations } from "next-intl";
 import {
-  LayoutDashboard, Package, Tag, ShoppingCart,
-  Users, TrendingUp, Receipt, Truck, Flame, Settings, BarChart2, Layers,
-  MessageCircle, Megaphone, Ship,
+  BadgePercent, ChartColumn, ClipboardList, Inbox, Layers, LayoutDashboard,
+  ListChecks, Megaphone, MessageSquareText, Package, ReceiptText, Settings,
+  Ship, Tags, TrendingUp, Truck, UsersRound,
 } from "lucide-react";
 
 const MainNav = ({
@@ -22,18 +22,18 @@ const MainNav = ({
     { title: t("products"),        href: "/admin/products",          icon: Package },
     { title: t("batches"),         href: "/admin/batches",           icon: Layers,    hide: role !== "admin" },
     { title: "الاستيراد",           href: "/admin/imports",           icon: Ship,      hide: role !== "admin" },
-    { title: t("categories"),      href: "/admin/categories",        icon: Tag },
-    { title: t("orders"),          href: "/admin/orders",            icon: ShoppingCart },
-    { title: t("chats"),           href: "/admin/chats",             icon: MessageCircle },
-    { title: "رسائل الصفحات",       href: "/admin/social-inbox",      icon: MessageCircle, hide: role !== "admin" },
-    { title: "المتابعة",            href: "/admin/follow-up",         icon: LayoutDashboard },
+    { title: t("categories"),      href: "/admin/categories",        icon: Tags },
+    { title: t("orders"),          href: "/admin/orders",            icon: ClipboardList },
+    { title: t("chats"),           href: "/admin/chats",             icon: MessageSquareText },
+    { title: "رسائل الصفحات",       href: "/admin/social-inbox",      icon: Inbox, hide: role !== "admin" },
+    { title: "المتابعة",            href: "/admin/follow-up",         icon: ListChecks },
     { title: t("marketing"),       href: "/admin/marketing",         icon: Megaphone, hide: role !== "admin" },
-    { title: t("modonStats"),      href: "/admin/modon-stats",       icon: BarChart2,  hide: role !== "admin" },
-    { title: t("users"),           href: "/admin/users",             icon: Users,     hide: role !== "admin" },
+    { title: t("modonStats"),      href: "/admin/modon-stats",       icon: ChartColumn, hide: role !== "admin" },
+    { title: t("users"),           href: "/admin/users",             icon: UsersRound, hide: role !== "admin" },
     { title: t("profitAnalysis"),  href: "/admin/profit",            icon: TrendingUp, hide: role !== "admin" },
-    { title: t("expenses"),        href: "/admin/expenses",          icon: Receipt,   hide: role !== "admin" },
+    { title: t("expenses"),        href: "/admin/expenses",          icon: ReceiptText, hide: role !== "admin" },
     { title: t("shippingSettings"),href: "/admin/shipping-settings", icon: Truck,     hide: role !== "admin" },
-    { title: t("dealSettings"),    href: "/admin/deal-settings",     icon: Flame,     hide: role !== "admin" },
+    { title: t("dealSettings"),    href: "/admin/deal-settings",     icon: BadgePercent, hide: role !== "admin" },
     { title: t("siteSettings"),    href: "/admin/site-settings",     icon: Settings,  hide: role !== "admin" },
   ];
 
@@ -58,7 +58,7 @@ const MainNav = ({
                 : "text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
-            <Icon className="w-3.5 h-3.5 shrink-0" />
+            <Icon aria-hidden="true" className="w-3.5 h-3.5 shrink-0" />
             {item.title}
           </Link>
         );

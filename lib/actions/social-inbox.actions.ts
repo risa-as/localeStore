@@ -19,7 +19,8 @@ import { z } from "zod";
 import { insertOrderSchema } from "@/lib/validators";
 import { iraqGovernorates } from "@/lib/constants";
 import { extractInboxOrder, digits, SOCIAL_ORDER_NAME } from "@/lib/meta/inbox-order";
-import { submitQuickOrder } from "@/lib/orders/quick-order";
+import { submitQuickOrder, submitQuickOrderItems } from "@/lib/orders/quick-order";
+import { quickOrderCustomerSchema, quickOrderLinesSchema, type QuickOrderLine } from "@/lib/orders/quick-order-input";
 import { revalidatePath } from "next/cache";
 import { applyInboxDelivery } from "@/lib/meta/inbox-delivery-storage";
 import { selectedOrderValue } from "@/lib/meta/inbox-workflow";
@@ -155,20 +156,22 @@ export async function prepareSocialInboxOrder(input: { pageId: string; platform:
 }
 
 export async function approveSocialInboxOrder(input: {
-  pageId: string; platform: SocialPlatform; handle: string; requestId: string; productId: string;
-  phoneNumber: string; governorate: string; address: string; quantity: number; selectedColor?: string | null; source?: OrderSource;
-}) {
+  pageId: string; platform: SocialPlatform; handle: string; requestId: string;
+  phoneNumber: string; governorate: string; address: string; source?: OrderSource;
+} & ({ items: QuickOrderLine[] } | { productId: string; quantity: number; selectedColor?: string | null })) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
     const conversationId = sourceConversation(ctx, input.handle, input.source);
     const requestId = z.string().uuid().parse(input.requestId);
-    const productId = z.string().uuid().parse(input.productId);
-    const data = insertOrderSchema.parse({ ...input, fullName: SOCIAL_ORDER_NAME,
+    const data = quickOrderCustomerSchema.parse({ ...input, fullName: SOCIAL_ORDER_NAME,
       phoneNumber: input.phoneNumber.trim(), address: input.address.trim() });
     if (!iraqGovernorates.includes(data.governorate)) throw new Error("اختر محافظة توصيل صحيحة");
     const requestKey = createHash("sha256").update(JSON.stringify([ctx.pageId, ctx.platform, conversationId, requestId])).digest("hex");
-    const result = await submitQuickOrder(data, productId, { canMerge: async () => true,
-      receipt: { requestKey, pageId: ctx.pageId, platform: ctx.platform, conversationId, createdBy: ctx.userId } });
+    const options = { canMerge: async () => true,
+      receipt: { requestKey, pageId: ctx.pageId, platform: ctx.platform, conversationId, createdBy: ctx.userId } };
+    const result = "items" in input
+      ? await submitQuickOrderItems(data, quickOrderLinesSchema.parse(input.items), options)
+      : await submitQuickOrder(insertOrderSchema.parse({ ...input, ...data }), z.string().uuid().parse(input.productId), options);
     // The commit already succeeded; cache invalidation must never make it appear to fail.
     try { revalidatePath("/[locale]/admin/orders", "page"); } catch { /* Manual refresh remains available. */ }
     return result;

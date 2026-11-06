@@ -4,6 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -17,10 +26,10 @@ import {
   ArrowRight,
   Check,
   CheckCheck,
+  ChevronDown,
   Clock,
   FileText,
   Image as ImageIcon,
-  Inbox,
   Loader2,
   MapPin,
   MessageCircle,
@@ -28,12 +37,11 @@ import {
   Search,
   Send,
   TriangleAlert,
-  Undo2,
   User,
   X,
 } from "lucide-react";
 import { inboxOrderLookupHref } from "@/lib/meta/inbox-workflow";
-import type { WaConversationFilter } from "@/lib/whatsapp-inbox-filters";
+import { WA_INBOX_PAGE_SIZE, type WaConversationFilter } from "@/lib/whatsapp-inbox-filters";
 
 type Conversation = {
   id: string;
@@ -83,6 +91,11 @@ type InboxData = Awaited<ReturnType<typeof getWaInbox>>;
 
 /** محادثات أُرسل لها قالب معيّن — يُفلتر على الخادم */
 type TemplateFilter = "all" | "confirmation" | "returned";
+const templateLabels = {
+  all: "كل القوالب",
+  confirmation: "تأكيد الطلب",
+  returned: "الطلب الراجع",
+} satisfies Record<TemplateFilter, string>;
 
 function formatTime(iso: string) {
   return new Date(iso).toLocaleTimeString("ar-IQ", {
@@ -285,7 +298,12 @@ const ChatsClient = ({
   const [templateCounts, setTemplateCounts] = useState(initialInbox.templateCounts);
   const [counts, setCounts] = useState(initialInbox.counts);
   const [listLoading, setListLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreError, setLoadMoreError] = useState(false);
+  const listLimit = useRef(WA_INBOX_PAGE_SIZE);
+  const listScrollRef = useRef<HTMLDivElement>(null);
   const listRequestId = useRef(0);
+  const loadMoreRequestId = useRef<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedIdRef = useRef<string | null>(null);
   const threadRequestId = useRef(0);
@@ -303,53 +321,80 @@ const ChatsClient = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // تحديث قائمة المحادثات دورياً
-  const refreshList = useCallback(async () => {
-    if (document.visibilityState !== "visible") return;
+  const refreshList = useCallback(async (loadMore = false) => {
+    if (document.visibilityState !== "visible" || loadMoreRequestId.current !== null) return;
     // ردّ متأخر لبحث/فلتر سابق يجب ألا يكتب فوق نتيجة الفلتر الحالي
     const requestId = ++listRequestId.current;
+    const limit = listLimit.current + (loadMore ? WA_INBOX_PAGE_SIZE : 0);
+    if (loadMore) {
+      loadMoreRequestId.current = requestId;
+      setLoadingMore(true);
+      setLoadMoreError(false);
+    }
     try {
       const data = await getWaInbox(
         query || undefined,
         templateFilter === "all" ? undefined : templateFilter,
         filter,
+        limit,
       );
       if (requestId !== listRequestId.current) return;
+      listLimit.current = limit;
       setConversations(data.conversations);
       setTemplateCounts(data.templateCounts);
       setCounts(data.counts);
       setListLoading(false);
     } catch {
-      /* تجاهل أخطاء الشبكة العابرة أثناء الاستعلام الدوري */
+      if (loadMore && requestId === listRequestId.current) setLoadMoreError(true);
+    } finally {
+      if (loadMoreRequestId.current === requestId) {
+        loadMoreRequestId.current = null;
+        setLoadingMore(false);
+      }
     }
   }, [query, templateFilter, filter]);
 
+  const resetList = () => {
+    ++listRequestId.current;
+    loadMoreRequestId.current = null;
+    listLimit.current = WA_INBOX_PAGE_SIZE;
+    listScrollRef.current?.scrollTo({ top: 0 });
+    setLoadingMore(false);
+    setLoadMoreError(false);
+    setListLoading(true);
+  };
+
   const changeFilter = (value: WaConversationFilter) => {
     if (value === filter) return;
-    ++listRequestId.current;
-    setListLoading(true);
+    resetList();
     setFilter(value);
   };
 
   const changeQuery = (value: string) => {
-    ++listRequestId.current;
-    setListLoading(true);
+    if (value === query) return;
+    resetList();
     setQuery(value);
   };
 
   const changeTemplateFilter = (value: TemplateFilter) => {
     if (value === templateFilter) return;
-    ++listRequestId.current;
-    setListLoading(true);
+    resetList();
     setTemplateFilter(value);
   };
 
   useEffect(() => {
     // جلب أولي مؤجل (يعمل أيضاً كتأخير بسيط أثناء الكتابة في البحث)
-    const kickoff = setTimeout(refreshList, 300);
-    const interval = setInterval(refreshList, LIST_POLL_MS);
+    let active = true;
+    async function poll() {
+      await refreshList();
+      // Keep polling a longer list without downloading thousands of rows every six seconds.
+      const interval = LIST_POLL_MS * Math.ceil(listLimit.current / (3 * WA_INBOX_PAGE_SIZE));
+      if (active) timer = setTimeout(poll, interval);
+    }
+    let timer = setTimeout(poll, 300);
     return () => {
-      clearTimeout(kickoff);
-      clearInterval(interval);
+      active = false;
+      clearTimeout(timer);
     };
   }, [refreshList]);
 
@@ -556,97 +601,96 @@ const ChatsClient = ({
             selectedId ? "hidden md:flex" : "flex"
           }`}
         >
-          <div className="space-y-2 border-b bg-muted/20 p-3">
-            <div className="relative">
-              <Search className="absolute start-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                aria-label="البحث في محادثات واتساب"
-                value={query}
-                onChange={(e) => changeQuery(e.target.value)}
-                placeholder="بحث بالاسم أو الرقم..."
-                className="ps-8 h-9"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => changeQuery("")}
-                  className="absolute end-2 top-1/2 -translate-y-1/2 rounded-[10px] p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  aria-label="مسح البحث"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
+          <div className="shrink-0 space-y-2 border-b bg-card p-2.5">
+            <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+              <div className="relative min-w-0">
+                <Search aria-hidden="true" className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  aria-label="البحث في محادثات واتساب"
+                  value={query}
+                  onChange={(e) => changeQuery(e.target.value)}
+                  placeholder="الاسم أو الرقم"
+                  className={`h-9 bg-muted/35 ps-8 text-sm leading-relaxed shadow-none md:leading-relaxed ${query ? "pe-8" : "pe-2"}`}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => changeQuery("")}
+                    className="absolute end-1 top-1/2 grid size-7 -translate-y-1/2 place-items-center text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="مسح البحث"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+              <DropdownMenu dir="rtl">
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`فلتر قالب الرسالة، ${templateLabels[templateFilter]}`}
+                    className={`h-9 gap-1 px-2.5 leading-relaxed shadow-none [&_svg]:size-3.5 ${templateFilter === "all" ? "bg-muted/35" : "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"}`}
+                  >
+                    {templateLabels[templateFilter]}
+                    <ChevronDown aria-hidden="true" className="opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 rounded-[10px] p-1.5">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">قالب الرسالة</DropdownMenuLabel>
+                  <DropdownMenuRadioGroup aria-label="قالب الرسالة" value={templateFilter}>
+                    {(["all", "confirmation", "returned"] as const).map((value) => (
+                      <DropdownMenuRadioItem
+                        key={value}
+                        value={value}
+                        onSelect={() => changeTemplateFilter(value)}
+                        className="gap-2 rounded-[10px] leading-relaxed data-[state=checked]:bg-emerald-500/10 data-[state=checked]:text-emerald-800 dark:data-[state=checked]:text-emerald-300"
+                      >
+                        <span>{templateLabels[value]}</span>
+                        {value !== "all" && templateCounts?.[value] != null && (
+                          <span className="ms-auto rounded-md bg-muted px-1.5 text-xs leading-relaxed tabular-nums text-muted-foreground">{templateCounts[value]}</span>
+                        )}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                  <DropdownMenuSeparator />
+                  <p className="px-2 py-1 text-xs leading-relaxed text-muted-foreground">
+                    تُعرض النتائج المطابقة من الأحدث إلى الأقدم. لتحميل المزيد، انتقل إلى نهاية القائمة.
+                  </p>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <div className="flex flex-wrap gap-1" role="group" aria-label="فلتر حالة المحادثة">
-              {(
-                [
-                  ["all", "الكل", counts.all],
-                  [
-                    "unread",
-                    "غير المقروءة",
-                    counts.unread,
-                  ],
-                  ["open", "الرد متاح", counts.open],
-                  [
-                    "closed",
-                    "النافذة منتهية",
-                    counts.closed,
-                  ],
-                ] as const
-              ).map(([value, label, count]) => (
+            <div className="grid grid-cols-4 gap-0.5 rounded-[10px] border bg-muted/50 p-0.5" role="group" aria-label="فلتر حالة المحادثة">
+              {([
+                ["all", "الكل", "الكل"],
+                ["unread", "غير مقروءة", "غير المقروءة"],
+                ["open", "الرد متاح", "الرد متاح"],
+                ["closed", "منتهية", "النافذة منتهية"],
+              ] as const).map(([value, label, fullLabel]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => changeFilter(value)}
                   aria-pressed={filter === value}
-                  className={`shrink-0 rounded-[10px] border px-2 py-1.5 text-[11px] font-medium transition ${filter === value ? "border-emerald-600 bg-emerald-600 text-white" : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                  aria-label={`${fullLabel} (${counts[value]})`}
+                  className={`grid min-w-0 justify-items-center border px-0.5 py-0.5 text-center text-[11px] font-medium leading-[1.6] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${filter === value ? "border-emerald-600/30 bg-background text-emerald-800 shadow-sm dark:text-emerald-300" : "border-transparent text-muted-foreground hover:bg-background/70 hover:text-foreground"}`}
                 >
-                  {label} <span className="opacity-80">({count})</span>
+                  <span>{label}</span>
+                  <bdi className={`tabular-nums ${filter === value ? "font-bold" : "opacity-85"}`}>{counts[value]}</bdi>
                 </button>
               ))}
             </div>
-            <div className="flex flex-wrap items-center gap-1" role="group" aria-label="فلتر قالب الرسالة">
-              <span className="shrink-0 text-[11px] font-semibold text-muted-foreground">
-                القالب:
+            <div className="flex items-center justify-between gap-2 px-0.5 text-[11px] leading-relaxed text-muted-foreground">
+              <span aria-live="polite" className="inline-flex items-center gap-1 tabular-nums">
+                {(listLoading || loadingMore) && <Loader2 aria-hidden="true" className="size-3 animate-spin" />}
+                {visibleConversations.length === counts[filter] ? `${counts[filter]} نتيجة` : `${visibleConversations.length} من ${counts[filter]} نتيجة`}
               </span>
-              {(
-                [
-                  ["all", "الكل", null, null],
-                  [
-                    "confirmation",
-                    "تأكيد الطلب",
-                    Package,
-                    templateCounts?.confirmation,
-                  ],
-                  ["returned", "الطلب الراجع", Undo2, templateCounts?.returned],
-                ] as const
-              ).map(([value, label, Icon, count]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => changeTemplateFilter(value)}
-                  aria-pressed={templateFilter === value}
-                  className={`inline-flex shrink-0 items-center gap-1 rounded-[10px] border px-2 py-1.5 text-[11px] font-medium transition ${templateFilter === value ? "border-sky-600 bg-sky-600 text-white" : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground"}`}
-                >
-                  {Icon && <Icon className="h-3 w-3" />}
-                  {label}
-                  {count != null && <span className="opacity-80">({count})</span>}
-                </button>
-              ))}
+              <span>الأحدث أولاً</span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Inbox className="h-3.5 w-3.5" /> الأحدث أولاً
-              </span>
-              <span className="inline-flex items-center gap-1">
-                {listLoading && <Loader2 className="h-3 w-3 animate-spin" />}
-                {visibleConversations.length} من {counts[filter]} نتيجة
-                {counts[filter] > conversations.length && " (الأحدث)"}
-              </span>
-            </div>
-            <p className="text-[10px] leading-5 text-muted-foreground">الأعداد تشمل كل المحادثات المطابقة للبحث والقالب؛ تُعرض أحدث 100 نتيجة بعد تطبيق فلتر الحالة.</p>
           </div>
           <div
+            ref={listScrollRef}
+            aria-busy={listLoading || loadingMore}
             className={`flex-1 overflow-y-auto transition-opacity ${listLoading ? "pointer-events-none opacity-40" : ""}`}
           >
             {!listLoading && visibleConversations.length === 0 && (
@@ -660,7 +704,7 @@ const ChatsClient = ({
                 onClick={() => openConversation(c.id)}
                 aria-pressed={selectedId === c.id}
                 className={`w-full text-start px-3 py-3 border-b border-s-2 flex items-start gap-3 hover:bg-muted/60 transition-colors ${
-                  selectedId === c.id ? "bg-emerald-50/70 border-s-emerald-600 dark:bg-emerald-950/20" : "border-s-transparent"
+                  selectedId === c.id ? "!rounded-s-none bg-emerald-50/70 border-s-emerald-600 dark:bg-emerald-950/20" : "border-s-transparent"
                 }`}
               >
                 <div
@@ -698,6 +742,22 @@ const ChatsClient = ({
                 </div>
               </button>
             ))}
+            {!listLoading && visibleConversations.length < counts[filter] && (
+              <div className="space-y-1.5 p-2.5">
+                {loadMoreError && <p role="alert" className="text-center text-xs leading-relaxed text-destructive">تعذر تحميل المزيد. أعد المحاولة.</p>}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="w-full leading-relaxed shadow-none"
+                  disabled={loadingMore}
+                  onClick={() => void refreshList(true)}
+                >
+                  {loadingMore ? <Loader2 aria-hidden="true" className="animate-spin" /> : <ChevronDown aria-hidden="true" />}
+                  {loadingMore ? "جارٍ التحميل…" : "عرض المزيد"}
+                </Button>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -833,6 +893,7 @@ const ChatsClient = ({
                         type="button"
                         size="icon"
                         variant="outline"
+                        className="size-11 shrink-0"
                         disabled={sending}
                         onClick={() => fileInputRef.current?.click()}
                         aria-label="إرفاق صورة"
@@ -848,12 +909,13 @@ const ChatsClient = ({
                             ? "أضف تعليقاً (اختياري)..."
                             : "اكتب ردك هنا..."
                         }
-                        className="flex-1 min-w-0"
+                        className="h-11 min-w-0 flex-1 py-1 leading-[1.75] md:leading-[1.75]"
                         autoComplete="off"
                       />
                       <Button
                         type="submit"
                         size="icon"
+                        className="size-11 shrink-0"
                         aria-label="إرسال رد واتساب"
                         disabled={sending || (!replyText.trim() && !imageFile)}
                       >

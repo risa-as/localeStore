@@ -7,7 +7,7 @@ import {
 import ChatsClient from "./chats-client";
 
 export const metadata: Metadata = {
-  title: "المحادثات",
+  title: "رسائل قوالب ميتا",
 };
 
 const AdminChatsPage = async ({ searchParams }: {

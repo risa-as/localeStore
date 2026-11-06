@@ -73,6 +73,12 @@ async function main() {
     assert.equal(all.counts.unread, 18);
     assert.equal(all.counts.open, 18);
     assert.equal(all.counts.closed, 113);
+    const expanded = await getWaInbox(undefined, undefined, 'all', 200);
+    assert.equal(expanded.conversations.length, 131);
+    assert.equal(new Set(expanded.conversations.map(c => c.id)).size, 131);
+    assert.deepEqual(expanded.conversations.slice(0, 100), all.conversations);
+    assert.equal(expanded.conversations[100].id, 'c100');
+    assert.equal((await getWaInbox(undefined, undefined, 'all', -100)).conversations.length, 100);
     const unread = await getWaInbox(undefined, undefined, 'unread');
     assert.equal(unread.conversations.length, 18);
     assert(unread.conversations.some(c => c.id === 'c110'));
@@ -88,6 +94,10 @@ async function main() {
     assert.equal(closed.counts.closed, 113);
     assert.equal(closed.conversations.length, 100);
     assert(closed.conversations.some(c => c.id === 'c7'));
+    const closedExpanded = await getWaInbox(undefined, undefined, 'closed', 200);
+    assert.equal(closedExpanded.conversations.length, 113);
+    assert.deepEqual(closedExpanded.conversations.slice(0, 100), closed.conversations);
+    assert(closedExpanded.conversations.every(c => c.windowExpiresAt === null || new Date(c.windowExpiresAt) <= now));
     const template = await getWaInbox(undefined, 'returned', 'unread');
     assert.equal(template.conversations.length, 2); // Count conversations, even after multiple templates.
     assert.equal(template.counts.all, 2);

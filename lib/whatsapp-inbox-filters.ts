@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
+export const WA_INBOX_PAGE_SIZE = 100;
+
 // Both the follow-up summary and inbox count conversations, not individual messages.
 export const WA_UNREAD_CONVERSATIONS = { unreadCount: { gt: 0 } } satisfies Prisma.WaConversationWhereInput;
 export type WaConversationFilter = "all" | "unread" | "open" | "closed";
