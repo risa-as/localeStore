@@ -396,6 +396,24 @@ export async function listPageAdPostIds(pageId: string, userToken: string, adAcc
   return ids;
 }
 
+/** Graph v26 removed `ids`; a batch of GET requests still supports up to 50 posts. */
+async function readFacebookPostBatch<T extends { id: string }>(ctx: InboxContext, ids: string[], fields: string): Promise<Record<string, T>> {
+  const responses = await graphPost<{ code: number; body: string }[]>("", ctx.token, {
+    batch: ids.map(id => ({ method: "GET", relative_url: `${path(id)}?${new URLSearchParams({ fields })}` })),
+  });
+  if (!Array.isArray(responses) || responses.length !== ids.length) throw new Error("تعذر إكمال قراءة منشورات Meta");
+  const posts: Record<string, T> = {};
+  for (const response of responses) {
+    const body = JSON.parse(response.body);
+    if (response.code >= 200 && response.code < 300) {
+      if (typeof body.id === "string") posts[body.id] = body;
+    } else if (body.error?.code !== 803 && !(body.error?.code === 100 && body.error?.error_subcode === 33)) {
+      throw new GraphError(response.code, body.error?.message || "تعذر قراءة منشور Meta", body.error?.code);
+    }
+  }
+  return posts;
+}
+
 async function listFacebookPostsByActivity(ctx: InboxContext, after?: string, adPostIds: string[] = []): Promise<InboxPage> {
   const offset = after ? Number(after.match(/^offset:(\d{1,4})$/)?.[1] ?? NaN) : 0;
   if (!Number.isInteger(offset) || offset < 0) throw new Error("مؤشر غير صالح");
@@ -414,12 +432,12 @@ async function listFacebookPostsByActivity(ctx: InboxContext, after?: string, ad
       } while (cursor && found.length < MAX_SCANNED_POSTS);
       return found;
     };
-    // Ad posts: fetch their activity time 50 at a time (the `ids` limit).
+    // Fetch ad-post activity in batches of at most 50 GET requests.
     const scanAds = async () => {
       const ids = adPostIds.filter(id => id.startsWith(`${ctx.pageId}_`)).slice(0, MAX_SCANNED_POSTS);
       const chunks = Array.from({ length: Math.ceil(ids.length / 50) }, (_, i) => ids.slice(i * 50, i * 50 + 50));
-      const pages = await Promise.allSettled(chunks.map(chunk => graphGet<Record<string, { id: string; updated_time?: string; created_time?: string }>>(
-        "", ctx.token, { ids: chunk.join(","), fields: "id,updated_time,created_time" })));
+      const pages = await Promise.allSettled(chunks.map(chunk => readFacebookPostBatch<{ id: string; updated_time?: string; created_time?: string }>(
+        ctx, chunk, "id,updated_time,created_time")));
       return pages.flatMap(page => page.status === "fulfilled" ? Object.values(page.value) : [])
         .map(post => ({ id: post.id, updated: stamp(post) }));
     };
@@ -431,9 +449,9 @@ async function listFacebookPostsByActivity(ctx: InboxContext, after?: string, ad
   if (!slice.length) return { items: [], after: null };
   type Detail = { id: string; message?: string; created_time?: string; permalink_url?: string;
     comments?: { data?: (Comment & { from?: Person })[]; summary?: { total_count?: number } } };
-  const details = await graphGet<Record<string, Detail>>("", ctx.token, { ids: slice.map(post => post.id).join(","),
+  const details = await readFacebookPostBatch<Detail>(ctx, slice.map(post => post.id),
     // `stream` includes replies, so a Page reply under a comment counts as answered.
-    fields: "id,message,created_time,permalink_url,comments.filter(stream).order(reverse_chronological).limit(1).summary(true){id,message,from,created_time}" });
+    "id,message,created_time,permalink_url,comments.filter(stream).order(reverse_chronological).limit(1).summary(true){id,message,from,created_time}");
   const items = slice.flatMap(({ id, updated }) => {
     const post = details[id];
     const latest = post?.comments?.data?.[0];
