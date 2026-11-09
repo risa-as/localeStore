@@ -253,34 +253,17 @@ async function attempt<T>(fn: () => Promise<T>) {
       : err.code === 190 ? "انتهت صلاحية الاتصال بـ Meta؛ أعد الربط من التسويق"
       : err.code === 551 ? `تعذّر الرد على هذه المحادثة عبر تطبيق Meta (551${err.subcode ? `/${err.subcode}` : ""}). يمكنك متابعة الرد من Meta Business Suite؛ قد ينجح هناك مع استمرار رفض الإرسال عبر التطبيق. الرمز وحده لا يثبت أن الزبون حظر الصفحة. قبل إعادة الربط، افتح «الصفحة والمنصة» ثم «فحص اتصال المراسلة». إذا فشل مع معظم الزبائن، راجع وضع التطبيق وصلاحيات المراسلة.${err.traceId && /^[A-Za-z0-9_-]{1,150}$/.test(err.traceId) ? ` مرجع دعم Meta: ${err.traceId}` : ""}`
       : [10, 200].includes(err.code ?? 0) ? "Meta رفضت الوصول: راجع أذونات الرسائل/التعليقات وموافقة التطبيق وصلاحيات الصفحة"
-      : `تعذر إكمال الطلب لدى Meta (رمز ${err.code ?? err.status}). راجع إعدادات الاتصال ثم أعد التحديث.`
+      : `تعذر إكمال الطلب لدى Meta (رمز ${err.code ?? err.status}${err.subcode ? `/${err.subcode}` : ""}). أعد التحديث.`
       : err instanceof Error ? err.message : "تعذر إكمال الطلب";
     return { ok: false as const, message, uncertain: (err instanceof GraphError && !!err.outcomeUnknown) || message.includes("لم تؤكد Meta") };
   }
 }
 
-/**
- * With Standard Access, Meta lists Instagram conversations only for people who
- * have a role on the app. A busy inbox makes the call fail: code 1 ("reduce the
- * amount of data") or code -2 / subcode 2534084 (timeout). Comments still work.
- */
-function isInstagramInboxTooLarge(error: unknown) {
-  return error instanceof GraphError && (error.code === 1 || error.subcode === 2534084 || error.code === -2);
-}
-
-const INSTAGRAM_INBOX_LIMITED = "رسائل إنستغرام غير متاحة بعد: Meta لا تسمح بجلب صندوق رسائل كبير إلا بعد منح التطبيق «الوصول المتقدم» لإذن instagram_manage_messages (عبر مراجعة التطبيق في Meta). التعليقات تعمل من تبويب «التعليقات»، والرسائل متاحة حالياً من تطبيق إنستغرام أو Business Suite.";
-
 export async function getSocialInboxList(input: { pageId: string; platform: SocialPlatform; kind: "messages" | "comments"; after?: string }) {
   return attempt(async () => {
     const ctx = await context(input.pageId, input.platform);
     if (input.kind !== "messages" && input.kind !== "comments") throw new Error("قسم غير صالح");
-    if (input.kind === "messages") {
-      try { return applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after)); }
-      catch (error) {
-        if (ctx.platform === "instagram" && isInstagramInboxTooLarge(error)) throw new Error(INSTAGRAM_INBOX_LIMITED);
-        throw error;
-      }
-    }
+    if (input.kind === "messages") return applyInboxReceipts(ctx, await listInboxConversations(ctx, input.after));
     return listInboxPosts(ctx, input.after, ctx.platform === "facebook" ? await adPostIds(ctx.pageId) : undefined);
   });
 }

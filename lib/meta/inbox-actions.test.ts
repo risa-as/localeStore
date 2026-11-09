@@ -388,12 +388,25 @@ it("returns a handle for each public comment reply so the admin can delete it la
   expect(quick.ok && "publicHandle" in quick.data && resourceId(ctx, "comment", quick.data.publicHandle as string)).toBe("reply2");
 });
 
-it("explains that Meta limits the Instagram inbox instead of showing a bare error code", async () => {
+it("retries an Instagram inbox timeout with a smaller page and preserves Meta's error if it still fails", async () => {
   find.mockResolvedValue({ userAccessToken: "PRIVATE_USER", pages: [{ id: "page1", name: "Page", access_token: "PRIVATE_PAGE",
     instagram_business_account: { id: "ig1" } }] } as never);
-  jest.mocked(graphGet).mockRejectedValueOnce(Object.assign(new GraphError(500, "reduce data"), { code: 1, status: 500 }));
-  const result = await getSocialInboxList({ pageId: "page1", platform: "instagram", kind: "messages" });
-  expect(result).toMatchObject({ ok: false, message: expect.stringContaining("الوصول المتقدم") });
-  jest.mocked(graphGet).mockRejectedValueOnce(Object.assign(new GraphError(400, "timeout"), { code: -2, subcode: 2534084, status: 400 }));
-  expect(await getSocialInboxList({ pageId: "page1", platform: "instagram", kind: "messages" })).toMatchObject({ ok: false, message: expect.stringContaining("instagram_manage_messages") });
+  const graph = jest.mocked(graphGet);
+  const reduce = Object.assign(new GraphError(500, "reduce data"), { code: 1, status: 500 });
+  const timeout = Object.assign(new GraphError(400, "timeout"), { code: -2, subcode: 2534084, status: 400 });
+  const input = { pageId: "page1", platform: "instagram", kind: "messages", after: "previous" } as const;
+
+  graph.mockRejectedValueOnce(reduce).mockResolvedValueOnce({
+    data: [{ id: "ig-conversation" }],
+    paging: { next: "next-page", cursors: { after: "following" } },
+  });
+  expect(await getSocialInboxList(input)).toMatchObject({
+    ok: true, data: { items: [{ id: "ig-conversation" }], after: "following" },
+  });
+  expect(graph.mock.calls[0]?.[2]).toMatchObject({ limit: "50", after: "previous" });
+  expect(graph.mock.calls[1]?.[2]).toEqual({ ...graph.mock.calls[0]?.[2], limit: "5" });
+
+  graph.mockRejectedValueOnce(reduce).mockRejectedValueOnce(timeout);
+  expect(await getSocialInboxList(input)).toMatchObject({ ok: false, message: expect.stringContaining("-2/2534084") });
+  expect(graph).toHaveBeenCalledTimes(4);
 });

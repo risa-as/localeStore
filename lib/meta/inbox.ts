@@ -202,11 +202,20 @@ async function resolveInboxReply(ctx: InboxContext, messages: Message[]) {
 const messageFields = (ctx: InboxContext) => `id,message,from,created_time,attachments${ctx.platform === "facebook" ? ",sticker" : ""}`;
 
 export async function listInboxConversations(ctx: InboxContext, after?: string): Promise<InboxPage> {
-  const res = await graphGet<GraphPage<{ id: string; updated_time?: string;
+  const query = params(after);
+  const load = (limit = query.limit) => graphGet<GraphPage<{ id: string; updated_time?: string;
     participants?: { data?: Person[] }; unread_count?: number; messages?: { data?: Message[] } }>>(
-    `${path(ctx.pageId)}/conversations`, ctx.token, { ...params(after),
+    `${path(ctx.pageId)}/conversations`, ctx.token, { ...query, limit,
       platform: ctx.platform === "instagram" ? "instagram" : "messenger",
       fields: `id,updated_time,participants,messages.limit(1){${messageFields(ctx)}}${ctx.platform === "facebook" ? ",unread_count" : ""}` });
+  const res = await load().catch((error: unknown) => {
+    // Meta may ask for less data or time out while expanding the message previews.
+    if (ctx.platform === "instagram" && error instanceof GraphError &&
+        (error.code === 1 || error.code === -2 || error.subcode === 2534084)) {
+      return load("5");
+    }
+    throw error;
+  });
   return { items: (res.data ?? []).map(c => {
     const peer = c.participants?.data?.find(p => !own(ctx, p.id));
     const last = c.messages?.data?.[0];
